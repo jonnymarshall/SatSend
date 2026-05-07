@@ -71,6 +71,41 @@ describe("InvoiceForm access code", () => {
   });
 });
 
+describe("InvoiceForm bitcoin-only (v1.4.14)", () => {
+  it("does not render an Accept Bitcoin checkbox", () => {
+    render(<InvoiceForm />);
+    expect(
+      screen.queryByRole("checkbox", { name: /accept bitcoin/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("always renders the BTC address input by default", () => {
+    render(<InvoiceForm />);
+    expect(screen.getByPlaceholderText(/bc1q/i)).toBeInTheDocument();
+  });
+
+  it("saves a draft without a BTC address", async () => {
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.click(
+      screen.getByRole("button", { name: /save (draft|as draft)/i }),
+    );
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks publish when btc_address is empty and surfaces an error", async () => {
+    const { publishInvoice } = await import("@/app/(dashboard)/invoices/actions");
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.click(screen.getByRole("button", { name: /^publish/i }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /publish only/i }),
+    );
+    expect(screen.getByText(/btc address.*required/i)).toBeInTheDocument();
+    expect(publishInvoice).not.toHaveBeenCalled();
+  });
+});
+
 describe("InvoiceForm BTC address validation", () => {
   async function choosePublishOnly(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole("button", { name: /^publish/i }));
@@ -81,7 +116,6 @@ describe("InvoiceForm BTC address validation", () => {
     const user = userEvent.setup();
     render(<InvoiceForm />);
 
-    await user.click(screen.getByRole("checkbox", { name: /accept bitcoin/i }));
     const btcInput = screen.getByPlaceholderText(/bc1q/i);
     await user.type(btcInput, "notavalidaddress");
     await choosePublishOnly(user);
@@ -93,7 +127,6 @@ describe("InvoiceForm BTC address validation", () => {
     const user = userEvent.setup();
     render(<InvoiceForm />);
 
-    await user.click(screen.getByRole("checkbox", { name: /accept bitcoin/i }));
     const btcInput = screen.getByPlaceholderText(/bc1q/i);
     await user.type(btcInput, "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
     await choosePublishOnly(user);

@@ -31,7 +31,6 @@ const VALID_DRAFT = {
   client_email: "acme@example.com",
   line_items: [{ description: "Work", quantity: 1, unit_price: 1000 }],
   tax_percent: 0,
-  accepts_bitcoin: true,
   btc_address: "bc1qtest",
   due_date: "2026-06-01",
 };
@@ -138,15 +137,6 @@ describe("saveDraft", () => {
     await saveDraft({ ...VALID_DRAFT, btc_address: undefined });
     expect(addressHasHistory).not.toHaveBeenCalled();
     expect(insertSingle).toHaveBeenCalled();
-  });
-
-  it("validates btc_address whenever it is set, regardless of legacy accepts_bitcoin flag (v1.4.14)", async () => {
-    const { insertSingle } = makeSupabase();
-    vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
-    await expect(
-      saveDraft({ ...VALID_DRAFT, accepts_bitcoin: false }),
-    ).rejects.toThrow(/already received transactions/i);
-    expect(insertSingle).not.toHaveBeenCalled();
   });
 
   it("rejects when the BTC address is already used on another non-draft invoice in the user's account (v1.4.13.6)", async () => {

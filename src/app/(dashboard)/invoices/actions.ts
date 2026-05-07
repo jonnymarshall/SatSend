@@ -70,7 +70,6 @@ export interface InvoicePayload {
   client_tax_id?: string;
   line_items: LineItem[];
   tax_percent: number;
-  accepts_bitcoin: boolean;
   btc_address?: string;
   due_date?: string;
   access_code?: string;
