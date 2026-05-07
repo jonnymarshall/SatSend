@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import { computeInvoiceTotals, LineItem } from "@/lib/invoices";
+import { canPublishInvoice } from "@/lib/invoices/can-publish";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
@@ -209,15 +210,17 @@ async function loadAndAuthorise(invoiceId: string): Promise<{
   if (fetchError || !invoice) throw new Error("Invoice not found");
   if (invoice.user_id !== user!.id) throw new Error("Forbidden");
 
-  // Only check BTC validity and uniqueness if bitcoin is enabled and address is provided
-  if (invoice.accepts_bitcoin && invoice.btc_address) {
-    if (!isValidBtcAddress(invoice.btc_address)) {
-      throw new Error("btc_address: Invalid BTC address");
+  // v1.4.14: every publish requires a valid btc_address (bitcoin-only).
+  const check = canPublishInvoice({ btc_address: invoice.btc_address });
+  if (!check.ok) {
+    if (check.error === "btc_address_required") {
+      throw new Error("btc_address: A bitcoin address is required to publish");
     }
-
-    await assertAddressUniqueness(supabase, invoice.btc_address, invoiceId);
-    await assertAddressFreshness(invoice.btc_address, invoice.id);
+    throw new Error("btc_address: Invalid BTC address");
   }
+
+  await assertAddressUniqueness(supabase, invoice.btc_address, invoiceId);
+  await assertAddressFreshness(invoice.btc_address, invoice.id);
 
   return { supabase, invoice: invoice as Invoice };
 }

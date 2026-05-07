@@ -260,6 +260,17 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
   });
 });
 
+describe("publishInvoice — btc_address publish-gate (v1.4.14)", () => {
+  it("rejects when the invoice has no btc_address", async () => {
+    const noAddress = { ...PUBLISHABLE_INVOICE, btc_address: null };
+    const { updateChain } = makeSupabase({ fetchData: noAddress });
+    await expect(publishInvoice("inv-1")).rejects.toThrow(
+      /btc_address.*required/i,
+    );
+    expect(updateChain).not.toHaveBeenCalled();
+  });
+});
+
 describe("publishInvoice (publish-only, no email)", () => {
   it("sets status=pending without firing the invoice_published email", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
