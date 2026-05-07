@@ -1119,12 +1119,10 @@ When a payment is detected on the public invoice page (`src/app/invoice/[id]/`),
 5. **PDF: no structural change.**
    - Fiat totals continue to lead the document (unit of account). Bitcoin payment block stays in its current position. This is intentional; PDFs are downloaded once and shown later, often when no live BTC quote is available, so leading with fiat is correct.
 
-6. **Marketing / landing copy.**
-   - Wherever the product is described to a non-user (landing page, README, meta description, future marketing site), reframe positioning as "bitcoin-only invoicing". This is a feature, not a limitation.
-   - Specifically check: `src/app/layout.tsx` metadata, `README.md`, OpenGraph descriptions, any marketing copy already in the codebase.
-
-7. **Status / activity copy stays generic.**
+6. **Status / activity copy stays generic.**
    - "Awaiting payment" continues to render as-is; no need to qualify with "Bitcoin" since bitcoin is the only payment option. Shorter, cleaner.
+
+> **Marketing / landing copy is OUT of scope for v1.4.14.** The bitcoin-only positioning needs to land on a real marketing page that does not yet exist. Tracked as a separate entry (v1.4.23 below). This branch limits itself to in-app and in-product changes.
 
 **Schema migrations**
 
@@ -1166,7 +1164,7 @@ Backfill: audit existing rows for any `status != 'draft' and btc_address is null
 - The public payer page offers Bitcoin as the only payment method.
 - No email or in-app copy implies fiat is a payment option.
 - The per-invoice address-uniqueness guarantee from v1.4.12 is preserved.
-- Marketing-facing copy reads as bitcoin-only positioning.
+- Marketing-facing copy work is deliberately deferred to v1.4.23 (a marketing page does not yet exist; building it is a separate concern from the in-app pivot).
 
 ---
 
@@ -1465,6 +1463,39 @@ After auditing `invoice-actions.tsx` and `page.tsx` on the dashboard detail page
 - Changing the visual treatment of the Activity card itself (rendering, ordering, filtering). UX redesign is owned by v1.5 (Design System Overhaul).
 
 **Done when:** Clicking "Publish only" on a draft writes an Activity entry and the inline `invoice-actions--delivery-status` line is gone, with no other activity-card duplication remaining anywhere on `/invoices/[id]`. Tests, CHANGELOG, README, and any affected manual-test docs are updated.
+
+---
+
+### ⏳ v1.4.23 — Marketing Landing Page
+
+**Branch:** `v1.4.23/marketing-landing-page`
+
+> **Sequencing note:** Should land **after** v1.4.15 (rename to SatSend) so the page is branded correctly from the start. Should land **before** v1.5 (design-system overhaul) so the colour-scheme decision applies to the marketing page too. Slot inside the v1.4 train rather than v1.5 because the page is launch-blocking: the root URL needs to render something purposeful to first-time visitors.
+
+**Context:** The product currently has no marketing page. Hitting `/` (unauthenticated) lands users on whatever the App Router default is, which is not designed to convert. v1 launches as a bitcoin-only invoicing product and that positioning needs a real surface to live on. This branch builds that surface and propagates the same positioning to all non-app touch points (page metadata, OpenGraph, README).
+
+**Scope**
+- [ ] Build a public landing page at `/` (or wherever the unauthenticated root currently routes) for first-time visitors. Pitch: "Bitcoin-only invoicing for freelancers". Sections: hero with one-line value prop and CTA, three-to-five product highlights (publish a bitcoin invoice in seconds; live BTC/fiat conversion at view time; on-chain payment detection; no fiat rails to set up; you keep your own keys), a short "How it works" walkthrough (1-2-3 steps), and a sign-in / sign-up CTA at the bottom.
+- [ ] Authenticated users hitting `/` should redirect to `/invoices` (or the existing dashboard route), not see the marketing page. Detect via the existing auth helper.
+- [ ] Page metadata: `src/app/layout.tsx` (or per-route metadata if the marketing page has its own layout) — `title`, `description`, `openGraph.title`, `openGraph.description`, `openGraph.images`. All copy reads as bitcoin-only positioning.
+- [ ] `README.md` — top-of-file description matches the new positioning. Reuse the hero copy where appropriate.
+- [ ] OpenGraph image — generate one (Vercel OG image route is the simplest path) that includes the SatSend wordmark, a "Bitcoin-only invoicing" tagline, and a visual cue (small QR or BTC sigil). Wire it into `openGraph.images` so social previews render correctly.
+- [ ] Audit existing copy for any non-bitcoin-only positioning that survived v1.4.14: `grep -ri "accept bitcoin\|fiat payment\|pay with" src/` and any `*.md` files. Update or remove.
+- [ ] No newsletter signup, no analytics beyond what's already wired, no third-party form embeds. Keep the page tight.
+
+**Tests**
+- [ ] Page renders with no auth: hero copy is present.
+- [ ] Authenticated request to `/` redirects to the dashboard route (snapshot the redirect target).
+- [ ] Metadata snapshot: `title` and `openGraph.title` contain "SatSend" and "bitcoin".
+- [ ] Manual smoke: open the page in dev, confirm visual hierarchy and CTA functionality.
+
+**Out of scope**
+- Pricing page, blog, docs site, FAQ — none of these exist for v1 launch.
+- A/B testing infrastructure — premature. One landing page, one variant.
+- Analytics integration beyond what's already in the app.
+- Custom illustrations or paid imagery — use simple typography and subtle background treatments. Polish can land in v1.5 with the design-system overhaul.
+
+**Done when:** The unauthenticated root URL renders a purposeful landing page that pitches the product as bitcoin-only invoicing; all metadata, OpenGraph, and README copy reflect the same positioning; authenticated users skip the page; no copy anywhere in the codebase contradicts the bitcoin-only positioning.
 
 ---
 
