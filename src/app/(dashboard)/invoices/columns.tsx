@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
+import { canMarkAsUnpaid } from "@/lib/invoices/manual-confirmation";
 
 export interface InvoiceRow {
   id: string;
@@ -30,6 +31,7 @@ export interface InvoiceRow {
   email_attempted_at: string | null;
   last_publish_email_status: "queued" | "sent" | "failed" | "skipped_no_api_key" | null;
   last_publish_email_error: string | null;
+  payment_confirmation_method?: "onchain" | "manual" | null;
 }
 
 export interface RowActions {
@@ -40,6 +42,8 @@ export interface RowActions {
   onMarkPaid: (id: string) => void;
   onMarkOverdue: (id: string) => void;
   onMarkPending: (id: string) => void;
+  onConfirmMarkedAsPaid: (id: string) => void;
+  onDisputeMarkedAsPaid: (id: string) => void;
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
   onDelete: (id: string) => void;
@@ -259,9 +263,34 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                   )}
                 </>
               )}
-              {invoice.status !== "paid" && !isDraft && (
-                <DropdownMenuItem onClick={() => actions.onMarkPaid(invoice.id)}>
-                  Mark as paid
+              {invoice.status === "marked_as_paid" && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => actions.onConfirmMarkedAsPaid(invoice.id)}
+                  >
+                    Confirm payment received
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => actions.onDisputeMarkedAsPaid(invoice.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Dispute / revert
+                  </DropdownMenuItem>
+                </>
+              )}
+              {invoice.status !== "paid" &&
+                invoice.status !== "marked_as_paid" &&
+                !isDraft && (
+                  <DropdownMenuItem onClick={() => actions.onMarkPaid(invoice.id)}>
+                    Mark as paid
+                  </DropdownMenuItem>
+                )}
+              {canMarkAsUnpaid({
+                status: invoice.status,
+                payment_confirmation_method: invoice.payment_confirmation_method ?? null,
+              }) && (
+                <DropdownMenuItem onClick={() => actions.onMarkPending(invoice.id)}>
+                  Mark as unpaid
                 </DropdownMenuItem>
               )}
               {canMarkAsOverdue(invoice) && (

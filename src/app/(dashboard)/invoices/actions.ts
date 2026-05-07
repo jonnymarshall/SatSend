@@ -339,9 +339,18 @@ export async function markPaid(invoiceId: string) {
 
   if (!invoice || invoice.user_id !== user!.id) throw new Error("Invoice not found");
 
+  // v1.4.14: stamp manual confirmation fields so the Mark-as-unpaid gate keeps
+  // working — without these, the Unpaid button would disappear after the owner
+  // manually marks an invoice paid (the gate treats null as on-chain).
+  // payment_method is left null because the owner clicked a generic "Mark as
+  // paid" button without telling us how the payment arrived.
   const { error } = await supabase
     .from("invoices")
-    .update({ status: "paid" })
+    .update({
+      status: "paid",
+      payment_confirmation_method: "manual",
+      paid_at: new Date().toISOString(),
+    })
     .eq("id", invoiceId);
 
   if (error) throw new Error(error.message);
@@ -380,15 +389,31 @@ export async function markUnpaid(invoiceId: string) {
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("user_id")
+    .select("user_id, payment_confirmation_method")
     .eq("id", invoiceId)
     .single();
 
   if (!invoice || invoice.user_id !== user!.id) throw new Error("Invoice not found");
 
+  // v1.4.14: only manual confirmations can be reverted. On-chain payments
+  // would re-detect on the next cron sweep and revert our revert; the only
+  // safe path for those is to also replace the BTC address (deferred).
+  // Legacy paid invoices have a null method and are treated as on-chain
+  // (every paid invoice before this version went through on-chain detection).
+  if (invoice.payment_confirmation_method !== "manual") {
+    throw new Error(
+      "on-chain payments cannot be reverted — replace the BTC address first",
+    );
+  }
+
   const { error } = await supabase
     .from("invoices")
-    .update({ status: "pending" })
+    .update({
+      status: "pending",
+      payment_method: null,
+      payment_confirmation_method: null,
+      paid_at: null,
+    })
     .eq("id", invoiceId);
 
   if (error) throw new Error(error.message);
@@ -400,6 +425,88 @@ export async function markUnpaid(invoiceId: string) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath(`/invoices/${invoiceId}`);
+}
+
+// v1.4.14 — owner approves a payer's fiat self-report.
+// Transitions marked_as_paid → paid and stamps paid_at. payment_method and
+// payment_confirmation_method were already set by markInvoicePaidByPayer
+// (fiat / manual), so we don't touch them.
+export async function confirmMarkedAsPaid(invoiceId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice || invoice.user_id !== user!.id) throw new Error("Invoice not found");
+  if (invoice.status !== "marked_as_paid") {
+    throw new Error("Invoice is not in marked_as_paid status");
+  }
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+    })
+    .eq("id", invoiceId);
+
+  if (error) throw new Error(error.message);
+
+  await logInvoiceEvent({
+    invoiceId,
+    userId: invoice.user_id,
+    eventType: "payment_confirmed",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${invoiceId}`);
+}
+
+// v1.4.14 — owner disputes a payer's fiat self-report.
+// Transitions marked_as_paid → pending and clears the manual-payment fields
+// so the invoice is back to being payable from scratch (cron resumes its
+// poll cadence if BTC is enabled).
+export async function disputeMarkedAsPaid(invoiceId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice || invoice.user_id !== user!.id) throw new Error("Invoice not found");
+  if (invoice.status !== "marked_as_paid") {
+    throw new Error("Invoice is not in marked_as_paid status");
+  }
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      status: "pending",
+      payment_method: null,
+      payment_confirmation_method: null,
+      paid_at: null,
+    })
+    .eq("id", invoiceId);
+
+  if (error) throw new Error(error.message);
+
+  await logInvoiceEvent({
+    invoiceId,
+    userId: invoice.user_id,
+    eventType: "marked_as_unpaid",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
 }
 

@@ -85,9 +85,14 @@ export async function bulkMarkPaid(ids: string[]) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // v1.4.14: same manual-confirmation stamp as markPaid — see comment there.
   const { error } = await supabase
     .from("invoices")
-    .update({ status: "paid" })
+    .update({
+      status: "paid",
+      payment_confirmation_method: "manual",
+      paid_at: new Date().toISOString(),
+    })
     .eq("user_id", user!.id)
     .in("id", ids);
 

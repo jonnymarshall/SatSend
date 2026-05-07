@@ -8,6 +8,7 @@ import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { InvoiceDates } from "@/components/invoice-dates";
 import { PaymentWatcher } from "./payment-watcher";
 import { MarkSentButton } from "./mark-sent-button";
+import { PayFiatButton } from "./pay-fiat-button";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
@@ -235,6 +236,23 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
               status={status}
               onStatusChange={setStatus}
               showButton={showPaymentDetails}
+            />
+          </div>
+        )}
+
+        {/* Fiat payment — v1.4.14. Visible whenever the invoice is payable.
+           Always shown, since every invoice has a fiat total. */}
+        {isPayableStatus(status) && (
+          <div id="invoice-view--fiat-section" className="rounded-lg border border-border p-6 space-y-4">
+            <h2 id="invoice-view--fiat-heading" className="font-semibold">Pay with {invoice.currency}</h2>
+            <p className="text-sm text-muted-foreground">
+              Already paid by bank transfer, Wise, or another off-chain method?
+              Mark this invoice as paid and the seller will confirm receipt.
+            </p>
+            <PayFiatButton
+              invoiceId={invoice.id}
+              currency={invoice.currency}
+              onMarked={() => setStatus("marked_as_paid")}
             />
           </div>
         )}

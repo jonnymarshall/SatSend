@@ -5,12 +5,14 @@ import { PaymentDetectedOwnerEmail } from "./templates/payment-detected-owner";
 import { PaymentDetectedPayerEmail } from "./templates/payment-detected-payer";
 import { PaymentConfirmedOwnerEmail } from "./templates/payment-confirmed-owner";
 import { PaymentConfirmedPayerEmail } from "./templates/payment-confirmed-payer";
+import { InvoiceMarkedPaidByPayerEmail } from "./templates/invoice-marked-paid-by-payer";
 import { mempoolTxUrl } from "@/lib/btc-network";
 
 export type EmailType =
   | "invoice_published"
   | "payment_detected"
-  | "payment_confirmed";
+  | "payment_confirmed"
+  | "invoice_marked_paid_by_payer";
 
 export interface EmailContext {
   invoiceId: string;
@@ -221,6 +223,49 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
           txid: args.txid,
           mempoolUrl,
           invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
+        }),
+      });
+    },
+  );
+}
+
+// v1.4.14: client self-reports a fiat payment from the public page; we
+// can't verify off-chain payments automatically, so we ping the owner to
+// confirm receipt and either approve (→ paid) or dispute (→ pending).
+export interface SendInvoiceMarkedPaidByPayerArgs {
+  ownerEmail: string;
+  userId: string;
+  invoiceId: string;
+  invoiceNumber: string | null;
+  clientName: string;
+  totalFiat: number;
+  currency: string;
+}
+
+export async function sendInvoiceMarkedPaidByPayerEmail(
+  args: SendInvoiceMarkedPaidByPayerArgs,
+): Promise<EmailOutcome> {
+  return await safeSend(
+    {
+      invoiceId: args.invoiceId,
+      userId: args.userId,
+      type: "invoice_marked_paid_by_payer",
+      recipient: args.ownerEmail,
+    },
+    async () => {
+      const resend = getResend()!;
+      return await resend.emails.send({
+        from: getFromAddress(),
+        to: args.ownerEmail,
+        subject: args.invoiceNumber
+          ? `${args.clientName} marked invoice ${args.invoiceNumber} as paid in ${args.currency}`
+          : `${args.clientName} marked your invoice as paid in ${args.currency}`,
+        react: InvoiceMarkedPaidByPayerEmail({
+          invoiceNumber: args.invoiceNumber,
+          clientName: args.clientName,
+          totalDisplay: fmtCurrency(args.totalFiat, args.currency),
+          currency: args.currency,
+          dashboardUrl: `${getAppUrl()}/invoices/${args.invoiceId}`,
         }),
       });
     },

@@ -84,6 +84,13 @@ export async function GET(request: NextRequest) {
       if (decision.detectedTxid) {
         update.btc_txid = decision.detectedTxid;
       }
+      // v1.4.14: stamp on-chain confirmation fields so the Mark-as-unpaid
+      // gate reliably hides the button for cron-confirmed payments.
+      if (decision.newStatus === "paid") {
+        update.payment_method = "bitcoin";
+        update.payment_confirmation_method = "onchain";
+        update.paid_at = now.toISOString();
+      }
 
       const { error: updateError } = await supabase
         .from("invoices")

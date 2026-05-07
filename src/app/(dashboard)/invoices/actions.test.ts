@@ -5,6 +5,7 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/email/send", () => ({
   sendInvoicePublishedEmail: vi.fn().mockResolvedValue({ status: "sent" }),
+  sendFiatPaymentConfirmedEmail: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/invoice-events", () => ({ logInvoiceEvent: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/mempool", () => ({ addressHasHistory: vi.fn().mockResolvedValue(false) }));
@@ -489,17 +490,25 @@ describe("markPaid", () => {
 });
 
 describe("markUnpaid", () => {
-  it("sets status to pending on a paid invoice", async () => {
-    const { updateChain } = makeSupabase({
-      fetchData: { id: "inv-1", status: "paid", user_id: "user-1" },
-    });
+  // v1.4.14: only manual confirmations can be reverted. These tests cover the
+  // happy path; the on-chain rejection path is in the gating describe block
+  // further down.
+  const MANUAL_PAID = {
+    id: "inv-1",
+    status: "paid",
+    user_id: "user-1",
+    payment_confirmation_method: "manual" as const,
+  };
+
+  it("sets status to pending on a manually-confirmed paid invoice", async () => {
+    const { updateChain } = makeSupabase({ fetchData: MANUAL_PAID });
     await markUnpaid("inv-1");
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.status).toBe("pending");
   });
 
   it("logs a marked_as_unpaid invoice_events row", async () => {
-    makeSupabase({ fetchData: { id: "inv-1", status: "paid", user_id: "user-1" } });
+    makeSupabase({ fetchData: MANUAL_PAID });
     await markUnpaid("inv-1");
     expect(logInvoiceEvent).toHaveBeenCalledWith({
       invoiceId: "inv-1",
@@ -614,5 +623,139 @@ describe("duplicateInvoice", () => {
       fetchData: { ...SOURCE_INVOICE, user_id: "someone-else" },
     });
     await expect(duplicateInvoice("inv-src")).rejects.toThrow(/not found/i);
+  });
+});
+
+// v1.4.14 — owner confirms or disputes a payer's fiat self-report.
+// confirmMarkedAsPaid: marked_as_paid → paid. Preserves payment_method/method.
+// disputeMarkedAsPaid: marked_as_paid → pending. Clears the fields.
+
+describe("confirmMarkedAsPaid (owner approves payer's fiat report)", () => {
+  const FIAT_MARKED = {
+    id: "inv-1",
+    user_id: "user-1",
+    status: "marked_as_paid",
+    invoice_number: "INV-77",
+    client_name: "Ada",
+    client_email: "ada@example.com",
+    your_name: "Charles",
+    your_email: "charles@example.com",
+    your_company: null,
+    total_fiat: 500,
+    currency: "USD",
+    payment_method: "fiat",
+    payment_confirmation_method: "manual",
+  };
+
+  it("transitions marked_as_paid → paid and stamps paid_at", async () => {
+    const { updateChain } = makeSupabase({ fetchData: FIAT_MARKED });
+    const { confirmMarkedAsPaid } = await import("./actions");
+    await confirmMarkedAsPaid("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.status).toBe("paid");
+    expect(payload.paid_at).toBeTruthy();
+  });
+
+  it("does NOT overwrite payment_method or payment_confirmation_method (they were set when payer marked)", async () => {
+    const { updateChain } = makeSupabase({ fetchData: FIAT_MARKED });
+    const { confirmMarkedAsPaid } = await import("./actions");
+    await confirmMarkedAsPaid("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("payment_method");
+    expect(payload).not.toHaveProperty("payment_confirmation_method");
+  });
+
+  it("logs a payment_confirmed event", async () => {
+    makeSupabase({ fetchData: FIAT_MARKED });
+    const { confirmMarkedAsPaid } = await import("./actions");
+    await confirmMarkedAsPaid("inv-1");
+    expect(logInvoiceEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceId: "inv-1", eventType: "payment_confirmed" }),
+    );
+  });
+
+  it("rejects when the invoice is not in marked_as_paid (no double-confirm)", async () => {
+    makeSupabase({ fetchData: { ...FIAT_MARKED, status: "paid" } });
+    const { confirmMarkedAsPaid } = await import("./actions");
+    await expect(confirmMarkedAsPaid("inv-1")).rejects.toThrow(/not in marked_as_paid/i);
+  });
+
+  it("rejects when the invoice belongs to another user", async () => {
+    makeSupabase({ fetchData: { ...FIAT_MARKED, user_id: "someone-else" } });
+    const { confirmMarkedAsPaid } = await import("./actions");
+    await expect(confirmMarkedAsPaid("inv-1")).rejects.toThrow(/not found|forbidden/i);
+  });
+});
+
+describe("disputeMarkedAsPaid (owner reverts payer's fiat report)", () => {
+  const FIAT_MARKED = {
+    id: "inv-1",
+    user_id: "user-1",
+    status: "marked_as_paid",
+    payment_method: "fiat",
+    payment_confirmation_method: "manual",
+  };
+
+  it("transitions marked_as_paid → pending and clears the payment fields", async () => {
+    const { updateChain } = makeSupabase({ fetchData: FIAT_MARKED });
+    const { disputeMarkedAsPaid } = await import("./actions");
+    await disputeMarkedAsPaid("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.status).toBe("pending");
+    expect(payload.payment_method).toBeNull();
+    expect(payload.payment_confirmation_method).toBeNull();
+    expect(payload.paid_at).toBeNull();
+  });
+
+  it("logs a marked_as_unpaid event (reuses the existing event type)", async () => {
+    makeSupabase({ fetchData: FIAT_MARKED });
+    const { disputeMarkedAsPaid } = await import("./actions");
+    await disputeMarkedAsPaid("inv-1");
+    expect(logInvoiceEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceId: "inv-1", eventType: "marked_as_unpaid" }),
+    );
+  });
+
+  it("rejects when the invoice is not in marked_as_paid", async () => {
+    makeSupabase({ fetchData: { ...FIAT_MARKED, status: "pending" } });
+    const { disputeMarkedAsPaid } = await import("./actions");
+    await expect(disputeMarkedAsPaid("inv-1")).rejects.toThrow(/not in marked_as_paid/i);
+  });
+
+  it("rejects when the invoice belongs to another user", async () => {
+    makeSupabase({ fetchData: { ...FIAT_MARKED, user_id: "someone-else" } });
+    const { disputeMarkedAsPaid } = await import("./actions");
+    await expect(disputeMarkedAsPaid("inv-1")).rejects.toThrow(/not found|forbidden/i);
+  });
+});
+
+// v1.4.14 — markUnpaid is gated by payment_confirmation_method.
+// On-chain confirmations cannot be reverted (the address would need to be
+// replaced too — deferred). Manual confirmations can be reverted safely.
+
+describe("markUnpaid — payment_confirmation_method gating (v1.4.14)", () => {
+  const PAID_INVOICE = {
+    id: "inv-1",
+    user_id: "user-1",
+    status: "paid",
+  };
+
+  it("rejects when the invoice was confirmed on-chain (or has null method, treated as on-chain)", async () => {
+    makeSupabase({ fetchData: { ...PAID_INVOICE, payment_confirmation_method: "onchain" } });
+    await expect(markUnpaid("inv-1")).rejects.toThrow(/on-chain payments cannot be reverted/i);
+  });
+
+  it("rejects when the invoice has a null confirmation method (legacy paid invoice)", async () => {
+    makeSupabase({ fetchData: { ...PAID_INVOICE, payment_confirmation_method: null } });
+    await expect(markUnpaid("inv-1")).rejects.toThrow(/on-chain payments cannot be reverted/i);
+  });
+
+  it("proceeds when the invoice was confirmed manually (fiat or BTC off-chain)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PAID_INVOICE, payment_confirmation_method: "manual" },
+    });
+    await markUnpaid("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.status).toBe("pending");
   });
 });

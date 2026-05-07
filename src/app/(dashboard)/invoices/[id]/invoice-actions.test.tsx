@@ -306,24 +306,58 @@ describe("InvoiceActions — archived status", () => {
 });
 
 describe("InvoiceActions — paid status", () => {
-  const paid = { id: "inv-paid", status: "paid" };
+  // v1.4.14: Unpaid is gated by payment_confirmation_method.
+  const paidManual = {
+    id: "inv-paid",
+    status: "paid",
+    payment_confirmation_method: "manual" as const,
+  };
+  const paidOnchain = {
+    id: "inv-paid",
+    status: "paid",
+    payment_confirmation_method: "onchain" as const,
+  };
 
-  it("Mark as menu hides the Paid item (already paid) and offers Unpaid", () => {
-    // Overdue is no longer offered for paid invoices: per the four-cases spec
-    // (v1.4.11), only unpaid statuses are eligible for the manual "Mark as
-    // overdue" button. A paid invoice must first be marked Unpaid.
-    render(<InvoiceActions invoice={paid} />);
+  it("Mark as menu hides the Paid item (already paid) and offers Unpaid for manual confirmations", () => {
+    render(<InvoiceActions invoice={paidManual} />);
     fireEvent.click(screen.getByRole("button", { name: /^mark as$/i }));
     expect(screen.queryByRole("menuitem", { name: /^paid$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /^unpaid$/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /^overdue$/i })).not.toBeInTheDocument();
   });
 
+  it("Mark as menu hides Unpaid for on-chain confirmations (cannot revert without replacing address)", () => {
+    render(<InvoiceActions invoice={paidOnchain} />);
+    fireEvent.click(screen.getByRole("button", { name: /^mark as$/i }));
+    expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
+  });
+
   it("still renders View public invoice, Archive, Duplicate, Delete", () => {
-    render(<InvoiceActions invoice={paid} />);
+    render(<InvoiceActions invoice={paidManual} />);
     expect(screen.getByRole("link", { name: /view public invoice/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^archive$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
+  });
+});
+
+describe("InvoiceActions — marked_as_paid status (v1.4.14)", () => {
+  const markedAsPaid = {
+    id: "inv-mp",
+    status: "marked_as_paid",
+    payment_confirmation_method: "manual" as const,
+  };
+
+  it("renders Confirm payment received and Dispute / revert buttons", () => {
+    render(<InvoiceActions invoice={markedAsPaid} />);
+    expect(
+      screen.getByRole("button", { name: /confirm payment received/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /dispute \/ revert/i })).toBeInTheDocument();
+  });
+
+  it("hides the generic Mark As menu (Confirm/Dispute take over)", () => {
+    render(<InvoiceActions invoice={markedAsPaid} />);
+    expect(screen.queryByRole("button", { name: /^mark as$/i })).not.toBeInTheDocument();
   });
 });

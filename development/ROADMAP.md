@@ -1081,7 +1081,7 @@ When a payment is detected on the public invoice page (`src/app/invoice/[id]/`),
 
 ---
 
-### ⏳ v1.4.14 — Fiat Payment Flow + Manual Confirmation + Mark-as-Unpaid
+### ✅ v1.4.14 — Fiat Payment Flow + Manual Confirmation + Mark-as-Unpaid
 
 **Branch:** `v1.4.14/fiat-payment-and-manual-confirmation`
 
@@ -1109,28 +1109,28 @@ alter table invoices add column paid_at timestamptz;
 - `paid_at` — stamped at the transition to `paid`. Distinct from `updated_at`.
 
 **Payer flow**
-- [ ] Add a "Pay with <currency>" button on the public invoice page alongside "Pay with Bitcoin", visible only when the invoice has a fiat total (i.e. always, right now).
-- [ ] Clicking opens a dialog with the user-supplied copy: *"By clicking confirm, you are marking this invoice as paid. To avoid any confusion with the payee, please do not click confirm until after you have made payment."* Cancel / Confirm buttons.
-- [ ] Confirm → server action sets `status = marked_as_paid`, `payment_method = fiat`, `payment_confirmation_method = manual`. Sends a new email variant ("Your client has marked this invoice as paid in <currency>") to the owner.
+- [x] Add a "Pay with <currency>" button on the public invoice page alongside "Pay with Bitcoin", visible only when the invoice has a fiat total (i.e. always, right now).
+- [x] Clicking opens a dialog with the user-supplied copy: *"By clicking confirm, you are marking this invoice as paid. To avoid any confusion with the payee, please do not click confirm until after you have made payment."* Cancel / Confirm buttons.
+- [x] Confirm → server action sets `status = marked_as_paid`, `payment_method = fiat`, `payment_confirmation_method = manual`. Sends a new email variant ("Your client has marked this invoice as paid in <currency>") to the owner.
 - [ ] The same flow can fire with `payment_method = bitcoin_offchain` if we want to offer an "I paid in BTC to a different address" option. Deferred to a follow-up unless requested — for v1.4.10, fiat only.
 
 **Owner flow**
-- [ ] Owner sees `marked_as_paid` status on their dashboard with a dedicated badge colour.
-- [ ] Detail page + per-row dropdown get a "Confirm payment received" action → transitions to `paid` with same `payment_method` / `payment_confirmation_method` preserved. Also a "Dispute / revert" action → transitions back to `pending`.
-- [ ] On `marked_as_paid → paid`, send the existing payment-confirmed email (now going to both parties per v1.4.4).
+- [x] Owner sees `marked_as_paid` status on their dashboard with a dedicated badge colour.
+- [x] Detail page + per-row dropdown get a "Confirm payment received" action → transitions to `paid` with same `payment_method` / `payment_confirmation_method` preserved. Also a "Dispute / revert" action → transitions back to `pending`.
+- [x] On `marked_as_paid → paid`, send the existing payment-confirmed email (now going to both parties per v1.4.4).
 
 **Mark-as-unpaid gating**
-- [ ] Refactor the existing "Mark as unpaid" button to only render when `payment_confirmation_method = 'manual'`. If `onchain`, either hide the button or show it disabled with a tooltip ("on-chain payments cannot be reverted — the address would need to be replaced to avoid future collisions"). Preferred: hide entirely; tooltip introduces noise.
+- [x] Refactor the existing "Mark as unpaid" button to only render when `payment_confirmation_method = 'manual'`. If `onchain`, either hide the button or show it disabled with a tooltip ("on-chain payments cannot be reverted — the address would need to be replaced to avoid future collisions"). Preferred: hide entirely; tooltip introduces noise.
 - [ ] When reverting an `onchain`-confirmed invoice is genuinely needed (edge case: the owner knows the tx was unrelated), offer a separate "Replace BTC address and revert" flow — presents an address input, validates it (including the v1.4.8 balance check), updates both fields atomically, resets `payment_confirmation_method` to null. Deferred unless requested; not blocking v1.4.10.
 
 **Status enum surface area**
-- [ ] All existing UI that switches on `status` needs to handle `marked_as_paid` — status badge colour/label, filters on `/invoices`, the PDF renderer. Audit everywhere with `grep -r "'paid'" src/` and `grep -r "'payment_detected'" src/` — every place that has those cases needs a `marked_as_paid` case.
+- [x] All existing UI that switches on `status` needs to handle `marked_as_paid` — status badge colour/label, filters on `/invoices`, the PDF renderer. Audit everywhere with `grep -r "'paid'" src/` and `grep -r "'payment_detected'" src/` — every place that has those cases needs a `marked_as_paid` case.
 
 **Tests**
-- [ ] Pure logic: the `onchain` vs `manual` gate for mark-as-unpaid.
-- [ ] Server action: "client marks as paid in fiat" happy path; ownership check (can't mark-as-paid somebody else's invoice); idempotency (double-click doesn't double-email).
-- [ ] Integration test — full fiat flow: payer marks, owner confirms, status ends at `paid` with `payment_method = fiat` and `payment_confirmation_method = manual`.
-- [ ] Integration test — on-chain-confirmed invoice does not expose "Mark as unpaid".
+- [x] Pure logic: the `onchain` vs `manual` gate for mark-as-unpaid.
+- [x] Server action: "client marks as paid in fiat" happy path; ownership check (can't mark-as-paid somebody else's invoice); idempotency (double-click doesn't double-email).
+- [x] Integration test — full fiat flow: payer marks, owner confirms, status ends at `paid` with `payment_method = fiat` and `payment_confirmation_method = manual`.
+- [x] Integration test — on-chain-confirmed invoice does not expose "Mark as unpaid".
 
 **Out of scope (for this branch)**
 - Multi-currency handling beyond the single currency stored on the invoice (v2.4 territory).

@@ -16,6 +16,8 @@ import {
   publishInvoice,
   publishAndSendEmail,
   publishAndMarkSent,
+  confirmMarkedAsPaid,
+  disputeMarkedAsPaid,
 } from "../actions";
 import { bulkArchive, bulkDelete, bulkUnarchive } from "../bulk-actions";
 import { parseServerError } from "@/lib/invoices";
@@ -28,6 +30,7 @@ interface Invoice {
   sent_at?: string | null;
   send_method?: "email" | "manual" | null;
   email_attempted_at?: string | null;
+  payment_confirmation_method?: "onchain" | "manual" | null;
 }
 
 export function InvoiceActions({ invoice }: { invoice: Invoice }) {
@@ -38,7 +41,10 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
   const isDraft = invoice.status === "draft";
   const isArchived = invoice.status === "archived";
-  const canShowMarkAsMenu = !isDraft && !isArchived;
+  const isMarkedAsPaid = invoice.status === "marked_as_paid";
+  // When awaiting owner confirmation, the dedicated Confirm/Dispute buttons
+  // take over — the generic Mark As menu would just confuse the action set.
+  const canShowMarkAsMenu = !isDraft && !isArchived && !isMarkedAsPaid;
   // Hide the publish/send trigger only when truly nothing remains to do — i.e., the invoice
   // has both been marked sent AND had an email attempt. Until then keep the menu reachable
   // (even with no client_email — the "Send via email" item explains via tooltip).
@@ -175,11 +181,33 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
             invoiceId={invoice.id}
             status={invoice.status}
             dueDate={invoice.due_date ?? null}
+            paymentConfirmationMethod={invoice.payment_confirmation_method ?? null}
             busy={busy}
             onMarkPaid={(id) => run(() => markPaid(id))}
             onMarkUnpaid={(id) => run(() => markUnpaid(id))}
             onMarkOverdue={(id) => run(() => markOverdue(id))}
           />
+        )}
+
+        {isMarkedAsPaid && (
+          <>
+            <Button
+              id="invoice-actions--confirm-marked-as-paid-button"
+              onClick={() => run(() => confirmMarkedAsPaid(invoice.id))}
+              disabled={busy}
+            >
+              Confirm payment received
+            </Button>
+            <Button
+              id="invoice-actions--dispute-marked-as-paid-button"
+              variant="outline"
+              className="text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={() => run(() => disputeMarkedAsPaid(invoice.id))}
+              disabled={busy}
+            >
+              Dispute / revert
+            </Button>
+          </>
         )}
 
         {isArchived && (

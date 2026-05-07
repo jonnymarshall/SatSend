@@ -48,6 +48,8 @@ import {
   duplicateInvoice,
   markOverdue,
   markUnpaid,
+  confirmMarkedAsPaid,
+  disputeMarkedAsPaid,
 } from "./actions";
 import { buildColumns, InvoiceRow } from "./columns";
 import { useInvoiceRealtime } from "./use-invoice-realtime";
@@ -71,7 +73,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
   useInvoiceRealtime(userId);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([
-    { id: "status", value: ["draft", "pending", "payment_detected", "paid", "overdue"] },
+    { id: "status", value: ["draft", "pending", "payment_detected", "marked_as_paid", "paid", "overdue"] },
   ]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -115,6 +117,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
         onMarkPaid: (id) => runRowAction(() => bulkMarkPaid([id])),
         onMarkOverdue: (id) => runRowAction(() => markOverdue(id)),
         onMarkPending: (id) => runRowAction(() => markUnpaid(id)),
+        onConfirmMarkedAsPaid: (id) => runRowAction(() => confirmMarkedAsPaid(id)),
+        onDisputeMarkedAsPaid: (id) => runRowAction(() => disputeMarkedAsPaid(id)),
         onArchive: (id) => runRowAction(() => bulkArchive([id])),
         onUnarchive: (id) => runRowAction(() => bulkUnarchive([id])),
         onDelete: (id) => setDeleteTarget([id]),
@@ -158,8 +162,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
 
   React.useEffect(() => {
     const statusValues = showArchived
-      ? ["draft", "pending", "payment_detected", "paid", "overdue", "archived"]
-      : ["draft", "pending", "payment_detected", "paid", "overdue"];
+      ? ["draft", "pending", "payment_detected", "marked_as_paid", "paid", "overdue", "archived"]
+      : ["draft", "pending", "payment_detected", "marked_as_paid", "paid", "overdue"];
     table.getColumn("status")?.setFilterValue(statusValues);
   }, [showArchived, table]);
 

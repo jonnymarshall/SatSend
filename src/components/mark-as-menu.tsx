@@ -9,11 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
+import { canMarkAsUnpaid } from "@/lib/invoices/manual-confirmation";
 
 export interface MarkAsMenuProps {
   invoiceId: string;
   status: string;
   dueDate: string | null;
+  paymentConfirmationMethod: "onchain" | "manual" | null;
   onMarkPaid: (id: string) => void;
   onMarkUnpaid: (id: string) => void;
   onMarkOverdue: (id: string) => void;
@@ -26,6 +28,7 @@ export function MarkAsMenu({
   invoiceId,
   status,
   dueDate,
+  paymentConfirmationMethod,
   onMarkPaid,
   onMarkUnpaid,
   onMarkOverdue,
@@ -34,11 +37,14 @@ export function MarkAsMenu({
   const isPaid = status === "paid";
   const isUnpaid = UNPAID_STATES.has(status);
   const showOverdue = canMarkAsOverdue({ status, due_date: dueDate });
-  // "Pending" is the case-#4 reverse (overdue → pending). The paid → pending
-  // transition keeps its existing always-on availability for paid invoices.
-  const showPending = isPaid || canMarkAsPending({ status, due_date: dueDate });
-  // Suppress the duplicate when the row is already in an unpaid state.
-  const showPendingItem = showPending && !isUnpaid;
+  // "Unpaid" (paid → pending): v1.4.14 only renders this for manual
+  // confirmations — see canMarkAsUnpaid. "Pending" (overdue → pending) is
+  // case #4 and stays governed by canMarkAsPending.
+  const showUnpaid = canMarkAsUnpaid({
+    status,
+    payment_confirmation_method: paymentConfirmationMethod,
+  });
+  const showPending = canMarkAsPending({ status, due_date: dueDate }) && !isUnpaid;
 
   return (
     <DropdownMenu>
@@ -63,12 +69,20 @@ export function MarkAsMenu({
             Paid
           </DropdownMenuItem>
         )}
-        {showPendingItem && (
+        {showUnpaid && (
           <DropdownMenuItem
             id={`mark-as-menu--unpaid-${invoiceId}`}
             onClick={() => onMarkUnpaid(invoiceId)}
           >
-            {isPaid ? "Unpaid" : "Pending"}
+            Unpaid
+          </DropdownMenuItem>
+        )}
+        {showPending && (
+          <DropdownMenuItem
+            id={`mark-as-menu--pending-${invoiceId}`}
+            onClick={() => onMarkUnpaid(invoiceId)}
+          >
+            Pending
           </DropdownMenuItem>
         )}
         {showOverdue && (

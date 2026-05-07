@@ -80,9 +80,13 @@ export function PaymentWatcher({
     statusRef.current = status;
   }, [status]);
   const isPaid = status === "paid";
+  // v1.4.14: also bail out when the payer has self-reported a fiat payment.
+  // The API endpoint would reject our reports anyway (status not payable),
+  // so polling is just wasted work until the owner confirms or disputes.
+  const isInactive = isPaid || status === "marked_as_paid";
 
   useEffect(() => {
-    if (isPaid) return;
+    if (isInactive) return;
 
     let cancelled = false;
     let activeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -235,7 +239,7 @@ export function PaymentWatcher({
       closeWebSocket();
       clearActive();
     };
-  }, [invoiceId, btcAddress, onStatusChange, isPaid, paymentRevealed]);
+  }, [invoiceId, btcAddress, onStatusChange, isInactive, paymentRevealed]);
 
   return <InvoiceStatusBadge status={status} id="invoice-view--status" />;
 }

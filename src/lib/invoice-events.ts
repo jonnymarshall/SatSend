@@ -4,7 +4,8 @@ export type InvoiceEventType =
   | "marked_as_sent"
   | "marked_as_paid"
   | "marked_as_overdue"
-  | "marked_as_unpaid";
+  | "marked_as_unpaid"
+  | "payment_confirmed";
 
 export interface LogInvoiceEventArgs {
   invoiceId: string;

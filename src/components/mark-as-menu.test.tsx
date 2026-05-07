@@ -12,12 +12,23 @@ function open() {
   fireEvent.click(screen.getByRole("button", { name: /mark as/i }));
 }
 
-function renderMenu(props: { status: string; dueDate?: string | null; invoiceId?: string }) {
+function renderMenu(props: {
+  status: string;
+  dueDate?: string | null;
+  invoiceId?: string;
+  paymentConfirmationMethod?: "onchain" | "manual" | null;
+}) {
+  // Default to "manual" so legacy tests that don't care about the gate keep
+  // their existing behavior (Unpaid visible for paid invoices). Tests that
+  // pass null explicitly must keep null.
+  const method =
+    "paymentConfirmationMethod" in props ? props.paymentConfirmationMethod ?? null : "manual";
   render(
     <MarkAsMenu
       invoiceId={props.invoiceId ?? "inv-1"}
       status={props.status}
       dueDate={props.dueDate ?? null}
+      paymentConfirmationMethod={method}
       onMarkPaid={onMarkPaid}
       onMarkUnpaid={onMarkUnpaid}
       onMarkOverdue={onMarkOverdue}
@@ -71,12 +82,24 @@ describe("MarkAsMenu — overdue/pending visibility (the four cases)", () => {
   });
 });
 
-describe("MarkAsMenu — paid → pending stays available (out of v1.4.11 scope)", () => {
-  it("paid invoice: shows Unpaid (label) regardless of due date", () => {
-    renderMenu({ status: "paid", dueDate: null });
+describe("MarkAsMenu — paid → pending gating by payment_confirmation_method (v1.4.14)", () => {
+  it("paid + manual confirmation: shows Unpaid (revert is safe)", () => {
+    renderMenu({ status: "paid", paymentConfirmationMethod: "manual" });
     open();
     expect(screen.getByRole("menuitem", { name: /^unpaid$/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /^paid$/i })).not.toBeInTheDocument();
+  });
+
+  it("paid + on-chain confirmation: hides Unpaid (revert would re-detect)", () => {
+    renderMenu({ status: "paid", paymentConfirmationMethod: "onchain" });
+    open();
+    expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
+  });
+
+  it("paid + null confirmation method (legacy): hides Unpaid (treated as on-chain)", () => {
+    renderMenu({ status: "paid", paymentConfirmationMethod: null });
+    open();
+    expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
   });
 });
 
@@ -103,6 +126,7 @@ describe("MarkAsMenu — wiring", () => {
         invoiceId="inv-1"
         status="pending"
         dueDate={null}
+        paymentConfirmationMethod={null}
         busy
         onMarkPaid={onMarkPaid}
         onMarkUnpaid={onMarkUnpaid}

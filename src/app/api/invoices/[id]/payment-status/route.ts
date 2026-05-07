@@ -83,6 +83,20 @@ export async function POST(
     new Date()
   );
 
+  // v1.4.14: stamp the on-chain confirmation fields when the watcher reports
+  // a transition to `paid`. This is what makes the Mark-as-unpaid gate hide
+  // the button for on-chain payments — without these fields set, the gate
+  // would let owners revert an on-chain payment, which would then be
+  // re-detected on the next cron sweep (loop).
+  const onchainPatch =
+    decision.newStatus === "paid"
+      ? {
+          payment_method: "bitcoin" as const,
+          payment_confirmation_method: "onchain" as const,
+          paid_at: new Date().toISOString(),
+        }
+      : {};
+
   const { data: updated, error: updateError } = await supabase
     .from("invoices")
     .update({
@@ -91,6 +105,7 @@ export async function POST(
       mempool_seen_at: decision.newMempoolSeenAt,
       stage_attempt: decision.newStageAttempt,
       next_check_at: decision.newNextCheckAt,
+      ...onchainPatch,
     })
     .eq("id", id)
     .eq("status", invoice.status)

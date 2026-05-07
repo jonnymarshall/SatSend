@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14] - 2026-05-06
+
+### Added
+
+- **Fiat payment flow on the public invoice page.** Every invoice now has a "Pay with <currency>" button alongside "Pay with Bitcoin". Clicking opens a confirmation dialog; on confirm the invoice transitions to a new `marked_as_paid` status and the owner gets an email so they can verify the bank/wire arrived.
+- **`marked_as_paid` invoice status.** Intermediate state between `pending` and `paid`. The owner sees a dedicated badge ("Awaiting Confirmation"), a per-row "Confirm payment received" / "Dispute / revert" pair on the dashboard, and a matching button pair on the detail page.
+- **`payment_method` and `payment_confirmation_method` columns on `invoices`.** Captures *how* the invoice was paid (`bitcoin` | `fiat` | `bitcoin_offchain`) and *who confirmed it* (`onchain` | `manual`). Plus a separate `paid_at` timestamp distinct from `updated_at`.
+- **`payment_confirmed` invoice event type and `invoice_marked_paid_by_payer` email type.** Both surface in the per-invoice activity card so owner and payer actions are visually distinct.
+
+### Changed
+
+- **`Mark as unpaid` button now gated by `payment_confirmation_method`.** Only visible for invoices confirmed manually. On-chain-confirmed invoices hide the button entirely (reverting them would re-detect on the next cron sweep — the safe revert flow requires also replacing the BTC address, deferred). Legacy paid invoices (null method) are treated as on-chain.
+- **`markPaid`, `bulkMarkPaid` now stamp `payment_confirmation_method = 'manual'` and `paid_at`.** Without this, owner-marked-paid invoices would lose their Mark-as-unpaid button under the new gate.
+- **Cron sweep + on-page payment-status route now stamp `payment_method = 'bitcoin'`, `payment_confirmation_method = 'onchain'`, `paid_at` on transitions to `paid`.** Closes the loop so the gate hides Mark-as-unpaid for cron-detected payments.
+- **Public-page payment watcher idle in `marked_as_paid`.** Polling pauses while the invoice is awaiting owner confirmation — the API endpoint would reject any reports anyway.
+
+### Migrations
+
+- `0015_fiat_and_manual_confirmation.sql` — adds the `marked_as_paid` enum value, two new enums (`payment_method`, `payment_confirmation_method`), and three columns on `invoices`.
+- `0016_payment_confirmed_event_type.sql` — adds `payment_confirmed` to the `invoice_event_type` enum so the activity feed can render the owner's confirm action distinctly from the payer's self-report.
+
+### Notes
+
+- Out of scope: multi-currency support, the "replace BTC address and revert" flow for on-chain payments, partial payments, and the `bitcoin_offchain` payer dialog (deferred follow-ups).
+
 ## [1.4.13.7] - 2026-05-05
 
 ### Changed

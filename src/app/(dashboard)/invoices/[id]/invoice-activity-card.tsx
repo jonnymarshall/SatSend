@@ -1,14 +1,19 @@
 import { format } from "date-fns";
-import { Mail, AlertCircle, Send, CheckCircle, Clock, RotateCcw } from "lucide-react";
+import { Mail, AlertCircle, Send, CheckCircle, Clock, RotateCcw, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
-type EmailType = "invoice_published" | "payment_detected" | "payment_confirmed";
+type EmailType =
+  | "invoice_published"
+  | "payment_detected"
+  | "payment_confirmed"
+  | "invoice_marked_paid_by_payer";
 type EmailEventStatus = "queued" | "sent" | "failed" | "skipped_no_api_key";
 type InvoiceEventType =
   | "marked_as_sent"
   | "marked_as_paid"
   | "marked_as_overdue"
-  | "marked_as_unpaid";
+  | "marked_as_unpaid"
+  | "payment_confirmed";
 
 interface EmailEventRow {
   id: string;
@@ -33,13 +38,15 @@ const EMAIL_TYPE_LABEL: Record<EmailType, string> = {
   invoice_published: "Invoice published",
   payment_detected: "Payment detected",
   payment_confirmed: "Payment confirmed",
+  invoice_marked_paid_by_payer: "Client marked as paid",
 };
 
 const MANUAL_EVENT_LABEL: Record<InvoiceEventType, string> = {
   marked_as_sent: "Marked as sent",
-  marked_as_paid: "Marked as paid",
+  marked_as_paid: "Client marked as paid",
   marked_as_overdue: "Marked as overdue",
   marked_as_unpaid: "Marked as unpaid",
+  payment_confirmed: "Payment confirmed by you",
 };
 
 const ICON_CLASS = "h-4 w-4 shrink-0";
@@ -61,6 +68,8 @@ function manualIcon(type: InvoiceEventType) {
       return <Clock data-icon="clock" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
     case "marked_as_unpaid":
       return <RotateCcw data-icon="rotate-ccw" className={`${ICON_CLASS} text-muted-foreground`} />;
+    case "payment_confirmed":
+      return <ShieldCheck data-icon="shield-check" className={`${ICON_CLASS} text-green-600 dark:text-green-400`} />;
   }
 }
 

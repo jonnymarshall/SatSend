@@ -252,10 +252,14 @@ describe("bulkDelete", () => {
 });
 
 describe("bulkMarkPaid", () => {
-  it("updates all given invoices to paid status", async () => {
+  it("updates all given invoices to paid status with manual confirmation fields (v1.4.14)", async () => {
     const { updatePayloads } = makeSupabase();
     await bulkMarkPaid(["inv-1", "inv-2"]);
-    expect(updatePayloads[0]).toEqual({ status: "paid" });
+    expect(updatePayloads[0]).toMatchObject({
+      status: "paid",
+      payment_confirmation_method: "manual",
+    });
+    expect(updatePayloads[0].paid_at).toBeTruthy();
   });
 
   it("scopes the update to the authenticated user", async () => {
