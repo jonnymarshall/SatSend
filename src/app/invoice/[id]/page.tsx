@@ -24,7 +24,7 @@ export default async function ClientInvoicePage({ params }: Props) {
   }
 
   let btcPrice: number | null = null;
-  if (invoice.accepts_bitcoin && invoice.btc_address) {
+  if (invoice.btc_address) {
     try {
       const result = await fetchBtcPrice(invoice.currency);
       btcPrice = result.price;

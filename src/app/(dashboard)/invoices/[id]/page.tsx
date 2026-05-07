@@ -52,8 +52,7 @@ export default async function InvoiceDetailPage({
             <InvoiceDates createdAt={invoice.created_at} dueDate={invoice.due_date} />
           </div>
         </div>
-        {invoice.accepts_bitcoin &&
-        invoice.btc_address &&
+        {invoice.btc_address &&
         (invoice.status === "pending" ||
           invoice.status === "payment_detected" ||
           invoice.status === "overdue") ? (
@@ -136,7 +135,7 @@ export default async function InvoiceDetailPage({
       </section>
 
       {/* Bitcoin address */}
-      {invoice.accepts_bitcoin && invoice.btc_address && (
+      {invoice.btc_address && (
         <div className="rounded-lg border border-border bg-card px-5 py-4 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Bitcoin Address</p>
           <code className="block text-xs break-all">{invoice.btc_address}</code>

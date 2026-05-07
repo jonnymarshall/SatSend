@@ -197,7 +197,7 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
             </View>
           </View>
 
-          {invoice.accepts_bitcoin && invoice.btc_address ? (
+          {invoice.btc_address ? (
             <View style={styles.btcBlock}>
               {qrDataUrl ? <Image src={qrDataUrl} style={styles.btcQr} /> : null}
               <View style={styles.btcInfo}>
@@ -225,14 +225,13 @@ export async function renderInvoicePdf(
   opts: RenderInvoicePdfOptions
 ): Promise<Buffer> {
   const publicUrl = `${opts.appUrl.replace(/\/$/, "")}/invoice/${invoice.id}`;
-  const qrDataUrl =
-    invoice.accepts_bitcoin && invoice.btc_address
-      ? await QRCode.toDataURL(`bitcoin:${invoice.btc_address}`, {
-          margin: 0,
-          width: 256,
-          color: { dark: brandColors.foreground, light: "#FFFFFF" },
-        })
-      : null;
+  const qrDataUrl = invoice.btc_address
+    ? await QRCode.toDataURL(`bitcoin:${invoice.btc_address}`, {
+        margin: 0,
+        width: 256,
+        color: { dark: brandColors.foreground, light: "#FFFFFF" },
+      })
+    : null;
 
   return renderToBuffer(
     <InvoiceDocument invoice={invoice} publicUrl={publicUrl} qrDataUrl={qrDataUrl} />

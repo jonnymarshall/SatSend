@@ -57,7 +57,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   // detected/paid), so the txid link is visible without an extra click.
   const showPaymentDetails = userRevealedPayment || !isPayableStatus(status);
   const cur = invoice.currency;
-  const showBtc = invoice.accepts_bitcoin && !!invoice.btc_address && !!btcPrice;
+  const showBtc = !!invoice.btc_address && !!btcPrice;
   const btcAmount = showBtc ? fiatToBtc(invoice.total_fiat, btcPrice!) : null;
   const btcAmountDisplay = btcAmount !== null
     ? btcAmount.toFixed(8).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
@@ -93,7 +93,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
             >
               <Button variant="outline" size="sm">Download PDF</Button>
             </a>
-            {invoice.accepts_bitcoin && invoice.btc_address ? (
+            {invoice.btc_address ? (
               <PaymentWatcher
                 invoiceId={invoice.id}
                 btcAddress={invoice.btc_address}
@@ -239,13 +239,13 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
           </div>
         )}
 
-        {invoice.accepts_bitcoin && !invoice.btc_address && (
+        {!invoice.btc_address && (
           <p id="invoice-view--btc-missing" className="text-sm text-muted-foreground text-center">
             Bitcoin payment details not yet configured for this invoice.
           </p>
         )}
 
-        {invoice.accepts_bitcoin && invoice.btc_address && !btcPrice && (
+        {invoice.btc_address && !btcPrice && (
           <div id="invoice-view--btc-price-error" className="rounded-lg border border-border p-6 space-y-2">
             <h2 className="font-semibold">Pay with Bitcoin</h2>
             <p className="text-sm text-muted-foreground">
