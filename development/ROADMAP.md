@@ -1081,63 +1081,92 @@ When a payment is detected on the public invoice page (`src/app/invoice/[id]/`),
 
 ---
 
-### ⏳ v1.4.14 — Fiat Payment Flow + Manual Confirmation + Mark-as-Unpaid
+### ⏳ v1.4.14 — Bitcoin-Only Focus
 
-**Branch:** `v1.4.14/fiat-payment-and-manual-confirmation`
+**Branch:** `v1.4.14/bitcoin-only-focus`
 
-**Context:** Three tightly coupled features:
+> **Pivot note (2026-05-07):** This slot was originally scoped for a fiat payment flow, manual confirmation, and conditional mark-as-unpaid. That work is preserved as a single WIP commit on `origin/v1.4.14/fiat-payment-and-manual-confirmation` (not merged) and may be revived post-launch. The v1 product is now bitcoin-only.
 
-1. **Fiat payment flow.** Today the public invoice page only offers "Pay in Bitcoin". Real invoices get paid in fiat too — bank transfer, Wise, etc. There's no way for a client to mark that they paid, and no way for the owner to acknowledge a fiat payment.
-2. **New `marked_as_paid` status.** A client self-reports payment (either via fiat, or via BTC to an address not known to the platform — e.g. they accidentally sent to a previous invoice's address and want to reconcile). The invoice sits in `marked_as_paid` until the owner confirms and promotes it to `paid`.
-3. **Mark-as-unpaid — but only for manual confirmations.** If an invoice reached `paid` via on-chain detection (we saw the tx), reverting it to unpaid would require replacing the BTC address (else future detections collide with the old tx). If it reached `paid` via manual confirmation, reverting is safe — no on-chain footprint to worry about. Conditional revert logic keyed on *how* the invoice was confirmed.
+**Context:** SatSend v1 launches as a bitcoin-only invoicing product. Users who want fiat-payment rails have a thousand other tools to choose from; trying to support both adds surface area, complicates the data model, and dilutes positioning. This branch removes every code path that gates Bitcoin behind an opt-in or treats fiat as a payment method, and forces every published invoice to carry a Bitcoin address.
 
-**Schema changes — new migration `supabase/migrations/0010_fiat_and_manual_confirmation.sql`**
+**Important boundary:** fiat stays as the **unit of account** (invoices remain denominated in USD/GBP/etc; line items, totals, and PDF ordering do not change). What goes away is fiat as a **payment method** and the optional "Accept Bitcoin" gate.
+
+**Scope**
+
+1. **Drop the `accepts_bitcoin` toggle entirely.**
+   - Migration: drop the `accepts_bitcoin` column from `invoices`.
+   - Invoice form: remove the checkbox; remove every code path that branches on `accepts_bitcoin`.
+   - Invoice detail page (`src/app/(dashboard)/invoices/[id]/page.tsx`): drop the `invoice.accepts_bitcoin && invoice.btc_address` gate.
+   - Public payer page: same. Bitcoin payment is the only path; no conditional render.
+   - Audit: `grep -ri "accepts_bitcoin\|acceptsBitcoin" src/` must return zero hits after the branch lands.
+
+2. **Make `btc_address` mandatory at publish time, not at draft save.**
+   - `btc_address` stays nullable in the schema. Drafts can be saved without one.
+   - The `publishInvoice` server action rejects any invoice without a valid `btc_address` (returns a structured validation error so the form can highlight the field).
+   - DB-level guard: a check constraint enforcing `btc_address is not null` whenever `status != 'draft'`. Belt-and-braces with the action-layer check; protects against direct DB writes / future code paths.
+   - Form-level: required field on publish, with helper text ("Required to publish, not required to save draft"). The field stays editable until publish; once published, the existing v1.4.12 freshness rules continue to apply.
+   - **Address remains unique per invoice.** No account-level default, no copy-from-previous-invoice. Reusing an address across invoices breaks payment detection (v1.4.12 freshness rule) and is a privacy regression. This is a hard constraint, not a UX choice.
+
+3. **Remove every fiat-payment affordance from the public payer page.**
+   - Only "Pay with Bitcoin" renders. No "Pay with [currency]" button, no "I paid via [other method]" escape hatch.
+   - Owner side: no "received off-platform" confirmation flow. Audit `mark-as-menu.tsx`, `invoice-actions.tsx`, and the dashboard row dropdown to confirm no surface assumes a fiat-payment path exists.
+
+4. **Email templates: bitcoin-centric copy, no QR codes in emails.**
+   - Reasoning: QR codes encode the BTC amount, computed live from a fiat conversion at view time. An email-time QR would show a stale BTC amount whenever the price moves. Emails link to the live invoice page; QR rendering stays on the public payer page only.
+   - `invoice_published`: subject and body should clearly indicate this is a bitcoin invoice. CTA links to the public invoice URL (live QR + address there).
+   - `payment_detected`, `payment_confirmed`, `overdue_*`: audit copy. Remove any phrasing that implies fiat is a supported payment method.
+
+5. **PDF: no structural change.**
+   - Fiat totals continue to lead the document (unit of account). Bitcoin payment block stays in its current position. This is intentional; PDFs are downloaded once and shown later, often when no live BTC quote is available, so leading with fiat is correct.
+
+6. **Marketing / landing copy.**
+   - Wherever the product is described to a non-user (landing page, README, meta description, future marketing site), reframe positioning as "bitcoin-only invoicing". This is a feature, not a limitation.
+   - Specifically check: `src/app/layout.tsx` metadata, `README.md`, OpenGraph descriptions, any marketing copy already in the codebase.
+
+7. **Status / activity copy stays generic.**
+   - "Awaiting payment" continues to render as-is; no need to qualify with "Bitcoin" since bitcoin is the only payment option. Shorter, cleaner.
+
+**Schema migrations**
+
+This branch carries two migrations because the abandoned fiat work (0015, 0016) was already applied to the remote DB before the pivot. To keep history linear and auditable, both 0015 and 0016 are cherry-picked into this branch (so local matches remote) and reversed by 0017. The bitcoin-only schema change then lands as 0018.
+
+- `0015_fiat_and_manual_confirmation.sql` (cherry-picked from `origin/v1.4.14/fiat-payment-and-manual-confirmation`).
+- `0016_payment_confirmed_event_type.sql` (cherry-picked from same).
+- `0017_revert_fiat_and_manual_confirmation.sql` — drops the three columns, drops the two custom types, recreates `invoice_status` without `marked_as_paid`, recreates `invoice_event_type` without `payment_confirmed`. Defensive pre-clean of any rows referencing the removed values (expected zero on production).
+- `0018_bitcoin_only.sql` — the bitcoin-only change:
 
 ```sql
-alter type invoice_status add value if not exists 'marked_as_paid';
+-- Bitcoin is no longer optional; every invoice accepts BTC.
+alter table invoices drop column accepts_bitcoin;
 
-create type payment_method as enum ('bitcoin', 'fiat', 'bitcoin_offchain');
-create type payment_confirmation_method as enum ('onchain', 'manual');
-
-alter table invoices add column payment_method payment_method;
-alter table invoices add column payment_confirmation_method payment_confirmation_method;
-alter table invoices add column paid_at timestamptz;
+-- BTC address required for any non-draft invoice.
+alter table invoices add constraint btc_address_required_when_published
+  check (status = 'draft' or btc_address is not null);
 ```
 
-- `payment_method` — set when the invoice reaches `marked_as_paid` or `paid`. Nullable until then.
-- `payment_confirmation_method` — `onchain` if we detected the tx ourselves, `manual` if either party reported it. Drives mark-as-unpaid eligibility.
-- `paid_at` — stamped at the transition to `paid`. Distinct from `updated_at`.
-
-**Payer flow**
-- [ ] Add a "Pay with <currency>" button on the public invoice page alongside "Pay with Bitcoin", visible only when the invoice has a fiat total (i.e. always, right now).
-- [ ] Clicking opens a dialog with the user-supplied copy: *"By clicking confirm, you are marking this invoice as paid. To avoid any confusion with the payee, please do not click confirm until after you have made payment."* Cancel / Confirm buttons.
-- [ ] Confirm → server action sets `status = marked_as_paid`, `payment_method = fiat`, `payment_confirmation_method = manual`. Sends a new email variant ("Your client has marked this invoice as paid in <currency>") to the owner.
-- [ ] The same flow can fire with `payment_method = bitcoin_offchain` if we want to offer an "I paid in BTC to a different address" option. Deferred to a follow-up unless requested — for v1.4.10, fiat only.
-
-**Owner flow**
-- [ ] Owner sees `marked_as_paid` status on their dashboard with a dedicated badge colour.
-- [ ] Detail page + per-row dropdown get a "Confirm payment received" action → transitions to `paid` with same `payment_method` / `payment_confirmation_method` preserved. Also a "Dispute / revert" action → transitions back to `pending`.
-- [ ] On `marked_as_paid → paid`, send the existing payment-confirmed email (now going to both parties per v1.4.4).
-
-**Mark-as-unpaid gating**
-- [ ] Refactor the existing "Mark as unpaid" button to only render when `payment_confirmation_method = 'manual'`. If `onchain`, either hide the button or show it disabled with a tooltip ("on-chain payments cannot be reverted — the address would need to be replaced to avoid future collisions"). Preferred: hide entirely; tooltip introduces noise.
-- [ ] When reverting an `onchain`-confirmed invoice is genuinely needed (edge case: the owner knows the tx was unrelated), offer a separate "Replace BTC address and revert" flow — presents an address input, validates it (including the v1.4.8 balance check), updates both fields atomically, resets `payment_confirmation_method` to null. Deferred unless requested; not blocking v1.4.10.
-
-**Status enum surface area**
-- [ ] All existing UI that switches on `status` needs to handle `marked_as_paid` — status badge colour/label, filters on `/invoices`, the PDF renderer. Audit everywhere with `grep -r "'paid'" src/` and `grep -r "'payment_detected'" src/` — every place that has those cases needs a `marked_as_paid` case.
+Backfill: audit existing rows for any `status != 'draft' and btc_address is null` before adding the constraint. If any exist (likely none, given v1.4.12), decide per-row whether to delete, downgrade to draft, or supply an address. Migration body should `select count(*)` first and abort on non-zero, forcing manual reconciliation.
 
 **Tests**
-- [ ] Pure logic: the `onchain` vs `manual` gate for mark-as-unpaid.
-- [ ] Server action: "client marks as paid in fiat" happy path; ownership check (can't mark-as-paid somebody else's invoice); idempotency (double-click doesn't double-email).
-- [ ] Integration test — full fiat flow: payer marks, owner confirms, status ends at `paid` with `payment_method = fiat` and `payment_confirmation_method = manual`.
-- [ ] Integration test — on-chain-confirmed invoice does not expose "Mark as unpaid".
+- [ ] Server action: `publishInvoice` without `btc_address` returns a structured validation error; the response is shaped for the form to highlight the field.
+- [ ] Server action: `saveDraft` (or equivalent) without `btc_address` succeeds; status stays `draft`.
+- [ ] Server action: publishing an invoice with a valid `btc_address` succeeds and transitions out of `draft`.
+- [ ] Schema: migration runs cleanly on a fresh DB. Constraint rejects a direct insert of `(status='pending', btc_address=null)`.
+- [ ] Public payer page: only the bitcoin payment affordance renders; no fiat button under any data shape.
+- [ ] Codebase audit: `grep -ri "accepts_bitcoin\|acceptsBitcoin" src/` returns zero hits.
+- [ ] Email-template snapshot tests: no copy implies fiat is a supported payment method.
 
-**Out of scope (for this branch)**
-- Multi-currency handling beyond the single currency stored on the invoice (v2.4 territory).
-- "Replace BTC address and revert" flow (deferred).
-- Partial payments (never supported today; still not).
+**Out of scope (deferred)**
+- **Owner-side "received off-platform" escape hatch.** Lost-address recovery, out-of-band proof, etc. Edge case for v2; revisit if real users hit it.
+- **Partial / under / overpayment handling.** Already queued in v1.4.19 (Payment Amount Awareness). v1.4.14 must not block on it but must not regress current behaviour either: today's detector flips on any tx; v1.4.19 adds the 5% tolerance band. Current behaviour is acknowledged-but-imperfect for v1 launch.
+- **Account-level default BTC address.** Explicitly rejected: addresses must be unique per invoice (v1.4.12 freshness rule + privacy).
 
-**Done when:** A client can mark a fiat invoice as paid from the public page; the owner gets an email and can confirm it (→ `paid`) or revert it (→ `pending`); mark-as-unpaid is only offered for manual confirmations; every code path that switches on status handles the new enum value.
+**Done when:**
+- `accepts_bitcoin` is gone from schema, code, and tests.
+- An invoice cannot transition out of `draft` without a valid `btc_address`, enforced both at the action layer and the DB layer.
+- The public payer page offers Bitcoin as the only payment method.
+- No email or in-app copy implies fiat is a payment option.
+- The per-invoice address-uniqueness guarantee from v1.4.12 is preserved.
+- Marketing-facing copy reads as bitcoin-only positioning.
 
 ---
 
