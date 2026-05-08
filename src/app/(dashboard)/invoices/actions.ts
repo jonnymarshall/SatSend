@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import { computeInvoiceTotals, LineItem } from "@/lib/invoices";
+import { canPublishInvoice } from "@/lib/invoices/can-publish";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
@@ -69,7 +70,6 @@ export interface InvoicePayload {
   client_tax_id?: string;
   line_items: LineItem[];
   tax_percent: number;
-  accepts_bitcoin: boolean;
   btc_address?: string;
   due_date?: string;
   access_code?: string;
@@ -79,7 +79,8 @@ export async function saveDraft(payload: InvoicePayload) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (payload.accepts_bitcoin && payload.btc_address) {
+  // v1.4.14: bitcoin-only — validation is gated on address presence alone.
+  if (payload.btc_address) {
     await assertAddressUniqueness(supabase, payload.btc_address);
     await assertAddressFreshness(payload.btc_address);
   }
@@ -107,8 +108,7 @@ export async function saveDraft(payload: InvoicePayload) {
       subtotal_fiat: subtotal,
       total_fiat: total,
       currency: "USD",
-      accepts_bitcoin: payload.accepts_bitcoin,
-      btc_address: payload.accepts_bitcoin ? (payload.btc_address || null) : null,
+      btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,
       status: "draft",
@@ -134,7 +134,7 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
   if (!existing || existing.user_id !== user!.id) throw new Error("Invoice not found");
   if (existing.status !== "draft") throw new Error("Only draft invoices can be edited");
 
-  if (payload.accepts_bitcoin && payload.btc_address) {
+  if (payload.btc_address) {
     await assertAddressUniqueness(supabase, payload.btc_address, invoiceId);
     await assertAddressFreshness(payload.btc_address, invoiceId);
   }
@@ -160,8 +160,7 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
       total_fiat: total,
-      accepts_bitcoin: payload.accepts_bitcoin,
-      btc_address: payload.accepts_bitcoin ? (payload.btc_address || null) : null,
+      btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,
     })
@@ -179,7 +178,6 @@ type Invoice = Record<string, unknown> & {
   id: string;
   user_id: string;
   status: string;
-  accepts_bitcoin: boolean;
   btc_address: string | null;
   client_email: string | null;
   client_name: string | null;
@@ -209,15 +207,17 @@ async function loadAndAuthorise(invoiceId: string): Promise<{
   if (fetchError || !invoice) throw new Error("Invoice not found");
   if (invoice.user_id !== user!.id) throw new Error("Forbidden");
 
-  // Only check BTC validity and uniqueness if bitcoin is enabled and address is provided
-  if (invoice.accepts_bitcoin && invoice.btc_address) {
-    if (!isValidBtcAddress(invoice.btc_address)) {
-      throw new Error("btc_address: Invalid BTC address");
+  // v1.4.14: every publish requires a valid btc_address (bitcoin-only).
+  const check = canPublishInvoice({ btc_address: invoice.btc_address });
+  if (!check.ok) {
+    if (check.error === "btc_address_required") {
+      throw new Error("btc_address: A bitcoin address is required to publish");
     }
-
-    await assertAddressUniqueness(supabase, invoice.btc_address, invoiceId);
-    await assertAddressFreshness(invoice.btc_address, invoice.id);
+    throw new Error("btc_address: Invalid BTC address");
   }
+
+  await assertAddressUniqueness(supabase, invoice.btc_address, invoiceId);
+  await assertAddressFreshness(invoice.btc_address, invoice.id);
 
   return { supabase, invoice: invoice as Invoice };
 }
@@ -436,7 +436,6 @@ export async function duplicateInvoice(invoiceId: string) {
       subtotal_fiat: source.subtotal_fiat,
       total_fiat: source.total_fiat,
       currency: source.currency,
-      accepts_bitcoin: source.accepts_bitcoin,
       btc_address: null,
       due_date: source.due_date,
       status: "draft",

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14] - 2026-05-08
+
+### Changed
+
+- **Bitcoin-only focus.** The product pivots to a bitcoin-only invoicing positioning. The "Accept Bitcoin payment" checkbox is gone from the invoice form; the BTC address field renders unconditionally. Drafts may still be saved without an address; publishing requires one. Format validation runs whenever an address is set.
+- **`canPublishInvoice` publish-gate function** (`src/lib/invoices/can-publish.ts`). Single source of truth for "is this invoice publishable" — used by the server actions and (transitively) by the form. Returns a discriminated union: ok / required / invalid.
+- **Server actions enforce the publish-gate at every entry point.** `loadAndAuthorise` (used by `publishInvoice`, `publishAndSendEmail`, `publishAndMarkSent`) now runs `canPublishInvoice` unconditionally. The legacy `accepts_bitcoin && btc_address` short-circuit is gone.
+- **Validation gates on `btc_address` presence alone.** `saveDraft`, `updateDraft`, and the form's `validate()` no longer consult the `accepts_bitcoin` flag. `validate(isPublish)` distinguishes draft-time (presence not required) from publish-time (presence required).
+- **Display gates simplified across owner detail page, public payer page, and PDF.** Every place that read `invoice.accepts_bitcoin` now reads only `invoice.btc_address`. The `accepts_bitcoin` flag is no longer consulted anywhere in the codebase.
+- **`invoice_published` email copy is bitcoin-centric.** Body explicitly says the invoice is "payable in bitcoin"; CTA renamed from "View invoice" to "View and pay". Other templates (`payment_detected`, `payment_confirmed`) already referenced Bitcoin context and need no change.
+
+### Migrations
+
+- `0015_fiat_and_manual_confirmation.sql` (cherry-picked from the abandoned fiat branch — already on remote).
+- `0016_payment_confirmed_event_type.sql` (cherry-picked from the abandoned fiat branch — already on remote).
+- `0017_revert_fiat_and_manual_confirmation.sql` — drops the columns / custom types added by 0015, recreates `invoice_status` without `marked_as_paid`, recreates `invoice_event_type` without `payment_confirmed`. Drops and recreates the `anon_select_non_draft` policy, `invoice_email_summary` view, and `invoices_btc_address_active_idx` partial index since they all referenced `invoices.status`.
+- `0018_bitcoin_only.sql` — drops the `accepts_bitcoin` column and adds a `btc_address_required_when_published` CHECK constraint (`status = 'draft' or btc_address is not null`). Defensive abort if any non-draft rows lack an address. **Deploy ordering: this migration must be pushed AFTER the new code deploys, not before, so the currently-deployed pre-pivot writes do not fail.**
+
+### Notes
+
+- Marketing / landing copy is deliberately out of scope. A marketing page does not yet exist; building it is tracked as v1.4.23 and lands after v1.4.15 (rename to SatSend).
+- Manual mark-as-paid escape hatches and partial-payment / under-overpayment handling are not in this release. The latter is queued as v1.4.19 (Payment Amount Awareness).
+- The fiat-payment work originally scoped for v1.4.14 is preserved as a single WIP commit on `origin/v1.4.14/fiat-payment-and-manual-confirmation` (not merged), recoverable post-launch if revived.
+
 ## [1.4.13.7] - 2026-05-05
 
 ### Changed

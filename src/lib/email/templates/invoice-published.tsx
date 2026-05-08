@@ -27,11 +27,11 @@ export function InvoicePublishedEmail({
         <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
           <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>{label} from {senderName}</Heading>
           <Text>Hi {clientName},</Text>
-          <Text>{senderName} has sent you an invoice for <strong>{totalDisplay}</strong>.</Text>
+          <Text>{senderName} has sent you an invoice for <strong>{totalDisplay}</strong>, payable in bitcoin.</Text>
           {dueDateDisplay ? <Text>Due: {dueDateDisplay}</Text> : null}
           <Section style={{ margin: "24px 0" }}>
             <Link href={invoiceUrl} style={{ display: "inline-block", padding: "12px 20px", backgroundColor: "#DE3C4B", color: "#ffffff", borderRadius: "6px", textDecoration: "none" }}>
-              View invoice
+              View and pay
             </Link>
           </Section>
           {accessCode ? (

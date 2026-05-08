@@ -22,7 +22,6 @@ const BASE_INVOICE = {
   tax_percent: 0,
   total_fiat: 1000,
   currency: "USD",
-  accepts_bitcoin: false,
   btc_address: null as string | null,
   btc_txid: null as string | null,
   status: "pending",
@@ -96,7 +95,6 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
       makeSupabaseMock({
         ...BASE_INVOICE,
         status: "draft",
-        accepts_bitcoin: true,
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
@@ -110,7 +108,6 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
       makeSupabaseMock({
         ...BASE_INVOICE,
         status: "archived",
-        accepts_bitcoin: true,
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
@@ -124,7 +121,6 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
       makeSupabaseMock({
         ...BASE_INVOICE,
         status: "pending",
-        accepts_bitcoin: true,
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
@@ -138,7 +134,6 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
       makeSupabaseMock({
         ...BASE_INVOICE,
         status: "overdue",
-        accepts_bitcoin: true,
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );

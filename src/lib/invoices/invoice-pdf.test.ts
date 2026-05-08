@@ -26,7 +26,6 @@ const baseInvoice: Invoice = {
   tax_percent: 20,
   total_fiat: 7200,
   currency: "USD",
-  accepts_bitcoin: true,
   btc_address: "bc1qexampleaddressforinvoice000000000000",
   btc_txid: null,
   status: "pending",
@@ -69,13 +68,13 @@ describe("renderInvoicePdf", () => {
     expect(text).toContain("Consulting hours");
   });
 
-  it("includes the BTC address when accepts_bitcoin is true", async () => {
+  it("includes the BTC address when btc_address is set", async () => {
     const text = await textFromPdf(baseInvoice);
     expect(text).toContain("bc1qexampleaddressforinvoice000000000000");
   });
 
-  it("omits BTC address when accepts_bitcoin is false", async () => {
-    const text = await textFromPdf({ ...baseInvoice, accepts_bitcoin: false });
+  it("omits BTC address when btc_address is null (drafts)", async () => {
+    const text = await textFromPdf({ ...baseInvoice, btc_address: null });
     expect(text).not.toContain("bc1qexampleaddressforinvoice000000000000");
   });
 

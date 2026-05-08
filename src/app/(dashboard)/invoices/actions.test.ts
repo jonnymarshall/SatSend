@@ -31,7 +31,6 @@ const VALID_DRAFT = {
   client_email: "acme@example.com",
   line_items: [{ description: "Work", quantity: 1, unit_price: 1000 }],
   tax_percent: 0,
-  accepts_bitcoin: true,
   btc_address: "bc1qtest",
   due_date: "2026-06-01",
 };
@@ -133,9 +132,9 @@ describe("saveDraft", () => {
     warnSpy.mockRestore();
   });
 
-  it("skips the freshness check when accepts_bitcoin is false (no address to check)", async () => {
+  it("skips the freshness check when btc_address is absent (no address to check)", async () => {
     const { insertSingle } = makeSupabase();
-    await saveDraft({ ...VALID_DRAFT, accepts_bitcoin: false });
+    await saveDraft({ ...VALID_DRAFT, btc_address: undefined });
     expect(addressHasHistory).not.toHaveBeenCalled();
     expect(insertSingle).toHaveBeenCalled();
   });
@@ -183,7 +182,6 @@ const PUBLISHABLE_INVOICE = {
   id: "inv-1",
   status: "draft",
   user_id: "user-1",
-  accepts_bitcoin: true,
   btc_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
   client_email: "client@example.com",
   client_name: "Ada",
@@ -257,6 +255,17 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
     expect(payload.sent_at).toBeTruthy();
     expect(payload.send_method).toBe("email");
     expect(payload.email_attempted_at).toBeTruthy();
+  });
+});
+
+describe("publishInvoice — btc_address publish-gate (v1.4.14)", () => {
+  it("rejects when the invoice has no btc_address", async () => {
+    const noAddress = { ...PUBLISHABLE_INVOICE, btc_address: null };
+    const { updateChain } = makeSupabase({ fetchData: noAddress });
+    await expect(publishInvoice("inv-1")).rejects.toThrow(
+      /btc_address.*required/i,
+    );
+    expect(updateChain).not.toHaveBeenCalled();
   });
 });
 
@@ -551,7 +560,6 @@ describe("duplicateInvoice", () => {
     subtotal_fiat: 1000,
     total_fiat: 1100,
     currency: "USD",
-    accepts_bitcoin: true,
     btc_address: "bc1qtest",
     due_date: "2026-06-01",
     access_code: "LETMEIN1",

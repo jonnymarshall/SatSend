@@ -42,7 +42,6 @@ export default async function EditInvoicePage({
           client_tax_id: invoice.client_tax_id ?? "",
           line_items: (invoice.line_items as LineItem[]) ?? [{ description: "", quantity: 1, unit_price: 0 }],
           tax_percent: invoice.tax_percent ? String(invoice.tax_percent) : "",
-          accepts_bitcoin: invoice.accepts_bitcoin ?? false,
           btc_address: invoice.btc_address ?? "",
           due_date: invoice.due_date ? new Date(invoice.due_date) : undefined,
           no_due_date: !invoice.due_date,

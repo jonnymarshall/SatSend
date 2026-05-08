@@ -56,7 +56,6 @@ interface FormState {
   client_tax_id: string;
   line_items: LineItem[];
   tax_percent: string;
-  accepts_bitcoin: boolean;
   btc_address: string;
   due_date: Date | undefined;
   no_due_date: boolean;
@@ -77,7 +76,6 @@ const DEFAULT_STATE: FormState = {
   client_tax_id: "",
   line_items: [{ description: "", quantity: 1, unit_price: 0 }],
   tax_percent: "",
-  accepts_bitcoin: false,
   btc_address: "",
   due_date: undefined,
   no_due_date: false,
@@ -184,13 +182,14 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     btc_address: "input-btc-address",
   };
 
-  function validate(): boolean {
+  function validate(isPublish: boolean): boolean {
     const errs: Record<string, string> = {};
     if (form.client_email && !isValidEmail(form.client_email)) errs.client_email = "Must be a valid email";
     if (form.your_email && !isValidEmail(form.your_email)) errs.your_email = "Must be a valid email";
     if (form.invoice_number && form.invoice_number.length > 50) errs.invoice_number = "Max 50 characters";
-    if (form.accepts_bitcoin && !form.btc_address.trim()) errs.btc_address = "BTC address required when Bitcoin is enabled";
-    if (form.accepts_bitcoin && form.btc_address.trim() && !isValidBtcAddress(form.btc_address.trim())) errs.btc_address = "Invalid BTC address";
+    const btc = form.btc_address.trim();
+    if (btc && !isValidBtcAddress(btc)) errs.btc_address = "Invalid BTC address";
+    if (isPublish && !btc) errs.btc_address = "BTC address is required to publish";
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstKey = Object.keys(errs)[0];
@@ -215,8 +214,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       client_tax_id: form.client_tax_id || undefined,
       line_items: form.line_items,
       tax_percent: parseFloat(form.tax_percent) || 0,
-      accepts_bitcoin: form.accepts_bitcoin,
-      btc_address: form.accepts_bitcoin ? form.btc_address : undefined,
+      btc_address: form.btc_address.trim() || undefined,
       due_date: !form.no_due_date && form.due_date ? form.due_date.toISOString().split("T")[0] : undefined,
       access_code: form.access_code.trim() || undefined,
     };
@@ -233,7 +231,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   }
 
   async function handleSaveDraft() {
-    if (!validate()) return;
+    if (!validate(false)) return;
     setSaving(true);
     try {
       const payload = buildPayload();
@@ -254,7 +252,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   // Shared flow for all four publish/send options. Saves/updates the draft to obtain
   // an id, then runs the chosen publish action against that id, then navigates.
   async function runPublishFlow<T>(action: (id: string) => Promise<T>, postNavigate?: (result: T) => void) {
-    if (!validate()) return;
+    if (!validate(true)) return;
     setSaving(true);
     try {
       const payload = buildPayload();
@@ -465,32 +463,21 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
         </Field>
       </section>
 
-      {/* Bitcoin */}
-      <section id="section-bitcoin" className="space-y-3">
-        <label id="label-accepts-bitcoin" htmlFor="input-accepts-bitcoin" className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+      {/* Bitcoin address — required to publish, optional for drafts */}
+      <section id="section-btc-address" className="space-y-3">
+        <Field label="BTC address" error={errors.btc_address}>
           <input
-            id="input-accepts-bitcoin"
-            type="checkbox"
-            checked={form.accepts_bitcoin}
-            onChange={(e) => set("accepts_bitcoin", e.target.checked)}
-            className="rounded border-border"
+            id="input-btc-address"
+            type="text"
+            value={form.btc_address}
+            onChange={(e) => set("btc_address", e.target.value)}
+            className={inputCls}
+            placeholder="bc1q…"
           />
-          Accept Bitcoin payment
-        </label>
-        {form.accepts_bitcoin && (
-          <div id="section-btc-address">
-            <Field label="BTC address" error={errors.btc_address}>
-              <input
-                id="input-btc-address"
-                type="text"
-                value={form.btc_address}
-                onChange={(e) => set("btc_address", e.target.value)}
-                className={inputCls}
-                placeholder="bc1q…"
-              />
-            </Field>
-          </div>
-        )}
+          <p id="hint-btc-address" className="text-xs text-muted-foreground">
+            Required to publish. Each invoice needs a fresh, unique address — reusing one breaks payment detection.
+          </p>
+        </Field>
       </section>
 
       {/* Access code */}
