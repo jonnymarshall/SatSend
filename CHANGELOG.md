@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14.2] - 2026-05-08
+
+### Migrations
+
+- `0018_bitcoin_only.sql` — edited to be self-healing. The original draft aborted on non-zero offenders (`status != 'draft' AND btc_address IS NULL`), assuming v1.4.14.1's `0019` would clean them up first. But the Supabase CLI applies migrations in filename order: `0018` ran before `0019` got a chance, hit the abort, and the deploy stalled. Replaced the `raise exception` with an inline `delete from invoices where status != 'draft' and btc_address is null` plus a `raise notice` so the deleted count is logged. Constraint add + column drop are unchanged. `0019` becomes a documented no-op (its delete matches zero rows on the next run, because `0018` already cleared them).
+
+### Notes
+
+- Editing a not-yet-applied migration file is safe; the CLI re-reads content on each push. The remote `_supabase_migrations` table never had `0018` recorded as applied because of the original abort.
+- Anyone with a fresh checkout running `db push` after this branch lands sees a clean apply: `0018` (self-healing) → `0019` (no-op).
+
 ## [1.4.14.1] - 2026-05-08
 
 ### Migrations

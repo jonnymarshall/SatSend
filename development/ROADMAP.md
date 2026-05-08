@@ -1192,6 +1192,30 @@ Inspection of all 24 confirmed they are abandoned test data: trivial totals (mos
 
 ---
 
+### 🔄 v1.4.14.2 — Migration 0018 self-healing fix
+
+**Branch:** `v1.4.14.2/migration-order-fix`
+
+**Context:** v1.4.14.1 added migration `0019` to delete the 24 abandoned test invoices that violated the publish-time `btc_address` invariant. Plan was: 0019 deletes junk → 0018 retries cleanly. But the Supabase CLI applies migrations in filename order, so on the next `db push` `0018` ran first, hit its defensive `raise exception` abort (because the offenders were still there), and `0019` never got a chance to run.
+
+The fix is to make `0018` self-healing: instead of aborting on non-zero offenders, delete them inline. The constraint added in step 2 of the same migration then guarantees the state can never recur.
+
+**Scope**
+
+- [ ] Edit `0018_bitcoin_only.sql`. Replace the `raise exception` block with a `delete from invoices where status != 'draft' and btc_address is null`, plus a `raise notice` so the deleted count is visible in the migration log. Migration content is otherwise unchanged: same constraint add, same column drop. Cascading FKs handle related rows.
+- [ ] `0019` stays as-is. After this branch merges and `db push` runs, `0019`'s `delete` matches zero rows (because `0018` already cleared them) and is a documented no-op. Keeps the v1.4.14.1 audit trail intact.
+- [ ] Update CHANGELOG with v1.4.14.2 entry.
+
+**Why edit the merged 0018 instead of renaming or splitting:** Editing a migration file that has not yet been applied to remote (which 0018 hasn't, due to the abort) is safe — the supabase CLI re-reads the file content on each push. Renaming `0018` → `0020` to force order would propagate stale references through the v1.4.14 roadmap and CHANGELOG. Inlining the cleanup keeps `0018` as the single "make-the-schema-bitcoin-only" migration it was designed to be, just less brittle against legacy data.
+
+**Out of scope**
+- Removing or modifying `0019`. Even though it is now redundant, leaving it preserves the v1.4.14.1 history and costs nothing.
+- Any code changes. Migration-only branch.
+
+**Done when:** `0018` is self-healing, `npx supabase db push` from main applies both `0018` (deletes any offenders, adds the constraint, drops `accepts_bitcoin`) and `0019` (no-op) cleanly; remote schema matches local migration state at version `0019`; the v1.4.14 column-drop and CHECK constraint are both in place.
+
+---
+
 ### ⏳ v1.4.15 — Rename Paybitty → SatSend
 
 **Branch:** `v1.4.15/rename-to-satsend`
