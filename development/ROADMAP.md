@@ -1216,6 +1216,28 @@ The fix is to make `0018` self-healing: instead of aborting on non-zero offender
 
 ---
 
+### 🔄 v1.4.14.3 — Migration 0018 view-dependency fix
+
+**Branch:** `v1.4.14.3/migration-view-dependency-fix`
+
+**Context:** v1.4.14.2's self-healing fix to `0018` got past the offenders abort but tripped on a different obstacle: the `invoice_email_summary` view (created in migration `0012`) does `select i.*` from `invoices`, which captures every column including `accepts_bitcoin`. Postgres blocks `drop column` whenever a view references the column, so `0018` errored at `alter table invoices drop column accepts_bitcoin`.
+
+The exact same drop-and-recreate pattern was already used in `0017` for the same view; I just missed adding it to `0018`. This branch closes that gap.
+
+**Workflow note:** Per durable convention adopted with this branch, the migration was tested against remote *before* the PR was opened. `npx supabase db push` from this branch applied `0018` cleanly (the offenders deletion logged a NOTICE for 24 rows, the view was dropped/recreated, the column was dropped, the constraint was added). Migration tracking now shows local and remote both at `0019`. The PR ceremony is now formality only — the schema change is already landed.
+
+**Scope**
+
+- [ ] Edit `0018_bitcoin_only.sql`. Between step 2 (constraint add) and the column drop, add `drop view if exists invoice_email_summary`. After the column drop, add a verbatim `create or replace view invoice_email_summary as select i.*, ... from invoices i left join lateral (...) e on true` matching the original from `0012`.
+- [ ] Update CHANGELOG with v1.4.14.3 entry.
+
+**Out of scope**
+- Changing how the view is defined (e.g. naming columns explicitly instead of `select i.*`). That would avoid this dance forever, but it's a wider change than this hotfix's scope.
+
+**Done when:** `0018`'s edited file matches what was actually applied to remote; the view drop/recreate pattern is documented inline; CHANGELOG has the v1.4.14.3 entry; PR merges so main's git history matches the remote DB state.
+
+---
+
 ### ⏳ v1.4.15 — Rename Paybitty → SatSend
 
 **Branch:** `v1.4.15/rename-to-satsend`

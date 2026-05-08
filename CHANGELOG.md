@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14.3] - 2026-05-08
+
+### Migrations
+
+- `0018_bitcoin_only.sql` — drops and recreates the `invoice_email_summary` view around the column drop. The view (from `0012`) does `select i.*` from `invoices`, which captures `accepts_bitcoin`; Postgres blocks `drop column` whenever a view references the column. Same drop-and-recreate dance that `0017` already used.
+
+### Notes
+
+- This was the second of two missed dependencies on `accepts_bitcoin` in the original `0018` design (the first was the offenders abort, fixed in v1.4.14.2). Migration was verified against remote with `npx supabase db push` BEFORE this PR was opened — local and remote tracking now both at `0019` with the schema change fully landed.
+- New durable convention: future Supabase migrations get tested against remote *before* PR ceremony. Saved as a feedback memory.
+
 ## [1.4.14.2] - 2026-05-08
 
 ### Migrations

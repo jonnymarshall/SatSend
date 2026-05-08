@@ -44,5 +44,30 @@ end$$;
 alter table invoices add constraint btc_address_required_when_published
   check (status = 'draft' or btc_address is not null);
 
--- 3. Drop the accepts_bitcoin column.
+-- 3. Drop the `invoice_email_summary` view before the column drop, then
+--    recreate it after. The view (migration 0012) does `select i.*` which
+--    captures every invoice column, including `accepts_bitcoin`. Postgres
+--    blocks `drop column` whenever a view references the column, so the
+--    drop+recreate pattern is necessary. Mirrors the same dance in
+--    migration 0017.
+drop view if exists invoice_email_summary;
+
+-- 4. Drop the accepts_bitcoin column.
 alter table invoices drop column accepts_bitcoin;
+
+-- 5. Recreate the view with its original body (verbatim from migration 0012).
+create or replace view invoice_email_summary as
+select
+  i.*,
+  e.status        as last_publish_email_status,
+  e.error_message as last_publish_email_error,
+  e.created_at    as last_publish_email_at
+from invoices i
+left join lateral (
+  select status, error_message, created_at
+    from email_events
+   where invoice_id = i.id
+     and email_type = 'invoice_published'
+   order by created_at desc
+   limit 1
+) e on true;
