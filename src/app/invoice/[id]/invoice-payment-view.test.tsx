@@ -64,7 +64,6 @@ const BASE_INVOICE: Invoice = {
   tax_percent: 0,
   total_fiat: 500,
   currency: "USD",
-  accepts_bitcoin: false,
   btc_address: null,
   btc_txid: null,
   status: "pending",
@@ -106,7 +105,6 @@ describe("InvoicePaymentView — dates", () => {
 describe("InvoicePaymentView — BTC reveal", () => {
   const BTC_INVOICE: Invoice = {
     ...BASE_INVOICE,
-    accepts_bitcoin: true,
     btc_address: "tb1qtarget",
     status: "pending",
   };
@@ -141,7 +139,6 @@ describe("InvoicePaymentView — BTC reveal", () => {
 describe("InvoicePaymentView — copy buttons", () => {
   const BTC_INVOICE: Invoice = {
     ...BASE_INVOICE,
-    accepts_bitcoin: true,
     btc_address: "tb1qtarget",
     status: "paid",
   };
@@ -177,7 +174,6 @@ describe("InvoicePaymentView — copy buttons", () => {
 describe("InvoicePaymentView — txid live-update (v1.4.13)", () => {
   const BTC_INVOICE_PENDING: Invoice = {
     ...BASE_INVOICE,
-    accepts_bitcoin: true,
     btc_address: "tb1qtarget",
     btc_txid: null,
     status: "pending",

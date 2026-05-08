@@ -26,7 +26,6 @@ const baseInvoice: Invoice = {
   tax_percent: 20,
   total_fiat: 7200,
   currency: "USD",
-  accepts_bitcoin: true,
   btc_address: "bc1qexampleaddressforinvoice000000000000",
   btc_txid: null,
   status: "pending",

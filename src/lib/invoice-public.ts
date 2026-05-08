@@ -21,7 +21,6 @@ export interface Invoice {
   tax_percent: number;
   total_fiat: number;
   currency: string;
-  accepts_bitcoin: boolean;
   btc_address: string | null;
   btc_txid: string | null;
   status: "draft" | "pending" | "payment_detected" | "paid" | "overdue" | "archived";

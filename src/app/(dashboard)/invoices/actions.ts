@@ -80,8 +80,6 @@ export async function saveDraft(payload: InvoicePayload) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // v1.4.14: bitcoin-only — validation is gated on address presence alone.
-  // The legacy accepts_bitcoin flag is ignored on the validation path; the
-  // column itself is dropped in slice 7's migration.
   if (payload.btc_address) {
     await assertAddressUniqueness(supabase, payload.btc_address);
     await assertAddressFreshness(payload.btc_address);
@@ -110,7 +108,6 @@ export async function saveDraft(payload: InvoicePayload) {
       subtotal_fiat: subtotal,
       total_fiat: total,
       currency: "USD",
-      accepts_bitcoin: true,
       btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,
@@ -163,7 +160,6 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
       total_fiat: total,
-      accepts_bitcoin: true,
       btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,
@@ -182,7 +178,6 @@ type Invoice = Record<string, unknown> & {
   id: string;
   user_id: string;
   status: string;
-  accepts_bitcoin: boolean;
   btc_address: string | null;
   client_email: string | null;
   client_name: string | null;
@@ -441,7 +436,6 @@ export async function duplicateInvoice(invoiceId: string) {
       subtotal_fiat: source.subtotal_fiat,
       total_fiat: source.total_fiat,
       currency: source.currency,
-      accepts_bitcoin: source.accepts_bitcoin,
       btc_address: null,
       due_date: source.due_date,
       status: "draft",

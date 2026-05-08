@@ -34,7 +34,6 @@ const publishedInvoice = {
   tax_percent: 0,
   total_fiat: 100,
   currency: "USD",
-  accepts_bitcoin: false,
   btc_address: null,
   btc_txid: null,
   status: "pending",
