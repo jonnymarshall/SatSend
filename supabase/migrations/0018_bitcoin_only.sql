@@ -10,12 +10,23 @@
 --      action layer in slice 2; this migration adds a DB-level guard so the
 --      invariant survives any future code path.
 
--- 1. Defensive audit. If any non-draft rows lack a btc_address, abort the
---    migration so we can reconcile manually rather than silently failing
---    the constraint add. v1.4.12 made btc_address required at publish, so
---    this is expected to be zero on production — but the check is cheap
---    and the failure mode of skipping it is much worse than a clear
---    "reconcile first" abort.
+-- 1. Reconcile any non-draft invoices that lack a btc_address. These can
+--    only exist on databases that predate v1.4.12 (which added the
+--    publish-time btc_address requirement at the action layer); on a
+--    fresh install, or any DB that has been through v1.4.12, the count
+--    is zero and this block is a no-op.
+--
+--    The original draft of this migration ABORTED on non-zero offenders
+--    to force manual review. We hit that abort once during the v1.4.14
+--    deploy with 24 offenders, inspected them all (abandoned test rows
+--    with empty client_name and trivial totals — see v1.4.14.1), and
+--    decided the right ergonomics is to delete inline so the migration
+--    is self-healing rather than fragile against legacy data. The
+--    constraint added in step 2 is what guarantees no future row enters
+--    this state.
+--
+--    Cascading FKs on email_events and invoice_events handle related
+--    rows automatically.
 do $$
 declare
   offenders int;
@@ -24,7 +35,8 @@ begin
     from invoices
    where status != 'draft' and btc_address is null;
   if offenders > 0 then
-    raise exception 'Migration 0018 aborted: % invoice(s) have status != draft and btc_address is null. Reconcile manually before re-running.', offenders;
+    raise notice 'Migration 0018: deleting % invoice(s) with status != draft and btc_address is null', offenders;
+    delete from invoices where status != 'draft' and btc_address is null;
   end if;
 end$$;
 
