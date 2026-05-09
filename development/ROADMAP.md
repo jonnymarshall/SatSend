@@ -1292,27 +1292,30 @@ The exact same drop-and-recreate pattern was already used in `0017` for the same
 
 ---
 
-### ⏳ v1.4.17 — Invoices Pagination State Preserved on Navigate-Away
+### ✅ v1.4.17 — Invoices Pagination State Preserved on Navigate-Away
 
 **Branch:** `v1.4.17/invoices-pagination-state`
 
 **Context (bug):** `/invoices` paginates server-side (TanStack `getPaginationRowModel`). If the owner is on page 3 of their invoices, opens an invoice (`/invoices/[id]`), and clicks "← Invoices" to return, the list resets to page 1. They have to navigate forward again to get back to where they were. Same problem if they navigate away and come back via the browser back button or the nav.
 
-**Likely cause:** pagination state lives only in `useState` inside `InvoiceDataTable`. It's never reflected in the URL or persisted across mount/unmount, so the component re-mounts fresh on return.
+**Likely cause:** pagination state lives only in `useState` inside `InvoiceDataTable`. It's never reflected in the URL or persisted across mount/unmount, so the component re-mounts fresh on return. Plus, the `← Invoices` link itself was a hard `<Link href="/invoices">` (not `router.back()`), so even with URL state added, clicking it would still drop the page param.
 
 **Scope**
-- [ ] Choose a persistence approach. Options:
-  - **URL search param (`?page=3`)** — simplest, shareable, plays well with App Router's `useSearchParams`. Preferred unless there's a strong reason against.
-  - `sessionStorage` — survives navigation but not a hard refresh, and not URL-shareable. Reject.
-  - Server-side pagination via Next.js search params — bigger lift; only if URL-param refactor is needed anyway.
-- [ ] Wire up `useSearchParams` + `router.replace(?page=N)` in `data-table.tsx` so pagination changes update the URL, and initial state reads from the URL.
-- [ ] Verify the same approach handles other transient state worth preserving on navigate-away — global filter (search box), archive toggle, sort. Decide per piece of state; the bug report is about pagination specifically but the fix is most coherent if applied consistently.
-- [ ] Verify TanStack `pagination.pageIndex` ↔ URL stays in sync without infinite re-render loops.
+- [x] Persistence approach chosen: **URL search param (`?page=N`)**. 1-indexed in the URL (user-friendly), 0-indexed internally (TanStack convention). Page 1 = no param (canonical clean URL). `sessionStorage` rejected (not shareable, doesn't survive hard refresh).
+- [x] Wired `useSearchParams` + `router.replace` in `data-table.tsx`: initial `pageIndex` parsed via `parsePageParam()`, `onPaginationChange` callback writes URL on every page change. `{ scroll: false }` to avoid scroll-to-top when paging.
+- [x] **Out of scope (decided during planning):** persisting global filter, sort, or archive toggle. The bug report is specifically about pagination; those are query operations and reset-on-navigate matches user mental model. One-line additions later if real users complain.
+- [x] Clamp effect: if URL or filtering pushes `pageIndex` past `getPageCount() - 1`, reset to last available page. Prevents empty-table flash on `?page=99` and stale page after filtering.
+- [x] **Added during planning:** the `← Invoices` link in `[id]/page.tsx:42` was a hard `<Link href="/invoices">` — would drop page state even with URL persistence in place. Replaced with new `BackToInvoices` client component that uses `router.back()` when history exists, falling back to `router.push("/invoices")` for deep-link arrivals (paste URL, email).
+- [x] **Added:** wrap `<InvoiceDataTable>` in `<Suspense>` in `page.tsx` — required by Next.js App Router when a client component uses `useSearchParams`.
 
 **Tests**
-- [ ] Component test: rendering `InvoiceDataTable` with `?page=2` initial route lands on page 2.
-- [ ] Component test: clicking "Next" updates `?page=2` in the URL (mock `router.replace`).
-- [ ] Manual test: navigate to page 3, open an invoice, click back, confirm still on page 3.
+- [x] Component test: rendering `InvoiceDataTable` with `?page=2` lands on page 2 (verified via row visibility — page-2 rows present, page-1 rows absent).
+- [x] Component test: clicking "Next" calls `router.replace("/invoices?page=2", { scroll: false })`.
+- [x] Component test: clicking "Previous" from page 2 strips the param entirely (canonical clean URL).
+- [x] Component test (parameterized): invalid `?page=` values (`foo`, `0`, `-1`, ``) all default to page 1.
+- [x] Component test: `?page=99` (out-of-bounds) clamps to last available page.
+- [x] Component test (`back-to-invoices.test.tsx`): `BackToInvoices` calls `router.back()` when `window.history.length > 1`, falls back to `router.push("/invoices")` when history is empty.
+- [x] Manual tests: 8 scenarios in `manual-tests/v1.4.17-invoices-pagination-state.md` covering click-back, browser back, hard refresh, direct URL share, out-of-bounds, garbage values, sidebar nav, deep-link back-link.
 
 **Done when:** the dashboard pagination position is preserved across forward-and-back navigation, hard refresh, and direct URL-share, with the URL reflecting the current page.
 

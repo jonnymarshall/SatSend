@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceDates } from "@/components/invoice-dates";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
@@ -8,6 +7,7 @@ import { InvoiceDetailRealtime } from "./invoice-detail-realtime";
 import { CopyButton } from "@/components/copy-button";
 import { InvoiceActions } from "./invoice-actions";
 import { InvoiceActivityCard } from "./invoice-activity-card";
+import { BackToInvoices } from "./back-to-invoices";
 import type { LineItem } from "@/lib/invoices";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 
@@ -39,9 +39,7 @@ export default async function InvoiceDetailPage({
       {/* Header */}
       <div id="invoice-detail--header" className="flex items-start justify-between">
         <div>
-          <Link id="invoice-detail--back-link" href="/invoices" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Invoices
-          </Link>
+          <BackToInvoices />
           <div className="mt-2">
             <h1 id="invoice-detail--heading" className="text-2xl font-semibold">{invoice.invoice_number || "Invoice"}</h1>
           </div>

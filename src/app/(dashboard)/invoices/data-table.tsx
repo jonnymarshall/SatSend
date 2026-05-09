@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ColumnFiltersState,
+  PaginationState,
   SortingState,
+  Updater,
   VisibilityState,
   flexRender,
   getCoreRowModel,
@@ -52,6 +54,16 @@ import {
 import { buildColumns, InvoiceRow } from "./columns";
 import { useInvoiceRealtime } from "./use-invoice-realtime";
 
+const DEFAULT_PAGE_SIZE = 10;
+
+function parsePageParam(raw: string | null): number {
+  // Returns a 0-indexed pageIndex. Invalid / missing / <1 → 0 (page 1).
+  if (raw == null) return 0;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 0;
+  return n - 1;
+}
+
 const COLUMN_LABELS: Record<string, string> = {
   invoice_number: "Invoice",
   client_name: "Client",
@@ -68,7 +80,34 @@ interface Props {
 
 export function InvoiceDataTable({ data, userId }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   useInvoiceRealtime(userId);
+  const [pagination, setPagination] = React.useState<PaginationState>(() => ({
+    pageIndex: parsePageParam(searchParams.get("page")),
+    pageSize: DEFAULT_PAGE_SIZE,
+  }));
+
+  const onPaginationChange = React.useCallback(
+    (updater: Updater<PaginationState>) => {
+      setPagination((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        // Reflect pageIndex in the URL so back / forward / refresh / share preserve it.
+        // Page 1 = no param (canonical clean URL).
+        const params = new URLSearchParams(searchParams.toString());
+        if (next.pageIndex > 0) {
+          params.set("page", String(next.pageIndex + 1));
+        } else {
+          params.delete("page");
+        }
+        const qs = params.toString();
+        const url = qs ? `${pathname}?${qs}` : pathname;
+        router.replace(url, { scroll: false });
+        return next;
+      });
+    },
+    [router, pathname, searchParams]
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([
     { id: "status", value: ["draft", "pending", "payment_detected", "paid", "overdue"] },
@@ -127,6 +166,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const table = useReactTable({
     data,
     columns,
+    onPaginationChange,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -145,6 +185,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
       return num.includes(q) || client.includes(q);
     },
     state: {
+      pagination,
       sorting,
       columnFilters,
       globalFilter,
@@ -162,6 +203,14 @@ export function InvoiceDataTable({ data, userId }: Props) {
       : ["draft", "pending", "payment_detected", "paid", "overdue"];
     table.getColumn("status")?.setFilterValue(statusValues);
   }, [showArchived, table]);
+
+  // Clamp pageIndex if the URL or filtering pushes it past the last available page.
+  const pageCount = table.getPageCount();
+  React.useEffect(() => {
+    if (pageCount > 0 && pagination.pageIndex > pageCount - 1) {
+      table.setPageIndex(pageCount - 1);
+    }
+  }, [pageCount, pagination.pageIndex, table]);
 
   async function handleBulkMarkPaid() {
     setPending(true);

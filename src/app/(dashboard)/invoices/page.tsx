@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceDataTable } from "./data-table";
@@ -37,7 +38,9 @@ export default async function InvoicesPage() {
           </Link>
         </div>
       ) : (
-        <InvoiceDataTable data={invoices} userId={user?.id ?? ""} />
+        <Suspense fallback={null}>
+          <InvoiceDataTable data={invoices} userId={user?.id ?? ""} />
+        </Suspense>
       )}
     </div>
   );

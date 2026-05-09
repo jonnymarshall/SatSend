@@ -3,7 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { InvoiceDataTable } from "./data-table";
 import type { InvoiceRow } from "./columns";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+const mockReplace = vi.fn();
+let mockSearchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace, refresh: vi.fn() }),
+  useSearchParams: () => mockSearchParams,
+  usePathname: () => "/invoices",
+}));
 vi.mock("./bulk-actions", () => ({
   bulkArchive: vi.fn().mockResolvedValue({ archived: 1, skipped: 0 }),
   bulkDelete: vi.fn().mockResolvedValue(undefined),
@@ -44,7 +50,26 @@ const MOCK_INVOICES: InvoiceRow[] = [
 
 const bulkActionsBtn = () => document.getElementById("invoice-data-table--bulk-actions") as HTMLButtonElement;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockSearchParams = new URLSearchParams();
+});
+
+// Build a list of 15 pending invoices so pagination spans 2 pages (default pageSize=10).
+const PAGINATED: InvoiceRow[] = Array.from({ length: 15 }, (_, i) => ({
+  ...baseRow,
+  id: `pg-${String(i + 1).padStart(2, "0")}`,
+  invoice_number: `PG-${String(i + 1).padStart(2, "0")}`,
+  client_name: `Pager ${String(i + 1).padStart(2, "0")}`,
+  total_fiat: 100,
+  currency: "USD",
+  status: "pending" as const,
+  due_date: null,
+  created_at: `2026-04-${String((i % 28) + 1).padStart(2, "0")}T12:00:00Z`,
+  sent_at: "2026-04-15T12:00:00Z",
+  send_method: "email" as const,
+  email_attempted_at: "2026-04-15T12:00:00Z",
+}));
 
 describe("InvoiceDataTable — structure", () => {
   it("renders column headers: Invoice, Client, Date Sent, Date Due, Amount, Status", () => {
@@ -450,5 +475,45 @@ describe("InvoiceDataTable — overdue/pending row dropdown (cases #2, #3, #4)",
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     expect(await screen.findByRole("menuitem", { name: /view public invoice/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /mark as pending/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoiceDataTable — pagination URL state", () => {
+  it("starts on page 2 when ?page=2 is in the URL", () => {
+    mockSearchParams = new URLSearchParams("page=2");
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    // Page 1 rows (PG-01..PG-10) hidden; page 2 rows (PG-11..PG-15) visible.
+    expect(screen.queryByText("PG-01")).not.toBeInTheDocument();
+    expect(screen.getByText("PG-11")).toBeInTheDocument();
+    expect(screen.getByText("PG-15")).toBeInTheDocument();
+  });
+
+  it("clicking 'Next' pushes ?page=2 into the URL via router.replace", () => {
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^next$/i }));
+    expect(mockReplace).toHaveBeenCalledWith("/invoices?page=2", { scroll: false });
+  });
+
+  it("clicking 'Previous' from page 2 strips the ?page= param entirely", () => {
+    mockSearchParams = new URLSearchParams("page=2");
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^previous$/i }));
+    expect(mockReplace).toHaveBeenCalledWith("/invoices", { scroll: false });
+  });
+
+  it.each(["foo", "0", "-1", ""])("treats invalid ?page=%s as page 1", (raw) => {
+    mockSearchParams = new URLSearchParams(`page=${raw}`);
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    // Page 1 visible: PG-01 present, PG-11 (page 2 only) absent.
+    expect(screen.getByText("PG-01")).toBeInTheDocument();
+    expect(screen.queryByText("PG-11")).not.toBeInTheDocument();
+  });
+
+  it("clamps ?page= beyond last page to the last available page", () => {
+    // 15 rows, pageSize 10 → last page is index 1 (page 2). ?page=99 should land on the last page.
+    mockSearchParams = new URLSearchParams("page=99");
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    expect(screen.getByText("PG-11")).toBeInTheDocument();
+    expect(screen.queryByText("PG-01")).not.toBeInTheDocument();
   });
 });
