@@ -1321,46 +1321,51 @@ The exact same drop-and-recreate pattern was already used in `0017` for the same
 
 ---
 
-### ⏳ v1.4.18 — Resend Webhook: Sent vs Delivered vs Bounced
+### ✅ v1.4.18 — Resend Webhook: Sent vs Delivered vs Bounced
 
 **Branch:** `v1.4.18/resend-webhook`
 
 **Context:** Today the app conflates "Resend accepted the send request" with "the recipient received the email". When `email_events.status='sent'`, all we actually know is that Resend's API returned success at send-time — the email may still bounce (bad address, full mailbox), be marked as spam, or never reach the inbox at all, and the owner has no signal that anything went wrong. The `/invoices` indicator shipped in v1.4.9 surfaces *send-time* failures (Resend rejected the request); this branch covers *post-acceptance* failures by subscribing to Resend's webhook lifecycle.
 
-This branch closes the gap. After it lands, the **Email Activity** card distinguishes a "Sent" email (Resend accepted it) from a "Delivered" email (the recipient mailbox confirmed receipt) from a "Bounced" or "Marked as spam" email (post-acceptance failure).
+This branch closes the gap. After it lands, the **Activity** card distinguishes a "Sent" email (Resend accepted it) from a "Delivered" email (the recipient mailbox confirmed receipt) from a "Bounced" or "Marked as spam" email (post-acceptance failure).
 
 **Schema**
-- [ ] Migration: extend the `email_event_status` enum with `'delivered'`, `'bounced'`, `'complained'`. (Out of scope: `'opened'` / `'clicked'` — read-receipt territory, not delivery confirmation.)
-- [ ] Migration: ensure an index on `email_events(resend_message_id)` exists, since the webhook looks up rows by it.
+- [x] Migration `0021_resend_webhook_lifecycle.sql`: extends the `email_event_status` enum with `'delivered'`, `'bounced'`, `'complained'`; adds dedicated `email_events_resend_message_id_idx`; adds `webhook_deliveries(svix_id pk, event_type, received_at)` dedupe table.
 
 **Webhook endpoint**
-- [ ] New route `POST /api/webhooks/resend` (Routing Middleware passthrough — payer routes are already public, this is just another public endpoint).
-- [ ] Verifies the Svix signature. Resend uses Svix for webhook delivery; the request carries `svix-id`, `svix-timestamp`, and `svix-signature` headers, and the secret is provisioned per-endpoint in the Resend dashboard. Add `RESEND_WEBHOOK_SECRET` to `.env`, `.env.example`, and Vercel env (preview + production).
-- [ ] Parses the event payload, looks up the `email_events` row by `resend_message_id`, and updates `status` + `updated_at`. For `email.bounced` / `email.complained` events, also captures the reason in `error_message`.
-- [ ] **Idempotent.** Applying the same `svix-id` twice is a no-op. Status updates follow the lifecycle `queued → sent → delivered`, with `bounced` / `complained` allowed to overwrite `delivered` (a post-delivery complaint is a real and worse signal). Use a small `if (newStatus === currentStatus) return` short-circuit plus monotonic-or-overwrite logic on the lifecycle.
-- [ ] Returns `2xx` on every recognised payload. Logs and returns `2xx` (not `5xx`) for unknown event types — Resend retries on `5xx`, so we don't want noise on events we don't care about.
+- [x] New route `POST /api/webhooks/resend`.
+- [x] Verifies the Svix signature using the `svix` package against `RESEND_WEBHOOK_SECRET`.
+- [x] Parses the payload, looks up the `email_events` row by `resend_message_id`, and updates `status` + `updated_at`. For `email.bounced` events, captures `data.bounce.message` in `error_message`.
+- [x] **Idempotent** via a real `webhook_deliveries(svix_id pk)` dedupe table (chosen over the lighter "compare-status" short-circuit during planning — gives at-most-once as a DB-enforced invariant). Lifecycle: `queued`/`sent` → `delivered`; `bounced`/`complained` may overwrite `delivered`; no downgrades.
+- [x] Returns `2xx` on every recognised payload. Unknown event types (e.g. `email.opened`) return `200` with an `ignored:` body so Resend does not retry.
 
 **UI**
-- [ ] **Email Activity card** (`src/app/(dashboard)/invoices/[id]/email-activity-card.tsx`) — extend `STATUS_LABEL`, `STATUS_CLASSES`, and `STATUS_CONFIG` maps with `delivered` (green check, "Delivered"), `bounced` (red, "Bounced"), `complained` (orange, "Marked as spam"). The `sent` badge becomes a transient signal — relabel to "Sent — awaiting delivery" or similar so the distinction is visible at a glance.
-- [ ] **`/invoices` per-row indicator** (v1.4.9 `AlertCircle`) — extend the failed-state predicate from `status='failed'` to `status IN ('failed', 'bounced', 'complained')`. The `invoice_email_summary` view (v1.4.9 migration `0012`) doesn't need updating; it already exposes whatever status is in the row. Tooltip text should read accurately for each case ("Email failed to send", "Email bounced", "Email marked as spam") — likely a small map keyed off `last_publish_email_status`.
+- [x] **Activity card** (`src/app/(dashboard)/invoices/[id]/invoice-activity-card.tsx` — renamed in v1.4.10, the roadmap's `email-activity-card.tsx` reference was stale): widened `EmailEventStatus` to include the three new values; `emailIcon()` now returns a green `MailCheck` for delivered, red `MailX` for bounced, orange `MailWarning` for complained; `emailLabel()` suffixes `sent` rows with `awaiting delivery` to make the transient state visible at a glance; `bounced` rows surface `error_message` in red below the row (same pathway as `failed`).
+- [x] **`/invoices` per-row indicator** (`columns.tsx`): widened `last_publish_email_status` type; the failure predicate now triggers on `failed | bounced | complained`; per-status tooltip text via a small mapping.
 
-**Out of scope**
+**Out of scope (deferred)**
 - `email.opened` / `email.clicked` events — read-receipt territory, not delivery confirmation. Tracked separately if ever needed.
 - Retry / resend UX after a bounce — depends on the deferred "edit `client_email` post-publish + re-send" work.
 - Dashboard counters or aggregates ("you have 3 bounced emails this week") — separable from the per-invoice surfacing.
 
 **Tests**
-- [ ] Unit (webhook): rejects requests with bad / missing Svix signature with a 401.
-- [ ] Unit (webhook): applies an `email.delivered` event by flipping `email_events.status` from `sent → delivered` on the matching row.
-- [ ] Unit (webhook): applies an `email.bounced` event by flipping `sent → bounced` and writing `error_message`.
-- [ ] Unit (webhook): is idempotent — applying the same `svix-id` twice yields one effect.
-- [ ] Unit (webhook): unknown event type logs and returns `2xx` (not `5xx`).
-- [ ] Component (email-activity-card): renders the correct badge for `queued` / `sent` / `delivered` / `bounced` / `complained` / `failed` / `skipped_no_api_key`.
-- [ ] Component (`/invoices`): per-row indicator renders for `bounced` and `complained` rows, not just `failed` rows.
+- [x] Webhook: rejects requests with bad signature (401).
+- [x] Webhook: rejects requests with missing svix headers (401).
+- [x] Webhook: flips `sent → delivered` on `email.delivered`.
+- [x] Webhook: flips `sent → bounced` on `email.bounced` and writes `error_message`.
+- [x] Webhook: flips `delivered → complained` on `email.complained`.
+- [x] Webhook: duplicate `svix-id` is idempotent (no second update; dedupe table returns conflict).
+- [x] Webhook: unknown event type returns `200` (not `5xx`) with no DB update.
+- [x] Webhook: no matching `email_events` row returns `200` (not `4xx`).
+- [x] Webhook: does not downgrade — ignores `delivered` event when row is already `complained`.
+- [x] Webhook: allows `complained` to overwrite `delivered` (post-delivery complaint).
+- [x] Activity card: renders `delivered` (mail-check), `bounced` (mail-x with error_message), `complained` (mail-warning, "marked as spam") rows.
+- [x] Activity card: `sent` row carries the `awaiting delivery` suffix.
+- [x] `/invoices` columns: indicator renders for `bounced` (tooltip "Email bounced") and `complained` (tooltip "marked as spam") rows; absent on `delivered` rows.
 
-**Pre-deployment checklist**
+**Pre-deployment checklist (manual, post-merge)**
 - [ ] Add `RESEND_WEBHOOK_SECRET` to Vercel env (production + preview).
-- [ ] Configure the webhook endpoint in the Resend dashboard pointing at `https://<your-domain>/api/webhooks/resend`. Subscribe to `email.delivered`, `email.bounced`, `email.complained`. (`email.sent` is also fine but is a near-duplicate of the existing send-time write; subscribing is harmless and idempotent so include it for completeness.)
+- [ ] Configure the webhook endpoint in the Resend dashboard pointing at `https://<your-domain>/api/webhooks/resend`. Subscribe to `email.sent`, `email.delivered`, `email.bounced`, `email.complained`.
 - [ ] Smoke test on preview: send a publish email to a known-bouncing address (e.g., `bounce@simulator.amazonses.com`) and confirm the row flips through `sent → bounced` within a few seconds, the activity card updates, and the `/invoices` indicator appears.
 
 **Done when:** an owner can distinguish a "sent" email (Resend accepted) from a "delivered" email (recipient confirmed receipt), and a bounced or spam-marked email is surfaced in both the Email Activity card and the `/invoices` indicator without manual investigation. The README note at `notes:` under "Publish vs Send-via-email split" can be removed.

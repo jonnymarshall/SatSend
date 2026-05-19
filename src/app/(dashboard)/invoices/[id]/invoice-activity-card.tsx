@@ -1,9 +1,26 @@
 import { format } from "date-fns";
-import { Mail, AlertCircle, Send, CheckCircle, Clock, RotateCcw } from "lucide-react";
+import {
+  Mail,
+  MailCheck,
+  MailX,
+  MailWarning,
+  AlertCircle,
+  Send,
+  CheckCircle,
+  Clock,
+  RotateCcw,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 type EmailType = "invoice_published" | "payment_detected" | "payment_confirmed";
-type EmailEventStatus = "queued" | "sent" | "failed" | "skipped_no_api_key";
+type EmailEventStatus =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "bounced"
+  | "complained"
+  | "failed"
+  | "skipped_no_api_key";
 type InvoiceEventType =
   | "marked_as_sent"
   | "marked_as_paid"
@@ -48,6 +65,15 @@ function emailIcon(status: EmailEventStatus) {
   if (status === "failed") {
     return <AlertCircle data-icon="alert-circle" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
   }
+  if (status === "delivered") {
+    return <MailCheck data-icon="mail-check" className={`${ICON_CLASS} text-green-600 dark:text-green-400`} />;
+  }
+  if (status === "bounced") {
+    return <MailX data-icon="mail-x" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
+  }
+  if (status === "complained") {
+    return <MailWarning data-icon="mail-warning" className={`${ICON_CLASS} text-orange-600 dark:text-orange-400`} />;
+  }
   return <Mail data-icon="mail" className={`${ICON_CLASS} text-muted-foreground`} />;
 }
 
@@ -65,13 +91,23 @@ function manualIcon(type: InvoiceEventType) {
 }
 
 function emailLabel(evt: EmailEventRow): string {
-  if (evt.status === "failed") {
-    return `${EMAIL_TYPE_LABEL[evt.email_type]} failed`;
+  const base = EMAIL_TYPE_LABEL[evt.email_type];
+  switch (evt.status) {
+    case "failed":
+      return `${base} failed`;
+    case "skipped_no_api_key":
+      return `${base} skipped`;
+    case "sent":
+      return `${base} · awaiting delivery`;
+    case "delivered":
+      return `${base} · delivered`;
+    case "bounced":
+      return `${base} · bounced`;
+    case "complained":
+      return `${base} · marked as spam`;
+    default:
+      return base;
   }
-  if (evt.status === "skipped_no_api_key") {
-    return `${EMAIL_TYPE_LABEL[evt.email_type]} skipped`;
-  }
-  return EMAIL_TYPE_LABEL[evt.email_type];
 }
 
 export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) {
@@ -129,7 +165,7 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
                       <span className="text-muted-foreground"> — {evt.recipient}</span>
                     )}
                   </p>
-                  {evt.status === "failed" && evt.error_message && (
+                  {(evt.status === "failed" || evt.status === "bounced") && evt.error_message && (
                     <p className="proxy-id--invoice-detail--activity-error text-xs text-red-600 dark:text-red-400 break-words">
                       {evt.error_message}
                     </p>

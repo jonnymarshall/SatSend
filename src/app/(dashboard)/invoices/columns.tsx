@@ -28,7 +28,15 @@ export interface InvoiceRow {
   sent_at: string | null;
   send_method: "email" | "manual" | null;
   email_attempted_at: string | null;
-  last_publish_email_status: "queued" | "sent" | "failed" | "skipped_no_api_key" | null;
+  last_publish_email_status:
+    | "queued"
+    | "sent"
+    | "delivered"
+    | "bounced"
+    | "complained"
+    | "failed"
+    | "skipped_no_api_key"
+    | null;
   last_publish_email_error: string | null;
 }
 
@@ -153,16 +161,25 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       header: "Status",
       cell: ({ row }) => {
         const r = row.original;
-        // Failed-publish takes precedence over the sent-method icon: a row
-        // whose last email attempt failed shows only the failure indicator,
-        // never both icons stacked together.
-        const isFailed = r.last_publish_email_status === "failed";
-        const trailingIcon = isFailed ? (
+        // A failed / bounced / spam-complaint outcome takes precedence over
+        // the sent-method icon: those rows show only the failure indicator,
+        // never both icons stacked together. v1.4.18 added the bounced and
+        // complained statuses, which Resend reports post-acceptance via
+        // webhook.
+        const failureLabel =
+          r.last_publish_email_status === "failed"
+            ? "Email failed to send to this client"
+            : r.last_publish_email_status === "bounced"
+              ? "Email bounced"
+              : r.last_publish_email_status === "complained"
+                ? "Email marked as spam"
+                : null;
+        const trailingIcon = failureLabel ? (
           <AlertCircle
             className="proxy-id--invoice-row--email-failed-indicator h-3.5 w-3.5 text-destructive"
-            aria-label="Email failed to send to this client"
+            aria-label={failureLabel}
           >
-            <title>Email failed to send to this client</title>
+            <title>{failureLabel}</title>
           </AlertCircle>
         ) : r.send_method === "email" ? (
           <Mail

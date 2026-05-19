@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.18] - 2026-05-19
+
+### Added
+
+- **Resend webhook lifecycle handling.** New `POST /api/webhooks/resend` route accepts Svix-signed events from Resend and advances `email_events.status` through the real delivery lifecycle: `sent`, `delivered`, `bounced`, `complained`. Previously `sent` was the terminal value and the owner had no signal when an email failed *after* Resend accepted it.
+- New `webhook_deliveries(svix_id pk, event_type, received_at)` table for exactly-once processing. Resend retries on transient failures; a duplicate `svix-id` short-circuits to a no-op `200` response.
+- `delivered`, `bounced`, `complained` values added to the `email_event_status` enum (migration `0021_resend_webhook_lifecycle.sql`).
+- Dedicated index `email_events_resend_message_id_idx` on `email_events(resend_message_id)` (the webhook looks up rows by this column on every event).
+
+### Changed
+
+- **Activity card on `/invoices/[id]`** now reads the new statuses. `sent` rows display the label suffix `awaiting delivery` so the transient state is visible at a glance. `delivered` rows show a green mail-check icon. `bounced` rows show a red mail-x icon with the bounce reason captured from the webhook payload. `complained` rows render as `marked as spam` with an orange mail-warning icon.
+- **`/invoices` per-row failed-email indicator** (v1.4.9) now fires for `bounced` and `complained` rows, not just `failed`. Tooltip is per-status: `Email failed to send`, `Email bounced`, or `Email marked as spam`.
+
+### Notes
+
+- Requires `RESEND_WEBHOOK_SECRET` env var (provisioned per-endpoint in the Resend dashboard) on the environment running the route, plus a webhook endpoint configured in the Resend dashboard subscribed to `email.sent`, `email.delivered`, `email.bounced`, `email.complained`. See `manual-tests/v1.4.18-resend-webhook.md`.
+- `email.opened` / `email.clicked` events are explicitly out of scope (read-receipt territory, not delivery confirmation). They return `200` so Resend does not retry, but no DB write happens.
+- Lifecycle is monotonic with one exception: `complained` may overwrite a prior `delivered`, because a post-delivery spam complaint is a real and worse signal.
+
 ## [1.4.17] - 2026-05-08
 
 ### Fixed

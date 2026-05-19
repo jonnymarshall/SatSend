@@ -401,6 +401,77 @@ describe("InvoiceDataTable — per-row actions", () => {
     expect(screen.queryByLabelText(/email failed to send to this client/i)).not.toBeInTheDocument();
   });
 
+  it("renders the failed-email indicator for a bounced row with a 'bounced' tooltip", () => {
+    const data: InvoiceRow[] = [
+      {
+        ...baseRow,
+        id: "inv-bounced",
+        invoice_number: "INV-B",
+        client_name: "Bounce Co",
+        total_fiat: 100,
+        currency: "USD",
+        status: "pending",
+        due_date: null,
+        created_at: "2026-04-19T12:00:00Z",
+        sent_at: "2026-04-19T12:00:00Z",
+        send_method: "email",
+        email_attempted_at: "2026-04-19T12:00:00Z",
+        last_publish_email_status: "bounced",
+        last_publish_email_error: "mailbox does not exist",
+      },
+    ];
+    render(<InvoiceDataTable data={data} userId="u1" />);
+    expect(screen.getByLabelText(/email bounced/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/sent via email/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the failed-email indicator for a complained row with a 'marked as spam' tooltip", () => {
+    const data: InvoiceRow[] = [
+      {
+        ...baseRow,
+        id: "inv-complained",
+        invoice_number: "INV-C",
+        client_name: "Spam Co",
+        total_fiat: 100,
+        currency: "USD",
+        status: "pending",
+        due_date: null,
+        created_at: "2026-04-19T12:00:00Z",
+        sent_at: "2026-04-19T12:00:00Z",
+        send_method: "email",
+        email_attempted_at: "2026-04-19T12:00:00Z",
+        last_publish_email_status: "complained",
+        last_publish_email_error: null,
+      },
+    ];
+    render(<InvoiceDataTable data={data} userId="u1" />);
+    expect(screen.getByLabelText(/marked as spam/i)).toBeInTheDocument();
+  });
+
+  it("does not render the failed-email indicator for a delivered row (still shows the sent-via-email icon)", () => {
+    const data: InvoiceRow[] = [
+      {
+        ...baseRow,
+        id: "inv-delivered",
+        invoice_number: "INV-D",
+        client_name: "Delivered Co",
+        total_fiat: 100,
+        currency: "USD",
+        status: "pending",
+        due_date: null,
+        created_at: "2026-04-19T12:00:00Z",
+        sent_at: "2026-04-19T12:00:00Z",
+        send_method: "email",
+        email_attempted_at: "2026-04-19T12:00:00Z",
+        last_publish_email_status: "delivered",
+        last_publish_email_error: null,
+      },
+    ];
+    render(<InvoiceDataTable data={data} userId="u1" />);
+    expect(screen.queryByLabelText(/email failed|email bounced|marked as spam/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/sent via email/i)).toBeInTheDocument();
+  });
+
   it("shows only the email-failed indicator (not the sent-via-email icon) on a row that was sent via email but the email failed", () => {
     const data: InvoiceRow[] = [
       {

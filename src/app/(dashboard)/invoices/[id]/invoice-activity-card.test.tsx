@@ -10,7 +10,7 @@ interface EmailRow {
   id: string;
   email_type: "invoice_published" | "payment_detected" | "payment_confirmed";
   recipient: string;
-  status: "queued" | "sent" | "failed" | "skipped_no_api_key";
+  status: "queued" | "sent" | "delivered" | "bounced" | "complained" | "failed" | "skipped_no_api_key";
   error_message: string | null;
   created_at: string;
 }
@@ -144,5 +144,70 @@ describe("InvoiceActivityCard", () => {
     expect(container.querySelector('[data-icon="check-circle"]')).not.toBeNull();
     expect(container.querySelector('[data-icon="clock"]')).not.toBeNull();
     expect(container.querySelector('[data-icon="rotate-ccw"]')).not.toBeNull();
+  });
+
+  it("appends 'awaiting delivery' to a 'sent' email row (transient state)", async () => {
+    mockSupabase({
+      emailEvents: [{
+        id: "e1",
+        email_type: "invoice_published",
+        recipient: "ada@example.com",
+        status: "sent",
+        error_message: null,
+        created_at: "2026-04-15T10:00:00Z",
+      }],
+    });
+    render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
+    expect(screen.getByText(/awaiting delivery/i)).toBeInTheDocument();
+  });
+
+  it("renders a 'delivered' email with the mail-check icon", async () => {
+    mockSupabase({
+      emailEvents: [{
+        id: "e1",
+        email_type: "invoice_published",
+        recipient: "ada@example.com",
+        status: "delivered",
+        error_message: null,
+        created_at: "2026-04-15T10:00:00Z",
+      }],
+    });
+    const { container } = render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
+    expect(screen.getByText(/delivered/i)).toBeInTheDocument();
+    expect(container.querySelector('[data-icon="mail-check"]')).not.toBeNull();
+    expect(screen.queryByText(/awaiting delivery/i)).toBeNull();
+  });
+
+  it("renders a 'bounced' email with the mail-x icon and surfaces the error_message", async () => {
+    mockSupabase({
+      emailEvents: [{
+        id: "e1",
+        email_type: "invoice_published",
+        recipient: "ada@example.com",
+        status: "bounced",
+        error_message: "mailbox does not exist",
+        created_at: "2026-04-15T10:00:00Z",
+      }],
+    });
+    const { container } = render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
+    expect(screen.getByText(/bounced/i)).toBeInTheDocument();
+    expect(container.querySelector('[data-icon="mail-x"]')).not.toBeNull();
+    expect(screen.getByText(/mailbox does not exist/i)).toBeInTheDocument();
+  });
+
+  it("renders a 'complained' email as 'marked as spam' with the mail-warning icon", async () => {
+    mockSupabase({
+      emailEvents: [{
+        id: "e1",
+        email_type: "invoice_published",
+        recipient: "ada@example.com",
+        status: "complained",
+        error_message: null,
+        created_at: "2026-04-15T10:00:00Z",
+      }],
+    });
+    const { container } = render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
+    expect(screen.getByText(/marked as spam/i)).toBeInTheDocument();
+    expect(container.querySelector('[data-icon="mail-warning"]')).not.toBeNull();
   });
 });
