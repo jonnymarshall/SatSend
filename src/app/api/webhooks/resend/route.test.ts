@@ -146,6 +146,29 @@ describe("POST /api/webhooks/resend", () => {
     expect(state.updates[0].payload.error_message).toContain("mailbox does not exist");
   });
 
+  it("truncates a multi-sentence bounce reason to the first sentence", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: null },
+      emailEventsRow: { id: "row-trim", status: "sent" },
+      updates: [],
+    };
+    installFromMock(state);
+    const { res } = await postEvent({
+      body: {
+        type: "email.bounced",
+        data: {
+          email_id: "re_abc",
+          bounce: {
+            message:
+              "The recipient mailbox does not exist. SMTP error 550-5.1.1 user unknown. Refer to RFC 5321 section 4.2.2 for details.",
+          },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(state.updates[0].payload.error_message).toBe("The recipient mailbox does not exist");
+  });
+
   it("flips status to 'complained' for email.complained", async () => {
     const state: FromMockState = {
       dedupeInsert: { error: null },

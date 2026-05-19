@@ -119,8 +119,11 @@ export async function POST(request: NextRequest) {
     updated_at: new Date().toISOString(),
   };
   if (targetStatus === "bounced") {
-    const reason = event.data?.bounce?.message ?? "bounced";
-    update.error_message = reason.slice(0, 500);
+    const raw = event.data?.bounce?.message ?? "bounced";
+    // Resend bounce messages are often multi-sentence with SMTP detail. Surface
+    // just the first sentence in the UI; full payload remains in Resend's logs.
+    const firstSentence = raw.split(/[.\n]/)[0].trim();
+    update.error_message = (firstSentence || raw).slice(0, 200);
   }
 
   await admin.from("email_events").update(update).eq("id", row.id);
