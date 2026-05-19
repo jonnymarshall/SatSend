@@ -3,7 +3,9 @@ import { render, screen } from "@testing-library/react";
 import InvoicesPage from "./page";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/invoices",
 }));
 vi.mock("./bulk-actions", () => ({
   bulkArchive: vi.fn(),

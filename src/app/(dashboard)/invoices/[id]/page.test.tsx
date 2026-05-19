@@ -49,7 +49,10 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => makeSupabaseMock(BASE_INVOICE)),
 }));
 
-vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  notFound: vi.fn(),
+  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
+}));
 vi.mock("@/lib/btc-network", () => ({ getMempoolBaseUrl: () => "https://mempool.space" }));
 vi.mock("./invoice-actions", () => ({ InvoiceActions: () => null }));
 vi.mock("./invoice-detail-realtime", () => ({ InvoiceDetailRealtime: () => null }));

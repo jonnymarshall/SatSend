@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.17] - 2026-05-08
+
+### Fixed
+
+- **Pagination position preserved on navigate-away from `/invoices`.** Previously, going to page 2, opening an invoice, and clicking `← Invoices` would drop you back on page 1. Now the page index is reflected in the URL as `?page=N` (1-indexed; page 1 stays as bare `/invoices`), and the back link uses `router.back()` so any prior history is restored verbatim. Hard refresh, direct URL share, and the browser back button all preserve position. Out-of-bounds `?page=99` clamps to the last available page; garbage values (`foo`, `0`, `-1`) fall back to page 1.
+
+### Changed
+
+- `← Invoices` back link on `/invoices/[id]` is now a small client component (`BackToInvoices`) using `router.back()` with a `/invoices` fallback for deep-link arrivals. Previously a hard `<Link href="/invoices">`.
+- `<InvoiceDataTable>` now wrapped in `<Suspense>` on the invoices page (Next.js App Router requirement for `useSearchParams`).
+
+### Notes
+
+- Filter, sort, and archive-toggle state are intentionally NOT persisted in the URL. Decision documented in ROADMAP under v1.4.17 — the bug was scoped to pagination, those are query operations that reset-on-navigate matches user mental model. One-line additions later if real users complain.
+
 ## [1.4.16] - 2026-05-08
 
 ### Added

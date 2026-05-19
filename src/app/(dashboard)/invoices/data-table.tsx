@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ColumnFiltersState,
+  PaginationState,
   SortingState,
   VisibilityState,
   flexRender,
@@ -52,6 +53,16 @@ import {
 import { buildColumns, InvoiceRow } from "./columns";
 import { useInvoiceRealtime } from "./use-invoice-realtime";
 
+const DEFAULT_PAGE_SIZE = 10;
+
+function parsePageParam(raw: string | null): number {
+  // Returns a 0-indexed pageIndex. Invalid / missing / <1 → 0 (page 1).
+  if (raw == null) return 0;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 0;
+  return n - 1;
+}
+
 const COLUMN_LABELS: Record<string, string> = {
   invoice_number: "Invoice",
   client_name: "Client",
@@ -68,7 +79,36 @@ interface Props {
 
 export function InvoiceDataTable({ data, userId }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   useInvoiceRealtime(userId);
+  // Pagination is URL-driven: ?page=N is the single source of truth. Reading it from
+  // useSearchParams every render avoids the state/URL desync that caused v1.4.17's
+  // first attempt to revert to page 1 after every navigation (router.replace was
+  // re-fetching the server component, and something in that flow was resetting the
+  // local useState back to the URL's previous value).
+  const urlPageIndex = parsePageParam(searchParams.get("page"));
+  const pagination: PaginationState = React.useMemo(
+    () => ({ pageIndex: urlPageIndex, pageSize: DEFAULT_PAGE_SIZE }),
+    [urlPageIndex]
+  );
+  const writePageToUrl = React.useCallback(
+    (nextPageIndex: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextPageIndex > 0) params.set("page", String(nextPageIndex + 1));
+      else params.delete("page");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams]
+  );
+  const onPaginationChange = React.useCallback(
+    (updater: PaginationState | ((prev: PaginationState) => PaginationState)) => {
+      const next = typeof updater === "function" ? updater(pagination) : updater;
+      if (next.pageIndex !== pagination.pageIndex) writePageToUrl(next.pageIndex);
+    },
+    [pagination, writePageToUrl]
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([
     { id: "status", value: ["draft", "pending", "payment_detected", "paid", "overdue"] },
@@ -127,6 +167,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const table = useReactTable({
     data,
     columns,
+    onPaginationChange,
+    autoResetPageIndex: false,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -145,6 +187,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
       return num.includes(q) || client.includes(q);
     },
     state: {
+      pagination,
       sorting,
       columnFilters,
       globalFilter,
@@ -162,6 +205,16 @@ export function InvoiceDataTable({ data, userId }: Props) {
       : ["draft", "pending", "payment_detected", "paid", "overdue"];
     table.getColumn("status")?.setFilterValue(statusValues);
   }, [showArchived, table]);
+
+  // Clamp the URL if it points past the last available page (e.g. ?page=99 with only
+  // 2 pages of data, or pageCount shrank because of filtering). Source of truth is the
+  // URL, so the fix is to write a corrected URL — state derives from it next render.
+  const pageCount = table.getPageCount();
+  React.useEffect(() => {
+    if (pageCount > 0 && urlPageIndex > pageCount - 1) {
+      writePageToUrl(pageCount - 1);
+    }
+  }, [pageCount, urlPageIndex, writePageToUrl]);
 
   async function handleBulkMarkPaid() {
     setPending(true);
