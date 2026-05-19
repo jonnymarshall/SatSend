@@ -82,10 +82,33 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   useInvoiceRealtime(userId);
-  const [pagination, setPagination] = React.useState<PaginationState>(() => ({
-    pageIndex: parsePageParam(searchParams.get("page")),
-    pageSize: DEFAULT_PAGE_SIZE,
-  }));
+  // Pagination is URL-driven: ?page=N is the single source of truth. Reading it from
+  // useSearchParams every render avoids the state/URL desync that caused v1.4.17's
+  // first attempt to revert to page 1 after every navigation (router.replace was
+  // re-fetching the server component, and something in that flow was resetting the
+  // local useState back to the URL's previous value).
+  const urlPageIndex = parsePageParam(searchParams.get("page"));
+  const pagination: PaginationState = React.useMemo(
+    () => ({ pageIndex: urlPageIndex, pageSize: DEFAULT_PAGE_SIZE }),
+    [urlPageIndex]
+  );
+  const writePageToUrl = React.useCallback(
+    (nextPageIndex: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextPageIndex > 0) params.set("page", String(nextPageIndex + 1));
+      else params.delete("page");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams]
+  );
+  const onPaginationChange = React.useCallback(
+    (updater: PaginationState | ((prev: PaginationState) => PaginationState)) => {
+      const next = typeof updater === "function" ? updater(pagination) : updater;
+      if (next.pageIndex !== pagination.pageIndex) writePageToUrl(next.pageIndex);
+    },
+    [pagination, writePageToUrl]
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([
     { id: "status", value: ["draft", "pending", "payment_detected", "paid", "overdue"] },
@@ -144,7 +167,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const table = useReactTable({
     data,
     columns,
-    onPaginationChange: setPagination,
+    onPaginationChange,
+    autoResetPageIndex: false,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -182,33 +206,15 @@ export function InvoiceDataTable({ data, userId }: Props) {
     table.getColumn("status")?.setFilterValue(statusValues);
   }, [showArchived, table]);
 
-  // Clamp pageIndex if the URL or filtering pushes it past the last available page.
+  // Clamp the URL if it points past the last available page (e.g. ?page=99 with only
+  // 2 pages of data, or pageCount shrank because of filtering). Source of truth is the
+  // URL, so the fix is to write a corrected URL — state derives from it next render.
   const pageCount = table.getPageCount();
   React.useEffect(() => {
-    if (pageCount > 0 && pagination.pageIndex > pageCount - 1) {
-      setPagination((prev) => ({ ...prev, pageIndex: pageCount - 1 }));
+    if (pageCount > 0 && urlPageIndex > pageCount - 1) {
+      writePageToUrl(pageCount - 1);
     }
-  }, [pageCount, pagination.pageIndex]);
-
-  // Sync pagination → URL. Page 1 has no param (canonical clean URL).
-  // Done in an effect (not inside setPagination) to keep the state setter pure
-  // and avoid "Cannot update Router during render" when TanStack reconciles.
-  React.useEffect(() => {
-    const currentParam = searchParams.get("page");
-    const expectedParam = pagination.pageIndex > 0 ? String(pagination.pageIndex + 1) : null;
-    if (currentParam === expectedParam) return;
-    const params = new URLSearchParams(searchParams.toString());
-    if (expectedParam) {
-      params.set("page", expectedParam);
-    } else {
-      params.delete("page");
-    }
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    // Intentionally narrow deps to pageIndex: searchParams is a new object on every router
-    // update, which would re-fire this effect after every replace and cause a feedback loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.pageIndex]);
+  }, [pageCount, urlPageIndex, writePageToUrl]);
 
   async function handleBulkMarkPaid() {
     setPending(true);

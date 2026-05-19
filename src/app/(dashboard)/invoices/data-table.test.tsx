@@ -3,8 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { InvoiceDataTable } from "./data-table";
 import type { InvoiceRow } from "./columns";
 
-const mockReplace = vi.fn();
 let mockSearchParams = new URLSearchParams();
+// router.replace updates mockSearchParams so subsequent renders see the new URL,
+// matching real App Router behavior (useSearchParams is reactive to router.replace).
+const mockReplace = vi.fn((url: string) => {
+  const qIdx = url.indexOf("?");
+  mockSearchParams = qIdx >= 0 ? new URLSearchParams(url.slice(qIdx + 1)) : new URLSearchParams();
+});
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: mockReplace, refresh: vi.fn() }),
   useSearchParams: () => mockSearchParams,
@@ -537,5 +542,20 @@ describe("InvoiceDataTable — pagination URL state", () => {
     render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
     await new Promise((r) => setTimeout(r, 50));
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("preserves pageIndex when the data prop reference changes (regression: TanStack autoResetPageIndex)", async () => {
+    // Real-world failure: clicking Next calls router.replace, which triggers an App
+    // Router server re-fetch, which passes a NEW data array reference back to the
+    // table. TanStack defaults autoResetPageIndex=true, which would silently reset
+    // pageIndex to 0, snapping the user back to page 1. The fix is to disable
+    // autoResetPageIndex.
+    mockSearchParams = new URLSearchParams("page=2");
+    const { rerender } = render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    expect(screen.getByText("PG-11")).toBeInTheDocument();
+    // Simulate the server re-fetch handing us a fresh array with the same content.
+    rerender(<InvoiceDataTable data={[...PAGINATED]} userId="u1" />);
+    expect(screen.getByText("PG-11")).toBeInTheDocument();
+    expect(screen.queryByText("PG-01")).not.toBeInTheDocument();
   });
 });
