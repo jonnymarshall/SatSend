@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
   hardening-train equivalents (v1.4.19-H / v1.4.28-H).
 
+### Fixed
+
+- **v1.4.19-H (S0) — Green the build.** `actions.test.ts` froze test time
+  (`vi.useFakeTimers().setSystemTime`) so the `PUBLISHABLE_INVOICE` fixture's
+  `due_date: "2026-07-10"` fixture is future-dated again relative to the test
+  clock, fixing 5 tests that had started failing as real time passed the
+  fixture date. Also fixed the `react/display-name` lint error in
+  `columns.tsx`'s `sortableHeader` by naming the returned component. All three
+  gates (`test:run`, `tsc --noEmit`, `lint`) now exit 0.
+
 ### Notes
 
 - No application code changed in this entry — docs and roadmap only. The audit
