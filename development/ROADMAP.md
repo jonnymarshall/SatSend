@@ -1398,7 +1398,7 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ### Phase 0 — Launch blockers (do in this order)
 
-#### 🔴 v1.4.19-H (S0) — Green the build
+#### ✅ v1.4.19-H (S0) — Green the build
 **Branch:** `fix/green-the-build` · Detail: HARDENING-ROADMAP.md → S0
 The test suite is red on `main`: 5 tests in `actions.test.ts` fail because a
 fixture `due_date` (2026-07-10) is now in the past, and lint exits 1

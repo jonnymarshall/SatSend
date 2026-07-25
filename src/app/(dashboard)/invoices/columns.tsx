@@ -56,16 +56,19 @@ export interface RowActions {
 }
 
 function sortableHeader(label: string) {
-  return ({ column }: { column: { toggleSorting: (desc: boolean) => void; getIsSorted: () => false | "asc" | "desc" } }) => (
-    <Button
-      variant="ghost"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      className="-ml-3 h-8"
-    >
-      {label}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
-    </Button>
-  );
+  function SortableHeader({ column }: { column: { toggleSorting: (desc: boolean) => void; getIsSorted: () => false | "asc" | "desc" } }) {
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="-ml-3 h-8"
+      >
+        {label}
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    );
+  }
+  return SortableHeader;
 }
 
 export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {

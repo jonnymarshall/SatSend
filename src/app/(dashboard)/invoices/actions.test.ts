@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
@@ -95,11 +95,16 @@ function makeSupabase({
 }
 
 beforeEach(() => {
+  vi.useFakeTimers().setSystemTime(new Date("2026-06-01T00:00:00Z"));
   vi.clearAllMocks();
   // Re-establish the default: addressHasHistory returns false (fresh address) unless
   // a test overrides it. clearAllMocks clears call history but not once-mocks; if a
   // RED test queued a once-mock that never got consumed, it would leak into later tests.
   vi.mocked(addressHasHistory).mockReset().mockResolvedValue(false);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("saveDraft", () => {
