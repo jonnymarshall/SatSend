@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { fetchPublicInvoice } from "@/lib/invoice-public";
+import { fetchPublicInvoice, toPublicInvoice } from "@/lib/invoice-public";
 import { fetchBtcPrice } from "@/lib/btc-price";
 import { isAccessCodeValid, accessCookieName } from "@/lib/access-code";
 import { AccessCodeGate } from "./access-code-gate";
@@ -33,5 +33,5 @@ export default async function ClientInvoicePage({ params }: Props) {
     }
   }
 
-  return <InvoicePaymentView invoice={invoice} btcPrice={btcPrice} />;
+  return <InvoicePaymentView invoice={toPublicInvoice(invoice)} btcPrice={btcPrice} />;
 }

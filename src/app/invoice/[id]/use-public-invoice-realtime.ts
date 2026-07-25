@@ -4,23 +4,41 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { Invoice } from "@/lib/invoice-public";
+import type { PublicInvoice } from "@/lib/invoice-public";
 
-type PartialInvoice = Partial<Invoice> & { id: string };
+interface StatusUpdate {
+  status?: PublicInvoice["status"];
+  btc_txid?: string | null;
+}
+
+interface BroadcastRecord {
+  id: string;
+  status: PublicInvoice["status"];
+  btc_txid: string | null;
+}
+
+interface BroadcastPayload {
+  payload?: {
+    record?: BroadcastRecord;
+  };
+}
 
 /**
- * Public payer page (v1.4.2) Realtime subscription.
+ * Public payer page (v1.4.2) Realtime subscription, rewritten in v1.4.20-H
+ * (S1) to use a DB-triggered broadcast instead of postgres_changes.
  *
- * The /invoice/[id] page is unauthenticated — we subscribe with the anon key so
- * cron-driven status transitions (which the on-page mempool watcher cannot see
- * when no payment hits its watched address) flip the badge without a refresh.
- *
- * RLS for anon SELECT on non-draft invoices is granted by migration 0009.
- * REPLICA IDENTITY FULL (migration 0006) ensures UPDATE payloads carry full rows.
+ * The /invoice/[id] page is unauthenticated. anon has no SELECT policy on
+ * `invoices` (migration 0022 dropped it), so postgres_changes can no longer
+ * be used here. Instead, a trigger on `invoices` (migration 0022/0023)
+ * broadcasts a minimal {id, status, btc_txid} record — never the full row —
+ * to a channel named `invoice:<id>` whenever a non-draft invoice updates.
+ * `realtime.messages` RLS (migration 0023) authorizes anon to receive it;
+ * the channel must be opened with `{ config: { private: true } }` to trigger
+ * that authorization check.
  */
 export function usePublicInvoiceRealtime(
   invoiceId: string,
-  onUpdate: (next: PartialInvoice) => void
+  onUpdate: (next: StatusUpdate) => void
 ) {
   const router = useRouter();
 
@@ -28,7 +46,7 @@ export function usePublicInvoiceRealtime(
     if (!invoiceId) return;
 
     const supabase = createClient();
-    const channelName = `public-invoice:${invoiceId}`;
+    const channelName = `invoice:${invoiceId}`;
     let channel: RealtimeChannel | null = null;
 
     const handleVisibility = () => {
@@ -39,18 +57,13 @@ export function usePublicInvoiceRealtime(
     document.addEventListener("visibilitychange", handleVisibility);
 
     channel = supabase
-      .channel(channelName)
+      .channel(channelName, { config: { private: true } })
       .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "invoices",
-          filter: `id=eq.${invoiceId}`,
-        },
-        (payload) => {
-          const next = payload.new as PartialInvoice | undefined;
-          if (next && next.id) onUpdate(next);
+        "broadcast",
+        { event: "UPDATE" },
+        (payload: BroadcastPayload) => {
+          const record = payload.payload?.record;
+          if (record) onUpdate({ status: record.status, btc_txid: record.btc_txid });
         }
       )
       .subscribe((status, err) => {

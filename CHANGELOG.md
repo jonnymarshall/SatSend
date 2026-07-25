@@ -34,12 +34,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `columns.tsx`'s `sortableHeader` by naming the returned component. All three
   gates (`test:run`, `tsc --noEmit`, `lint`) now exit 0.
 
+### Security
+
+- **v1.4.20-H (S1) — Closed the four anon database exposures.** The
+  `invoice_email_summary` view ran with owner privileges (not the caller's),
+  bypassing RLS entirely and handing the anon key every invoice including
+  `access_code` and `user_id` — fixed with `security_invoker = on` + revoked
+  the anon grant. `webhook_deliveries` had no RLS at all — enabled it (no
+  policies; server-role-only by design). The blanket `anon_select_non_draft`
+  policy on `invoices` exposed every non-draft invoice's full row — dropped it
+  and replaced the public payer page's live-update path with a DB-triggered
+  broadcast (`realtime.broadcast_changes()`) carrying only `{id, status,
+  btc_txid}`, authorized via a new RLS policy on `realtime.messages` scoped to
+  the `invoice:<uuid>` topic pattern. Also stripped `access_code`/`user_id`
+  from the object passed into the payer page's client component, marked
+  `src/lib/supabase/admin.ts` `server-only`, and reverted `invoices` to
+  `REPLICA IDENTITY DEFAULT`. Migrations `0022_close_anon_exposures.sql` and
+  `0023_broadcast_guard_and_authorization.sql`. See
+  `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
+
 ### Notes
 
-- No application code changed in this entry — docs and roadmap only. The audit
-  found 5 CRITICAL issues (4 anonymous-key database exposures + 1 payment-forgery
-  bug) and a broken background-detection cron; all are pre-launch/testnet so
-  fixable before mainnet. Fixes are sequenced in the hardening train.
+- No application code changed by the audit/roadmap entry above — docs and
+  roadmap only. The audit found 5 CRITICAL issues (4 anonymous-key database
+  exposures + 1 payment-forgery bug) and a broken background-detection cron;
+  all are pre-launch/testnet so fixable before mainnet. Fixes are sequenced in
+  the hardening train; the first (S1, the 4 database exposures) is fixed above.
 
 ## [1.4.18] - 2026-05-19
 

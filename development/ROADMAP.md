@@ -1406,18 +1406,45 @@ fixture `due_date` (2026-07-10) is now in the past, and lint exits 1
 display-name lint error. Nothing else proceeds on a red suite.
 **Done when:** `npm run test:run`, `npx tsc --noEmit`, `npm run lint` all exit 0.
 
-#### 🔴 v1.4.20-H (S1) — Close the four anon database exposures
+#### ✅ v1.4.20-H (S1) — Close the four anon database exposures
 **Branch:** `fix/rls-critical-exposures` · Detail: HARDENING-ROADMAP.md → S1
-Highest priority in the project. One migration fixes: (1) the
-`invoice_email_summary` view leaks all invoices — `set (security_invoker = on)` +
-revoke anon; (2) `webhook_deliveries` has RLS off — enable it; (3) the
-`anon_select_non_draft` policy exposes every non-draft invoice — drop it and move
-the payer page onto a server-published **broadcast** channel instead of
-`postgres_changes` (so no anon table read is needed); (4) shrink the realtime
-publication + revert `REPLICA IDENTITY`. Also strip `access_code`/`user_id` from
-the public payload and mark `admin.ts` `server-only`.
+Highest priority in the project. Fixed: (1) the `invoice_email_summary` view
+leaked all invoices — `set (security_invoker = on)` + revoke anon; (2)
+`webhook_deliveries` had RLS off — enabled it, no policies (server-role-only,
+by design); (3) the `anon_select_non_draft` policy exposed every non-draft
+invoice — dropped it and moved the payer page onto a server-published
+**broadcast** channel instead of `postgres_changes` (so no anon table read is
+needed); (4) reverted `REPLICA IDENTITY` to `DEFAULT`. Also stripped
+`access_code`/`user_id` from the public payload and marked `admin.ts`
+`server-only`.
+
+**Deviations from the original spec:**
+- The "shrink the realtime publication" step (per-table `publish` restriction
+  via `ALTER PUBLICATION ... ADD TABLE ... WITH (publish = ...)`) turned out to
+  be invalid Postgres syntax — `publish` is a publication-wide setting, not a
+  per-table one. Dropped that step entirely: dropping the anon SELECT policy
+  already fully blocks anon from `postgres_changes` regardless of publication
+  config, so no publication change was needed to close the exposure.
+- Two gaps were found only after the first push of migration `0022` (already
+  applied to remote by then), so they shipped as a follow-up migration `0023`
+  rather than editing an already-applied file: `realtime.broadcast_changes()`
+  sends via `realtime.send()`, which defaults `private = true` — anon needs an
+  explicit RLS policy on `realtime.messages` (not `invoices`) to receive
+  broadcasts, and the client must open the channel with
+  `{ config: { private: true } }`. Added that policy, scoped to the
+  `invoice:<uuid>` topic pattern rather than joining back to `invoices` (anon
+  can no longer read that table). Also added a guard so the trigger never
+  broadcasts for `status = 'draft'` invoices.
+- `server-only` was not previously an installed dependency; added it, plus a
+  `vitest.config.ts` alias to Next's own no-op build of that package (the same
+  alias Next's webpack config uses on the server layer), since Vitest doesn't
+  apply Next's RSC bundling-layer separation and would otherwise hit
+  `server-only`'s throwing implementation in every test that transitively
+  imports `admin.ts`.
+
 **Done when:** no anon request with the public key can read any invoice, summary,
 or webhook row; the payer page still updates live; `supabase db lint` is clean.
+Manual test guide: `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
 
 #### 🔴 v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
 **Branch:** `v1.4.19/payment-amount-awareness` · Detail: HARDENING-ROADMAP.md → S2
