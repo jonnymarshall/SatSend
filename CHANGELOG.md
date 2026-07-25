@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-07-25
+
+### Added
+
+- **Master architecture audit.** Five-dimension senior review (payment
+  correctness, DB/RLS, security, frontend, process). Findings in
+  `development/ARCHITECTURE-AUDIT-2026-07.md`; sequenced fix plan in
+  `development/HARDENING-ROADMAP.md`.
+- **Security & Hardening train** wired into `development/ROADMAP.md` as the
+  next-priority work (Phase 0 launch-blockers → Phase 2 structural), taking
+  precedence over the older feature queue. Establishes `ROADMAP.md` as the single
+  source of truth, with the two audit docs as reference-only detail.
+
+### Changed
+
+- Flipped stale `🔄` markers on v1.4.14.1/.2/.3 to `✅` (merged in PRs #31-33).
+- Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
+  hardening-train equivalents (v1.4.19-H / v1.4.28-H).
+
+### Notes
+
+- No application code changed in this entry — docs and roadmap only. The audit
+  found 5 CRITICAL issues (4 anonymous-key database exposures + 1 payment-forgery
+  bug) and a broken background-detection cron; all are pre-launch/testnet so
+  fixable before mainnet. Fixes are sequenced in the hardening train.
+
 ## [1.4.18] - 2026-05-19
 
 ### Added
