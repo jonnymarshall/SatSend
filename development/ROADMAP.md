@@ -1,5 +1,15 @@
 # SatSend — Feature Roadmap
 
+> **This file is the single source of truth for what to build next and in what
+> order.** Work top to bottom through the first ⏳ item. The immediate next work
+> is the **Security & Hardening train (v1.4.19-H … v1.4.28-H)** below, which comes
+> from the 2026-07 master architecture audit and takes priority over the older
+> feature queue. Step-by-step detail for each hardening item lives in
+> `development/HARDENING-ROADMAP.md`; the reasoning and full findings live in
+> `development/ARCHITECTURE-AUDIT-2026-07.md`. Those two docs are reference only —
+> **you never need to read anything but this file to know what to do next**; open
+> the hardening doc when you start a specific hardening item, for its exact steps.
+
 ## Status Legend
 
 | Emoji | Meaning |
@@ -7,6 +17,7 @@
 | ✅ | Complete (merged) |
 | 🔄 | In progress |
 | ⏳ | Queued — not started |
+| 🔴 | Queued — security/correctness blocker (do before feature work) |
 | 🚫 | Deferred |
 
 ---
@@ -1168,7 +1179,7 @@ Backfill: audit existing rows for any `status != 'draft' and btc_address is null
 
 ---
 
-### 🔄 v1.4.14.1 — Reconcile pre-v1.4.12 invoices for migration 0018
+### ✅ v1.4.14.1 — Reconcile pre-v1.4.12 invoices for migration 0018
 
 **Branch:** `v1.4.14.1/reconcile-pre-v1-4-12-invoices`
 
@@ -1192,7 +1203,7 @@ Inspection of all 24 confirmed they are abandoned test data: trivial totals (mos
 
 ---
 
-### 🔄 v1.4.14.2 — Migration 0018 self-healing fix
+### ✅ v1.4.14.2 — Migration 0018 self-healing fix
 
 **Branch:** `v1.4.14.2/migration-order-fix`
 
@@ -1216,7 +1227,7 @@ The fix is to make `0018` self-healing: instead of aborting on non-zero offender
 
 ---
 
-### 🔄 v1.4.14.3 — Migration 0018 view-dependency fix
+### ✅ v1.4.14.3 — Migration 0018 view-dependency fix
 
 **Branch:** `v1.4.14.3/migration-view-dependency-fix`
 
@@ -1372,7 +1383,148 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ---
 
-### ⏳ v1.4.19 — Payment Amount Awareness (Under / Overpayment)
+## Security & Hardening Train (from the 2026-07 master audit)
+
+> **Do this whole train before resuming the feature queue below and before any
+> mainnet use.** Each item is one branch / one PR, same as any other roadmap
+> version. The one-liner here tells you *what and why*; open the matching item in
+> `development/HARDENING-ROADMAP.md` for the exact numbered steps when you start
+> it. Full findings and reasoning: `development/ARCHITECTURE-AUDIT-2026-07.md`.
+>
+> **Absorbed items:** the old `⏳ v1.4.19` (Payment Amount Awareness) is folded
+> into **v1.4.19-H (S2)**, and the old `⏳ v1.4.28` (Cron strategy) is folded into
+> **v1.4.28-H (S3)**. Do NOT do those two separately — their sections further down
+> are kept for their detailed spec but are superseded by the -H versions here.
+
+### Phase 0 — Launch blockers (do in this order)
+
+#### 🔴 v1.4.19-H (S0) — Green the build
+**Branch:** `fix/green-the-build` · Detail: HARDENING-ROADMAP.md → S0
+The test suite is red on `main`: 5 tests in `actions.test.ts` fail because a
+fixture `due_date` (2026-07-10) is now in the past, and lint exits 1
+(`columns.tsx:59`). Freeze time in the test with `vi.setSystemTime`, fix the
+display-name lint error. Nothing else proceeds on a red suite.
+**Done when:** `npm run test:run`, `npx tsc --noEmit`, `npm run lint` all exit 0.
+
+#### 🔴 v1.4.20-H (S1) — Close the four anon database exposures
+**Branch:** `fix/rls-critical-exposures` · Detail: HARDENING-ROADMAP.md → S1
+Highest priority in the project. One migration fixes: (1) the
+`invoice_email_summary` view leaks all invoices — `set (security_invoker = on)` +
+revoke anon; (2) `webhook_deliveries` has RLS off — enable it; (3) the
+`anon_select_non_draft` policy exposes every non-draft invoice — drop it and move
+the payer page onto a server-published **broadcast** channel instead of
+`postgres_changes` (so no anon table read is needed); (4) shrink the realtime
+publication + revert `REPLICA IDENTITY`. Also strip `access_code`/`user_id` from
+the public payload and mark `admin.ts` `server-only`.
+**Done when:** no anon request with the public key can read any invoice, summary,
+or webhook row; the payer page still updates live; `supabase db lint` is clean.
+
+#### 🔴 v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
+**Branch:** `v1.4.19/payment-amount-awareness` · Detail: HARDENING-ROADMAP.md → S2
+The payment-status API trusts the client's `status:"paid"` claim and checks no
+amount, so a 1-sat tx forges a paid invoice. Use the real fetched tx (not the
+synthetic one), persist `expected_sats` at publish, require received ≥ expected
+within tolerance before `paid`, require the access-code cookie, and require a
+confirmation-depth threshold. Implement the full old-v1.4.19 spec (below) on top.
+**Done when:** a forged-`paid` POST cannot move an invoice past `payment_detected`;
+below-tolerance pays land on `underpaid`; amount + price are persisted.
+
+#### 🔴 v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
+**Branch:** `v1.4.28/cron-strategy` · Detail: HARDENING-ROADMAP.md → S3
+The daily Vercel cron burns the per-minute `stage_attempt` schedule and stops
+monitoring after ~7 days. Decided: keep Hobby tier, drive `/api/cron/payment-sweep`
+every minute from a free external scheduler (GitHub Actions / cron-job.org) with
+`CRON_SECRET`. Also make the schedule time-based (not attempt-count based), add
+`.order`, include `overdue`, loop until the queue drains, set `maxDuration`.
+**Done when:** an abandoned testnet invoice transitions `pending → payment_detected
+→ paid` within minutes via the external scheduler, independent of stage exhaustion.
+
+#### 🔴 v1.4.21-H (S4) — DB defends money state
+**Branch:** `fix/db-money-invariants` · Detail: HARDENING-ROADMAP.md → S4
+One migration: CHECK constraints (amounts ≥ 0, tax 0-100, currency whitelist,
+totals consistent, line_items shape) added `NOT VALID` then validated; an
+immutability trigger on paid/payment_detected rows; a delete-guard trigger for
+non-draft rows; a status guard on `bulkDelete`.
+**Done when:** a PATCH to a paid invoice's total is rejected by the DB, non-draft
+deletes are rejected, and negative/inconsistent amounts cannot be written.
+
+> **END OF PHASE 0 = safe for mainnet.** Before flipping
+> `NEXT_PUBLIC_BTC_NETWORK=mainnet`, do the outstanding **mainnet dry-run** (real
+> receive address, small real payment, confirm the full flow through the external
+> cron). This has never succeeded and is the single highest-risk unverified path —
+> tracked in `development/OUTSTANDING-VERIFICATIONS.md`.
+
+### Phase 1 — Correctness & hygiene (before real volume)
+
+Each is one branch. Detail for all of these: HARDENING-ROADMAP.md → Phase 1.
+
+- 🔴 **v1.4.22-H — Detection robustness** (`v1.4.22-H/detection-robustness`): cron
+  CAS checks `.select("id")` before sending email (no duplicate emails); `markUnpaid`
+  / `bulkUnarchive` reset the schedule columns + clear `btc_txid`; `fetchAddressTxs`
+  throws + times out and doesn't burn an attempt on failure; scheduler picks the
+  confirmed tx over an unconfirmed dust tx; freshness check fails closed.
+- 🔴 **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`):
+  `pre_archive_status` → enum + CHECK; enumerate the summary view's columns;
+  `user_id` index + wrapped `auth.uid()`; webhook dedupe `23505`-only + retention;
+  `email_events.updated_at` trigger; `(user_id, invoice_number)` uniqueness.
+- 🔴 **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`):
+  `proxyConfig` → `config`; add `error.tsx` / `not-found.tsx` / `loading.tsx`;
+  proxy `getSession` → `getUser`; security headers in `next.config.ts`.
+- 🔴 **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
+  access-code check on the public PDF route; cap `line_items` length + cache PDF;
+  `btc-price` currency allowlist; `timingSafeEqual` for `CRON_SECRET`; `secure`
+  cookie flag.
+- 🔴 **v1.4.26-H — Rate limiting & abuse** (`v1.4.26-H/rate-limiting`): Vercel WAF
+  rate-limit rules on access-code verify / email send / PDF route; server-side
+  `client_email` validation; per-user daily send cap; minimum access-code length +
+  hashed storage.
+
+### Phase 2 — Structural single-sources-of-truth
+
+Each is one branch. Detail: HARDENING-ROADMAP.md → Phase 2.
+
+- ⏳ **v1.4.27-H — Generate Supabase types** (`chore/supabase-types`): generate
+  `database.types.ts`, thread `Database` through the three client factories, delete
+  the four hand-declared row shapes.
+- ⏳ **v1.4.29-H — Zod + typed action results** (`refactor/zod-validation`): one
+  shared `invoiceSchema` for form + actions; convert thrown-string validation
+  errors to `{ ok, field, message }` return values; collapse the form's three
+  parallel arrays into one.
+- ⏳ **v1.4.30-H — Realtime & styling unification** (`refactor/realtime-and-styling`):
+  one `useInvoiceChannel` hook with bounded resubscribe; document the 1-conf reorg
+  risk; pick one color source of truth (do the styling half during v1.5).
+- ⏳ **v1.4.31-H — Integration test layer** (`test/supabase-integration`): the
+  PRD-promised suite against a real Supabase instance, starting with
+  address-uniqueness (fix the cross-tenant oracle here via a `security definer`
+  boolean RPC) and status transitions.
+
+### Roadmap & docs housekeeping (do alongside Phase 0)
+
+- ⏳ **v1.4.32-H — Roadmap/docs restructure** (`chore/roadmap-restructure`): split
+  completed sections into `ROADMAP-ARCHIVE.md`; add `OUTSTANDING-VERIFICATIONS.md`
+  + `manual-tests/README.md`; banner `PRD.md` as historical + finish the SatSend
+  rename; add `.env.example`; set `package.json` to `1.4.18` + backfill git tags;
+  `git rm --cached` the `.DS_Store` files; delete the stale `master` branch. Detail:
+  HARDENING-ROADMAP.md → "Roadmap & docs restructure".
+- ⏳ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): add the
+  test-must-pass commit gate, typecheck-on-Stop, version-sync-on-PR, and roadmap-size
+  hooks; add the pre-merge-verification, migration-safety, and deploy-checklist
+  skills. Detail: HARDENING-ROADMAP.md → "Claude Code workflow".
+
+### Phase 3 — Feature queue resumes
+
+After the hardening train is merged, resume the ⏳ feature items below in order
+(v1.4.20 auto-overdue emails onward). They are unchanged by the audit. Note again
+that the old v1.4.19 and v1.4.28 sections are **superseded** by v1.4.19-H and
+v1.4.28-H above — keep them for reference but do not re-implement.
+
+---
+
+### ⏳ v1.4.19 — Payment Amount Awareness (Under / Overpayment) — SUPERSEDED by v1.4.19-H (S2)
+
+> **Superseded:** implement this as part of **v1.4.19-H (S2)** in the hardening
+> train above, which adds the forgery fix and amount verification on top of this
+> spec. This section is kept for its detailed schema/test spec only.
 
 **Branch:** `v1.4.19/payment-amount-awareness`
 
@@ -1697,7 +1849,11 @@ The list already has one example of the right pattern: **"Send via email"** is g
 
 ---
 
-### ⏳ v1.4.28 — Cron strategy decision before launch (Vercel Hobby workaround)
+### ⏳ v1.4.28 — Cron strategy decision before launch (Vercel Hobby workaround) — SUPERSEDED by v1.4.28-H (S3)
+
+> **Superseded:** the decision is made (Option B — free external scheduler on
+> Hobby tier) and the work is **v1.4.28-H (S3)** in the hardening train above,
+> which also fixes the time-based schedule. This section is kept for reference.
 
 **Branch:** `v1.4.28/cron-strategy` (or fold into the Vercel deploy/launch branch when that lands)
 
