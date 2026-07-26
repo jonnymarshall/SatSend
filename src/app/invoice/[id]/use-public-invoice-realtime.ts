@@ -32,9 +32,14 @@ interface BroadcastPayload {
  * be used here. Instead, a trigger on `invoices` (migration 0022/0023)
  * broadcasts a minimal {id, status, btc_txid} record — never the full row —
  * to a channel named `invoice:<id>` whenever a non-draft invoice updates.
- * `realtime.messages` RLS (migration 0023) authorizes anon to receive it;
- * the channel must be opened with `{ config: { private: true } }` to trigger
- * that authorization check.
+ * `realtime.messages` RLS (migration 0023) authorizes anon to receive it, but
+ * only once the socket has a JWT attached: `realtime.broadcast_changes()`
+ * sends via `realtime.send()`, which marks broadcasts private by default, and
+ * private channels are only authorized after `realtime.setAuth()` has run —
+ * even for an anonymous client, where it resolves to the anon key rather than
+ * a user session. Skipping this call is why an earlier version of this hook
+ * silently got CHANNEL_ERROR: the channel opened before the client had
+ * presented anything for the `realtime.messages` policy to evaluate.
  */
 export function usePublicInvoiceRealtime(
   invoiceId: string,
@@ -48,6 +53,7 @@ export function usePublicInvoiceRealtime(
     const supabase = createClient();
     const channelName = `invoice:${invoiceId}`;
     let channel: RealtimeChannel | null = null;
+    let cancelled = false;
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -56,23 +62,29 @@ export function usePublicInvoiceRealtime(
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    channel = supabase
-      .channel(channelName, { config: { private: true } })
-      .on(
-        "broadcast",
-        { event: "UPDATE" },
-        (payload: BroadcastPayload) => {
-          const record = payload.payload?.record;
-          if (record) onUpdate({ status: record.status, btc_txid: record.btc_txid });
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          console.warn(`[public-invoice-realtime] ${status} on ${channelName}`, err);
-        }
-      });
+    (async () => {
+      await supabase.realtime.setAuth();
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(channelName, { config: { private: true } })
+        .on(
+          "broadcast",
+          { event: "UPDATE" },
+          (payload: BroadcastPayload) => {
+            const record = payload.payload?.record;
+            if (record) onUpdate({ status: record.status, btc_txid: record.btc_txid });
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.warn(`[public-invoice-realtime] ${status} on ${channelName}`, err);
+          }
+        });
+    })();
 
     return () => {
+      cancelled = true;
       document.removeEventListener("visibilitychange", handleVisibility);
       if (channel) supabase.removeChannel(channel);
     };

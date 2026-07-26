@@ -20,6 +20,7 @@ let lastChannelConfig: unknown = null;
 let lastOnArgs: unknown[] | null = null;
 const channelSpy = vi.fn();
 const removeChannelSpy = vi.fn();
+const setAuthSpy = vi.fn().mockResolvedValue(undefined);
 
 function makeMockChannel(): MockChannel {
   const channel: MockChannel = {
@@ -42,6 +43,9 @@ vi.mock("@/lib/supabase/client", () => ({
       return makeMockChannel();
     },
     removeChannel: (ch: unknown) => removeChannelSpy(ch),
+    realtime: {
+      setAuth: setAuthSpy,
+    },
   }),
 }));
 
@@ -57,6 +61,7 @@ beforeEach(() => {
   refreshSpy.mockClear();
   channelSpy.mockClear();
   removeChannelSpy.mockClear();
+  setAuthSpy.mockClear();
   capturedCallback = null;
   lastChannelName = null;
   lastChannelConfig = null;
@@ -75,6 +80,14 @@ describe("usePublicInvoiceRealtime", () => {
     expect(channelSpy).toHaveBeenCalledOnce();
     expect(lastChannelName).toBe("invoice:inv-abc");
     expect(lastChannelConfig).toEqual({ config: { private: true } });
+  });
+
+  it("calls realtime.setAuth() before subscribing — required for private broadcast channels, even for anon", async () => {
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    expect(setAuthSpy).toHaveBeenCalledOnce();
+    expect(setAuthSpy).toHaveBeenCalledWith();
   });
 
   it("subscribes to the broadcast UPDATE event", async () => {
