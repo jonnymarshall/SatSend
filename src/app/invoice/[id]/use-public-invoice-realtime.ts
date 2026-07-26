@@ -72,12 +72,15 @@ export function usePublicInvoiceRealtime(
           "broadcast",
           { event: "UPDATE" },
           (payload: BroadcastPayload) => {
+            console.info(`[public-invoice-realtime] broadcast received on ${channelName}`, payload);
             const record = payload.payload?.record;
             if (record) onUpdate({ status: record.status, btc_txid: record.btc_txid });
           }
         )
         .subscribe((status, err) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          if (status === "SUBSCRIBED") {
+            console.info(`[public-invoice-realtime] subscribed: ${channelName}`);
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             console.warn(`[public-invoice-realtime] ${status} on ${channelName}`, err);
           }
         });

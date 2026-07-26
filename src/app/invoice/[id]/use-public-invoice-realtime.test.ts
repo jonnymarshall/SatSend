@@ -8,6 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 type Callback = (payload: unknown) => void;
+type SubscribeCallback = (status: string, err?: unknown) => void;
 
 interface MockChannel {
   on: ReturnType<typeof vi.fn>;
@@ -15,6 +16,7 @@ interface MockChannel {
 }
 
 let capturedCallback: Callback | null = null;
+let capturedSubscribeCallback: SubscribeCallback | null = null;
 let lastChannelName: string | null = null;
 let lastChannelConfig: unknown = null;
 let lastOnArgs: unknown[] | null = null;
@@ -29,7 +31,10 @@ function makeMockChannel(): MockChannel {
       capturedCallback = args[args.length - 1] as Callback;
       return channel;
     }),
-    subscribe: vi.fn(() => channel),
+    subscribe: vi.fn((cb?: SubscribeCallback) => {
+      capturedSubscribeCallback = cb ?? null;
+      return channel;
+    }),
   };
   return channel;
 }
@@ -63,6 +68,7 @@ beforeEach(() => {
   removeChannelSpy.mockClear();
   setAuthSpy.mockClear();
   capturedCallback = null;
+  capturedSubscribeCallback = null;
   lastChannelName = null;
   lastChannelConfig = null;
   lastOnArgs = null;
@@ -121,6 +127,30 @@ describe("usePublicInvoiceRealtime", () => {
 
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledWith({ status: "payment_detected", btc_txid: "abc123" });
+  });
+
+  it("logs on successful subscription, not just on error — silence made a real CHANNEL_ERROR indistinguishable from success during debugging", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    capturedSubscribeCallback?.("SUBSCRIBED");
+
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("subscribed"));
+  });
+
+  it("logs when a broadcast message is received, before parsing it", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    capturedCallback?.({
+      event: "UPDATE",
+      type: "broadcast",
+      payload: { record: { id: "inv-abc", status: "paid", btc_txid: "abc" } },
+    });
+
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("broadcast received"), expect.anything());
   });
 
   it("removes the channel on unmount", async () => {
