@@ -8,6 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 type Callback = (payload: unknown) => void;
+type SubscribeCallback = (status: string, err?: unknown) => void;
 
 interface MockChannel {
   on: ReturnType<typeof vi.fn>;
@@ -15,12 +16,13 @@ interface MockChannel {
 }
 
 let capturedCallback: Callback | null = null;
+let capturedSubscribeCallback: SubscribeCallback | null = null;
 let lastChannelName: string | null = null;
+let lastChannelConfig: unknown = null;
 let lastOnArgs: unknown[] | null = null;
 const channelSpy = vi.fn();
 const removeChannelSpy = vi.fn();
-const setAuthSpy = vi.fn();
-const getSessionSpy = vi.fn();
+const setAuthSpy = vi.fn().mockResolvedValue(undefined);
 
 function makeMockChannel(): MockChannel {
   const channel: MockChannel = {
@@ -29,22 +31,23 @@ function makeMockChannel(): MockChannel {
       capturedCallback = args[args.length - 1] as Callback;
       return channel;
     }),
-    subscribe: vi.fn(() => channel),
+    subscribe: vi.fn((cb?: SubscribeCallback) => {
+      capturedSubscribeCallback = cb ?? null;
+      return channel;
+    }),
   };
   return channel;
 }
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
-    channel: (name: string) => {
-      channelSpy(name);
+    channel: (name: string, config?: unknown) => {
+      channelSpy(name, config);
       lastChannelName = name;
+      lastChannelConfig = config;
       return makeMockChannel();
     },
     removeChannel: (ch: unknown) => removeChannelSpy(ch),
-    auth: {
-      getSession: () => getSessionSpy(),
-    },
     realtime: {
       setAuth: setAuthSpy,
     },
@@ -64,11 +67,10 @@ beforeEach(() => {
   channelSpy.mockClear();
   removeChannelSpy.mockClear();
   setAuthSpy.mockClear();
-  getSessionSpy.mockReset();
-  // Public payer is unauthenticated — return null session.
-  getSessionSpy.mockResolvedValue({ data: { session: null } });
   capturedCallback = null;
+  capturedSubscribeCallback = null;
   lastChannelName = null;
+  lastChannelConfig = null;
   lastOnArgs = null;
 });
 
@@ -77,40 +79,78 @@ afterEach(() => {
 });
 
 describe("usePublicInvoiceRealtime", () => {
-  it("opens a channel filtered by invoice id on the invoices table", async () => {
+  it("opens a private broadcast channel named after the invoice id", async () => {
     renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
     await flushAsync();
 
     expect(channelSpy).toHaveBeenCalledOnce();
-    expect(lastChannelName).toContain("inv-abc");
+    expect(lastChannelName).toBe("invoice:inv-abc");
+    expect(lastChannelConfig).toEqual({ config: { private: true } });
+  });
+
+  it("calls realtime.setAuth() before subscribing — required for private broadcast channels, even for anon", async () => {
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    expect(setAuthSpy).toHaveBeenCalledOnce();
+    expect(setAuthSpy).toHaveBeenCalledWith();
+  });
+
+  it("subscribes to the broadcast UPDATE event", async () => {
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
 
     expect(lastOnArgs).not.toBeNull();
     const [eventName, config] = lastOnArgs as [string, Record<string, string>];
-    expect(eventName).toBe("postgres_changes");
+    expect(eventName).toBe("broadcast");
     expect(config.event).toBe("UPDATE");
-    expect(config.schema).toBe("public");
-    expect(config.table).toBe("invoices");
-    expect(config.filter).toBe("id=eq.inv-abc");
   });
 
-  it("does NOT call setAuth — payer is unauthenticated and uses the anon key", async () => {
-    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
-    await flushAsync();
-    expect(setAuthSpy).not.toHaveBeenCalled();
-  });
-
-  it("invokes onUpdate with payload.new when a postgres UPDATE event fires", async () => {
+  it("invokes onUpdate with status/btc_txid from payload.payload.record", async () => {
     const onUpdate = vi.fn();
     renderHook(() => usePublicInvoiceRealtime("inv-abc", onUpdate));
     await flushAsync();
 
     expect(onUpdate).not.toHaveBeenCalled();
 
-    const newRow = { id: "inv-abc", status: "payment_detected", btc_txid: "abc123" };
-    capturedCallback?.({ eventType: "UPDATE", new: newRow });
+    capturedCallback?.({
+      event: "UPDATE",
+      type: "broadcast",
+      payload: {
+        operation: "UPDATE",
+        table: "invoices",
+        schema: "public",
+        record: { id: "inv-abc", status: "payment_detected", btc_txid: "abc123" },
+        old_record: { id: "inv-abc", status: "pending", btc_txid: null },
+      },
+    });
 
     expect(onUpdate).toHaveBeenCalledOnce();
-    expect(onUpdate).toHaveBeenCalledWith(newRow);
+    expect(onUpdate).toHaveBeenCalledWith({ status: "payment_detected", btc_txid: "abc123" });
+  });
+
+  it("logs on successful subscription, not just on error — silence made a real CHANNEL_ERROR indistinguishable from success during debugging", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    capturedSubscribeCallback?.("SUBSCRIBED");
+
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("subscribed"));
+  });
+
+  it("logs when a broadcast message is received, before parsing it", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    renderHook(() => usePublicInvoiceRealtime("inv-abc", () => {}));
+    await flushAsync();
+
+    capturedCallback?.({
+      event: "UPDATE",
+      type: "broadcast",
+      payload: { record: { id: "inv-abc", status: "paid", btc_txid: "abc" } },
+    });
+
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("broadcast received"), expect.anything());
   });
 
   it("removes the channel on unmount", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Invoice } from "@/lib/invoice-public";
+import type { PublicInvoice } from "@/lib/invoice-public";
 import { fiatToBtc, buildBip21Uri } from "@/lib/btc-qr";
 import { BtcQrCode } from "@/components/btc-qr-code";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
@@ -13,12 +13,12 @@ import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
 
-function isPayableStatus(s: Invoice["status"]): boolean {
+function isPayableStatus(s: PublicInvoice["status"]): boolean {
   return s === "pending" || s === "overdue";
 }
 
 interface Props {
-  invoice: Invoice;
+  invoice: PublicInvoice;
   btcPrice: number | null;
 }
 
@@ -28,14 +28,14 @@ function fmtCurrency(amount: number, currency: string) {
 
 
 export function InvoicePaymentView({ invoice, btcPrice }: Props) {
-  const [status, setStatus] = useState<Invoice["status"]>(invoice.status);
+  const [status, setStatus] = useState<PublicInvoice["status"]>(invoice.status);
   // v1.4.13: hold txid in client state so detection (from the watcher OR the
   // realtime UPDATE) renders the mempool link without a manual refresh.
   const [btcTxid, setBtcTxid] = useState<string | null>(invoice.btc_txid);
   const [userRevealedPayment, setUserRevealedPayment] = useState(false);
 
   const handleWatcherStatusChange = useCallback(
-    (s: Invoice["status"], txid?: string) => {
+    (s: PublicInvoice["status"], txid?: string) => {
       setStatus(s);
       if (txid) setBtcTxid(txid);
     },
@@ -45,7 +45,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   // Realtime fallback for cron-driven status changes the on-page mempool watcher
   // can't observe. The watcher remains the fastest path when the payer is here.
   const handleRealtimeUpdate = useCallback(
-    (next: { status?: Invoice["status"]; btc_txid?: string | null }) => {
+    (next: { status?: PublicInvoice["status"]; btc_txid?: string | null }) => {
       if (next.status) setStatus(next.status);
       if (next.btc_txid) setBtcTxid(next.btc_txid);
     },

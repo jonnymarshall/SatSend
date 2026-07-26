@@ -273,11 +273,26 @@ Works on both `/invoices` (list) and `/invoices/[id]` (detail). Any DB update fr
 
 File: `src/app/invoice/[id]/use-public-invoice-realtime.ts`
 
-- Subscribes to Supabase Realtime UPDATE events on the `invoices` row matching the public page's id, using the **anon** key (the payer is unauthenticated).
-- Migration `0009_anon_select_for_realtime.sql` adds an anon SELECT policy on non-draft invoices so Realtime delivers events under RLS. Draft invoices remain owner-only.
-- The hook surfaces `payload.new` to the page, which applies the next status to local React state — so the badge moves without a `router.refresh()` (which would re-run the server fetch and clobber other in-flight UI state).
+- **As of v1.4.20-H (S1), this no longer uses `postgres_changes`.** The anon
+  key has no SELECT policy on `invoices` at all (the audit found the prior
+  blanket policy exposed every non-draft invoice's full row, including
+  `access_code`, for far more than the payer page actually needed). Instead, a
+  trigger on `invoices` (migrations `0022_close_anon_exposures.sql`,
+  `0023_broadcast_guard_and_authorization.sql`) calls
+  `realtime.broadcast_changes()` on every non-draft UPDATE, sending a minimal
+  `{id, status, btc_txid}` record to a broadcast channel named `invoice:<id>`.
+  Draft invoices never broadcast at all.
+- The page subscribes to that channel with the **anon** key, opening it with
+  `{ config: { private: true } }`. `realtime.broadcast_changes()` sends via
+  `realtime.send()`, which defaults broadcasts to private — an RLS policy on
+  `realtime.messages` (not `invoices`) authorizes anon to receive messages on
+  topics matching the `invoice:<uuid>` pattern.
+- The hook surfaces `payload.payload.record` (`status`, `btc_txid`) to the
+  page, which applies them to local React state — so the badge moves without a
+  `router.refresh()` (which would re-run the server fetch and clobber other
+  in-flight UI state).
 - `visibilitychange` → `router.refresh()` is the safety net for silent socket drops.
-- The on-page mempool watcher (path A) is still the fastest source for transactions hitting the watched address; this Realtime path is the catch-all for cron-driven (path C) and owner-driven (e.g. mark-as-paid) transitions the watcher can't see.
+- The on-page mempool watcher (path A) is still the fastest source for transactions hitting the watched address; this path is the catch-all for cron-driven (path C) and owner-driven (e.g. mark-as-paid) transitions the watcher can't see.
 
 ---
 

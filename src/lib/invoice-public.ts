@@ -43,3 +43,13 @@ export async function fetchPublicInvoice(id: string): Promise<Invoice | null> {
 
   return data as Invoice;
 }
+
+// The shape allowed to cross into the client component tree. access_code is
+// the page's own auth secret and user_id identifies the owner — neither
+// should ever reach the payer's browser.
+export type PublicInvoice = Omit<Invoice, "access_code" | "user_id">;
+
+export function toPublicInvoice(invoice: Invoice): PublicInvoice {
+  const { access_code: _access_code, user_id: _user_id, ...publicInvoice } = invoice;
+  return publicInvoice;
+}
