@@ -52,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `REPLICA IDENTITY DEFAULT`. Migrations `0022_close_anon_exposures.sql` and
   `0023_broadcast_guard_and_authorization.sql`. See
   `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
+- **Fixed two bugs found during manual testing of the above:** (1) the payer
+  page's broadcast subscription needs `supabase.realtime.setAuth()` called
+  before `.subscribe()` — private broadcast channels (the default for
+  `realtime.broadcast_changes()`) only authorize against `realtime.messages`
+  RLS once the socket has a JWT attached, even for an anonymous client; (2)
+  **more severe** — the broadcast trigger function referenced its
+  `invoice_broadcast_record` composite type unqualified while running under
+  `set search_path = ''`, so Postgres couldn't resolve it and **every
+  non-draft UPDATE to `invoices` was throwing `42704` and aborting the whole
+  transaction** — silently blocking every invoice update (mark-as-paid,
+  edits, cron sweeps) from the moment migration `0022` was applied. Fixed in
+  migration `0024_fix_broadcast_type_search_path.sql` by qualifying the
+  reference as `public.invoice_broadcast_record`.
 
 ### Notes
 

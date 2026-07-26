@@ -1441,6 +1441,21 @@ needed); (4) reverted `REPLICA IDENTITY` to `DEFAULT`. Also stripped
   apply Next's RSC bundling-layer separation and would otherwise hit
   `server-only`'s throwing implementation in every test that transitively
   imports `admin.ts`.
+- Manual TEST 4 surfaced two more bugs, both fixed in follow-up commits/migrations:
+  1. The client subscribed to the private broadcast channel without first
+     calling `supabase.realtime.setAuth()` — private channels (which is what
+     `realtime.broadcast_changes()` sends by default) are only authorized
+     against `realtime.messages` RLS once the socket has a JWT attached, even
+     for an anonymous client. Fixed in `use-public-invoice-realtime.ts`.
+  2. **More severe:** `broadcast_invoice_status_change()` sets `search_path = ''`
+     (correct hardening) but referenced the `invoice_broadcast_record`
+     composite type unqualified. With an empty search path Postgres couldn't
+     resolve it, so **every non-draft UPDATE to `invoices` threw `42704` and
+     aborted the whole transaction** — not just breaking the broadcast, but
+     silently blocking every invoice update (mark-as-paid, edits, cron
+     sweeps) from the moment `0022` was applied until migration
+     `0024_fix_broadcast_type_search_path.sql` qualified the reference as
+     `public.invoice_broadcast_record`.
 
 **Done when:** no anon request with the public key can read any invoice, summary,
 or webhook row; the payer page still updates live; `supabase db lint` is clean.
