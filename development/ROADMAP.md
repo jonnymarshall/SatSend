@@ -1461,15 +1461,34 @@ needed); (4) reverted `REPLICA IDENTITY` to `DEFAULT`. Also stripped
 or webhook row; the payer page still updates live; `supabase db lint` is clean.
 Manual test guide: `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
 
-#### 🔴 v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
+#### ✅ v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
 **Branch:** `v1.4.19/payment-amount-awareness` · Detail: HARDENING-ROADMAP.md → S2
-The payment-status API trusts the client's `status:"paid"` claim and checks no
-amount, so a 1-sat tx forges a paid invoice. Use the real fetched tx (not the
-synthetic one), persist `expected_sats` at publish, require received ≥ expected
-within tolerance before `paid`, require the access-code cookie, and require a
-confirmation-depth threshold. Implement the full old-v1.4.19 spec (below) on top.
-**Done when:** a forged-`paid` POST cannot move an invoice past `payment_detected`;
-below-tolerance pays land on `underpaid`; amount + price are persisted.
+The payment-status API trusted the client's `status:"paid"` claim and checked
+no amount, so a 1-sat tx could forge a paid invoice. Fixed: the route now
+passes the REAL fetched tx into the shared scheduler (the synthetic tx is
+gone), requires the access-code cookie, and both detection callsites
+(fast-path route + cron) require a 2-block confirmation depth (computed from
+a fetched chain tip, since mempool.space only exposes a confirmed/not-confirmed
+flag plus block height) and a fiat-coverage check (5% tolerance) before landing
+on `paid`, `underpaid`, or `paid`+`overpaid`.
+
+**Deviation from the original spec (planning discussion, pre-implementation):**
+the spec above called for snapshotting `expected_sats` (and the BTC price used)
+at **publish** time. That was caught as wrong during planning: locking the sats
+target to the publish-time price means a payer who pays the correct fiat amount
+later, after BTC has moved, would be wrongly flagged over/underpaid purely
+because of price drift the invoice never priced in. Implemented instead: no
+publish-time snapshot; the paying tx's sats are converted to fiat using the
+BTC price fetched at confirmation time and compared against `total_fiat`. New
+columns are `amount_received_sats`, `btc_price_at_detection`,
+`amount_received_fiat`, `overpaid` (no `expected_sats` column). If the price
+oracle is unavailable when a tx confirms, the verdict is deferred (invoice
+stays `payment_detected`) rather than guessed, and retried on the next tick.
+
+**Done when:** a forged-`paid` POST cannot move an invoice past
+`payment_detected`; a real but below-tolerance payment lands on `underpaid`;
+the amount received and the price used to judge it are persisted; a confirmed
+tx below 2-block depth does not finalize a verdict.
 
 #### 🔴 v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
 **Branch:** `v1.4.28/cron-strategy` · Detail: HARDENING-ROADMAP.md → S3

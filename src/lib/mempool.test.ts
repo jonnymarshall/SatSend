@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { txPaysToAddress, fetchAddressTxs, fetchTx, addressHasHistory } from "./mempool";
+import {
+  txPaysToAddress,
+  fetchAddressTxs,
+  fetchTx,
+  fetchTipHeight,
+  confirmationDepth,
+  addressHasHistory,
+} from "./mempool";
 import type { MempoolTx } from "./mempool";
 
 const tx = (vout: { scriptpubkey_address?: string; value: number }[]): MempoolTx => ({
@@ -72,6 +79,49 @@ describe("fetchTx", () => {
       new Response("not found", { status: 404 })
     );
     expect(await fetchTx("abc123")).toBeNull();
+  });
+});
+
+describe("fetchTipHeight", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("fetches the current chain tip height", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("900010", { status: 200 })
+    );
+    const result = await fetchTipHeight();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("/api/blocks/tip/height"));
+    expect(result).toBe(900010);
+  });
+
+  it("returns null on non-ok response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("upstream error", { status: 503 })
+    );
+    expect(await fetchTipHeight()).toBeNull();
+  });
+
+  it("returns null when fetch throws (network failure)", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("network down"));
+    expect(await fetchTipHeight()).toBeNull();
+  });
+});
+
+describe("confirmationDepth", () => {
+  it("returns null when the tx is unconfirmed (no block_height)", () => {
+    expect(confirmationDepth(900_010, undefined)).toBeNull();
+  });
+
+  it("returns null when the tip height is unavailable", () => {
+    expect(confirmationDepth(null, 900_000)).toBeNull();
+  });
+
+  it("returns 1 when the tx just landed in the tip block", () => {
+    expect(confirmationDepth(900_000, 900_000)).toBe(1);
+  });
+
+  it("returns 2 when the tx is one block behind the tip", () => {
+    expect(confirmationDepth(900_001, 900_000)).toBe(2);
   });
 });
 

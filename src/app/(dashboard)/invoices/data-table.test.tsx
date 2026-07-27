@@ -53,6 +53,11 @@ const MOCK_INVOICES: InvoiceRow[] = [
   { ...baseRow, id: "inv-4", invoice_number: "INV-004", client_name: "Umbrella", total_fiat: 750, currency: "USD", status: "archived", due_date: null, created_at: "2026-04-18T12:00:00Z" },
 ];
 
+const WITH_UNDERPAID: InvoiceRow[] = [
+  ...MOCK_INVOICES,
+  { ...baseRow, id: "inv-5", invoice_number: "INV-005", client_name: "Hooli", total_fiat: 400, currency: "USD", status: "underpaid", due_date: null, created_at: "2026-04-19T12:00:00Z" },
+];
+
 const bulkActionsBtn = () => document.getElementById("invoice-data-table--bulk-actions") as HTMLButtonElement;
 
 beforeEach(() => {
@@ -90,6 +95,11 @@ describe("InvoiceDataTable — structure", () => {
   it("hides archived invoices by default", () => {
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     expect(screen.queryByText("Umbrella")).not.toBeInTheDocument();
+  });
+
+  it("shows underpaid invoices by default (not hidden alongside archived)", () => {
+    render(<InvoiceDataTable data={WITH_UNDERPAID} userId="u1" />);
+    expect(screen.getByText("Hooli")).toBeInTheDocument();
   });
 
   it("shows 'X of N invoices selected' footer", () => {

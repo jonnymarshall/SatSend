@@ -29,6 +29,9 @@ const BASE_INVOICE = {
   due_date: "2026-05-15" as string | null,
   created_at: "2026-04-15T12:00:00Z",
   updated_at: "2026-04-15T12:00:00Z",
+  amount_received_sats: null as number | null,
+  amount_received_fiat: null as number | null,
+  overpaid: false,
 };
 
 function makeSupabaseMock(invoiceData: typeof BASE_INVOICE) {
@@ -142,6 +145,53 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
     );
     render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
     expect(mockPaymentWatcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("InvoiceDetailPage — under/overpaid amount indicator", () => {
+  it("shows 'Received $X of $Y' when the invoice is underpaid", async () => {
+    const { createClient } = await import("@/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValueOnce(
+      makeSupabaseMock({
+        ...BASE_INVOICE,
+        status: "underpaid",
+        total_fiat: 1000,
+        amount_received_fiat: 250,
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    expect(screen.getByText(/received \$250(\.00)? of \$1,?000(\.00)?/i)).toBeInTheDocument();
+  });
+
+  it("shows an 'Overpaid by $X' indicator when overpaid is true", async () => {
+    const { createClient } = await import("@/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValueOnce(
+      makeSupabaseMock({
+        ...BASE_INVOICE,
+        status: "paid",
+        total_fiat: 1000,
+        amount_received_fiat: 1200,
+        overpaid: true,
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    expect(screen.getByText(/overpaid by \$200(\.00)?/i)).toBeInTheDocument();
+  });
+
+  it("shows neither indicator for a clean paid invoice", async () => {
+    const { createClient } = await import("@/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValueOnce(
+      makeSupabaseMock({
+        ...BASE_INVOICE,
+        status: "paid",
+        total_fiat: 1000,
+        amount_received_fiat: 1000,
+        overpaid: false,
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    expect(screen.queryByText(/received \$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/overpaid by/i)).not.toBeInTheDocument();
   });
 });
 

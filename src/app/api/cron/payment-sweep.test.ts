@@ -13,10 +13,19 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const mockFetchAddressTxs = vi.fn();
-vi.mock("@/lib/mempool", () => ({
-  fetchAddressTxs: (...args: unknown[]) => mockFetchAddressTxs(...args),
-  txPaysToAddress: (tx: { vout: { scriptpubkey_address?: string }[] }, addr: string) =>
-    tx.vout.some((o) => o.scriptpubkey_address === addr),
+const mockFetchTipHeight = vi.fn();
+vi.mock("@/lib/mempool", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/mempool")>("@/lib/mempool");
+  return {
+    ...actual,
+    fetchAddressTxs: (...args: unknown[]) => mockFetchAddressTxs(...args),
+    fetchTipHeight: (...args: unknown[]) => mockFetchTipHeight(...args),
+  };
+});
+
+const mockFetchBtcPrice = vi.fn();
+vi.mock("@/lib/btc-price", () => ({
+  fetchBtcPrice: (...args: unknown[]) => mockFetchBtcPrice(...args),
 }));
 
 const mockSendDetected = vi.fn().mockResolvedValue(undefined);
@@ -44,6 +53,8 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   process.env.CRON_SECRET = "test-secret";
+  mockFetchTipHeight.mockResolvedValue(900_001);
+  mockFetchBtcPrice.mockResolvedValue({ price: 50_000, source: "coinbase" });
 });
 
 function authHeaders() {
@@ -164,10 +175,11 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     vout: [{ scriptpubkey_address: "tb1qaddr", value: 50_000 }],
   };
 
+  // 500,000 sats @ $50,000/BTC = $250 — matches `pending.total_fiat` exactly.
   const confirmed = {
     txid: "tx-paid",
     status: { confirmed: true, block_height: 900_000 },
-    vout: [{ scriptpubkey_address: "tb1qaddr", value: 50_000 }],
+    vout: [{ scriptpubkey_address: "tb1qaddr", value: 500_000 }],
   };
 
   it("updates an invoice and dispatches payment_detected email when an unconfirmed tx is seen", async () => {
@@ -242,6 +254,49 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
 
     expect(mockSendConfirmed).toHaveBeenCalledTimes(1);
+    expect(mockSendDetected).not.toHaveBeenCalled();
+    expect(update.calls[0].payload).toMatchObject({
+      status: "paid",
+      amount_received_sats: 500_000,
+      amount_received_fiat: 250,
+      overpaid: false,
+    });
+  });
+
+  it("lands on underpaid (not paid) and still sends the confirmed-style email when a confirmed tx pays less than the tolerance band", async () => {
+    const detected = { ...pending, status: "payment_detected" as const, mempool_seen_at: "2026-04-23T10:00:00Z" };
+    const { builder } = makeSelectBuilder([detected]);
+    const update = makeUpdateBuilder();
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+    // 50,000 sats @ $50,000/BTC = $25 — 10% of the $250 total.
+    mockFetchAddressTxs.mockResolvedValue([
+      { txid: "tx-under", status: { confirmed: true, block_height: 900_000 }, vout: [{ scriptpubkey_address: "tb1qaddr", value: 50_000 }] },
+    ]);
+    mockGetUserById.mockResolvedValue({ data: { user: { id: "owner-1", email: "owner@example.com" } } });
+
+    const res = await getRequest(authHeaders());
+    const body = await res.json();
+    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
+
+    expect(update.calls[0].payload).toMatchObject({ status: "underpaid", amount_received_sats: 50_000 });
+    expect(mockSendConfirmed).toHaveBeenCalledTimes(1);
+    expect(mockSendDetected).not.toHaveBeenCalled();
+  });
+
+  it("defers the verdict (stays payment_detected, no email) when the BTC price oracle is unavailable for a confirmed tx", async () => {
+    const detected = { ...pending, status: "payment_detected" as const, mempool_seen_at: "2026-04-23T10:00:00Z" };
+    const { builder } = makeSelectBuilder([detected]);
+    const update = makeUpdateBuilder();
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+    mockFetchAddressTxs.mockResolvedValue([confirmed]);
+    mockFetchBtcPrice.mockRejectedValue(new Error("oracle down"));
+
+    const res = await getRequest(authHeaders());
+    const body = await res.json();
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
+
+    expect(update.calls[0].payload).toMatchObject({ status: "payment_detected" });
+    expect(mockSendConfirmed).not.toHaveBeenCalled();
     expect(mockSendDetected).not.toHaveBeenCalled();
   });
 

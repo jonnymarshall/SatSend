@@ -162,6 +162,11 @@ export interface SendPaymentStatusArgs {
   totalFiat: number;
   currency: string;
   txid: string;
+  // Confirmed-payment amount verification (v1.4.19-H). Optional so existing
+  // callers/tests that predate amount verification keep behaving as "paid".
+  status?: "paid" | "underpaid";
+  amountReceivedFiat?: number | null;
+  overpaid?: boolean;
 }
 
 const InvoiceLabel = (n: string | null) => (n ? `Invoice ${n}` : "Your invoice");
@@ -230,6 +235,10 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
 export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Promise<void> {
   const totalDisplay = fmtCurrency(args.totalFiat, args.currency);
   const mempoolUrl = mempoolTxUrl(args.txid);
+  const underpaid = args.status === "underpaid";
+  const overpaid = !!args.overpaid;
+  const amountReceivedDisplay =
+    args.amountReceivedFiat != null ? fmtCurrency(args.amountReceivedFiat, args.currency) : null;
 
   await safeSend(
     {
@@ -243,9 +252,13 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
       return await resend.emails.send({
         from: getFromAddress(),
         to: args.ownerEmail,
-        subject: args.invoiceNumber
-          ? `${InvoiceLabel(args.invoiceNumber)} confirmed on-chain`
-          : "Your invoice payment is confirmed",
+        subject: underpaid
+          ? args.invoiceNumber
+            ? `Partial payment received for invoice ${args.invoiceNumber}`
+            : "Partial payment received"
+          : args.invoiceNumber
+            ? `${InvoiceLabel(args.invoiceNumber)} confirmed on-chain`
+            : "Your invoice payment is confirmed",
         react: PaymentConfirmedOwnerEmail({
           invoiceNumber: args.invoiceNumber,
           clientName: args.clientName,
@@ -253,6 +266,9 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
           txid: args.txid,
           mempoolUrl,
           dashboardUrl: `${getAppUrl()}/invoices/${args.invoiceId}`,
+          underpaid,
+          overpaid,
+          amountReceivedDisplay,
         }),
       });
     },
@@ -272,9 +288,13 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
       return await resend.emails.send({
         from: getFromAddress(),
         to: args.payerEmail!,
-        subject: args.invoiceNumber
-          ? `Your payment for invoice ${args.invoiceNumber} is confirmed`
-          : "Your payment is confirmed",
+        subject: underpaid
+          ? args.invoiceNumber
+            ? `Your partial payment for invoice ${args.invoiceNumber} was received`
+            : "Your partial payment was received"
+          : args.invoiceNumber
+            ? `Your payment for invoice ${args.invoiceNumber} is confirmed`
+            : "Your payment is confirmed",
         react: PaymentConfirmedPayerEmail({
           invoiceNumber: args.invoiceNumber,
           senderName: args.senderName,
@@ -282,6 +302,9 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
           txid: args.txid,
           mempoolUrl,
           invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
+          underpaid,
+          overpaid,
+          amountReceivedDisplay,
         }),
       });
     },

@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchTx, txPaysToAddress, type MempoolTx } from "@/lib/mempool";
+import { fetchTx, fetchTipHeight, txPaysToAddress } from "@/lib/mempool";
+import { fetchBtcPrice } from "@/lib/btc-price";
+import { isAccessCodeValid, accessCookieName } from "@/lib/access-code";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 
@@ -39,12 +42,18 @@ export async function POST(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, btc_address, status, user_id, invoice_number, client_name, client_email, total_fiat, currency, mempool_seen_at, stage_attempt, your_name, your_company, your_email"
+      "id, btc_address, status, user_id, invoice_number, client_name, client_email, total_fiat, currency, mempool_seen_at, stage_attempt, your_name, your_company, your_email, access_code"
     )
     .eq("id", id)
     .single();
 
   if (error || !invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+
+  const cookieStore = await cookies();
+  const storedCode = cookieStore.get(accessCookieName(id))?.value ?? null;
+  if (!isAccessCodeValid(invoice.access_code, storedCode)) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
 
   const currentOrder = STATUS_ORDER[invoice.status] ?? -1;
   const newOrder = STATUS_ORDER[status];
@@ -59,28 +68,32 @@ export async function POST(
     );
   }
 
+  // Fetch the REAL transaction from mempool.space — never trust the client's
+  // claimed `status`. It's treated purely as a "check now" hint below.
   const tx = await fetchTx(txid);
   if (!tx || !txPaysToAddress(tx, invoice.btc_address)) {
     return NextResponse.json({ error: "Transaction does not pay to invoice address" }, { status: 400 });
   }
 
-  // Synthesize a tx-list reflecting the client-reported transition (confirmed vs. unconfirmed)
-  // and delegate to the shared scheduler so next_check_at / stage_attempt / mempool_seen_at
-  // stay consistent with the background cron.
-  const syntheticTx: MempoolTx = {
-    txid,
-    status: { confirmed: status === "paid" },
-    vout: [{ scriptpubkey_address: invoice.btc_address, value: 0 }],
-  };
+  let btcPrice: number | null = null;
+  try {
+    btcPrice = (await fetchBtcPrice(invoice.currency)).price;
+  } catch {
+    // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
+  }
+  const tipHeight = await fetchTipHeight();
+
   const decision = decidePaymentSchedule(
     {
       status: invoice.status as "pending" | "payment_detected",
       btc_address: invoice.btc_address,
       mempool_seen_at: invoice.mempool_seen_at,
       stage_attempt: invoice.stage_attempt,
+      total_fiat: invoice.total_fiat,
     },
-    [syntheticTx],
-    new Date()
+    [tx],
+    new Date(),
+    { btcPrice, tipHeight }
   );
 
   const { data: updated, error: updateError } = await supabase
@@ -91,6 +104,10 @@ export async function POST(
       mempool_seen_at: decision.newMempoolSeenAt,
       stage_attempt: decision.newStageAttempt,
       next_check_at: decision.newNextCheckAt,
+      amount_received_sats: decision.amountReceivedSats,
+      btc_price_at_detection: decision.btcPriceAtDetection,
+      amount_received_fiat: decision.amountReceivedFiat,
+      overpaid: decision.overpaid,
     })
     .eq("id", id)
     .eq("status", invoice.status)
@@ -124,8 +141,13 @@ export async function POST(
         currency: invoice.currency,
         txid,
       };
-      if (decision.newStatus === "paid") {
-        await sendPaymentConfirmedEmail(emailArgs);
+      if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
+        await sendPaymentConfirmedEmail({
+          ...emailArgs,
+          status: decision.newStatus,
+          amountReceivedFiat: decision.amountReceivedFiat,
+          overpaid: decision.overpaid,
+        });
       } else {
         await sendPaymentDetectedEmail(emailArgs);
       }

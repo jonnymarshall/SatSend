@@ -3,6 +3,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending:           { label: "Pending",           className: "bg-yellow-500/15 text-yellow-400" },
   payment_detected:  { label: "Payment Detected",  className: "bg-blue-500/15 text-blue-400" },
   paid:              { label: "Paid",              className: "bg-green-500/15 text-green-400" },
+  underpaid:         { label: "Underpaid",         className: "bg-amber-500/15 text-amber-400" },
   overdue:           { label: "Overdue",           className: "bg-destructive/15 text-destructive" },
   archived:          { label: "Archived",          className: "bg-muted/50 text-muted-foreground/60" },
 };

@@ -12,7 +12,7 @@ export interface InvoiceForOverdueActions {
   due_date: string | null;
 }
 
-const UNPAID_STATES = new Set(["pending", "payment_detected"]);
+const UNPAID_STATES = new Set(["pending", "payment_detected", "underpaid"]);
 
 export function canMarkAsOverdue(invoice: InvoiceForOverdueActions): boolean {
   if (invoice.due_date) return false;

@@ -65,6 +65,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edits, cron sweeps) from the moment migration `0022` was applied. Fixed in
   migration `0024_fix_broadcast_type_search_path.sql` by qualifying the
   reference as `public.invoice_broadcast_record`.
+- **v1.4.19-H (S2) — Payment forgery fix + amount verification.** The
+  payment-status API previously trusted the client-supplied `status:"paid"`
+  claim to build a synthetic transaction, so a POST claiming `paid` for any
+  real (or even 1-sat) tx paying the invoice address would forge a fully-paid
+  invoice with no amount check. Fixed: the route now passes the REAL fetched
+  tx into the shared `decidePaymentSchedule` scheduler (the synthetic tx is
+  deleted), requires the invoice's access-code cookie, and both detection
+  callsites (the fast-path route and the background cron) now require a
+  2-block confirmation depth (computed from a fetched chain tip — mempool.space
+  only exposes confirmed/not + block height, not a live confirmation count)
+  and a fiat-coverage check (5% tolerance against `total_fiat`, priced at
+  confirmation time) before landing on `paid`, the new `underpaid` status, or
+  `paid` with the new `overpaid` flag. If the BTC price oracle is unavailable
+  when a tx confirms, the verdict is deferred rather than guessed. New columns:
+  `amount_received_sats`, `btc_price_at_detection`, `amount_received_fiat`,
+  `overpaid` (migration `0025_payment_amount_awareness.sql`). Payment-confirmed
+  emails and the invoice detail page now surface the under/overpaid amount.
+  See `manual-tests/v1.4.19-H-payment-amount-awareness.md`.
 
 ### Notes
 

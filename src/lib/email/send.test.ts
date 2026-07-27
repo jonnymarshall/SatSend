@@ -287,4 +287,22 @@ describe("sendPaymentConfirmedEmail", () => {
   it("renders distinct templates for the owner and the payer (no throw)", async () => {
     await expect(sendPaymentConfirmedEmail(paymentArgs)).resolves.toBeUndefined();
   });
+
+  it("uses a partial-payment subject when status is underpaid", async () => {
+    await sendPaymentConfirmedEmail({
+      ...paymentArgs,
+      status: "underpaid",
+      amountReceivedFiat: 62.5,
+    });
+
+    const ownerCall = mockResendSend.mock.calls.find((call) => call[0].to === "owner@example.com");
+    expect(ownerCall![0].subject).toMatch(/partial payment/i);
+  });
+
+  it("uses the standard confirmed subject when status is paid (default)", async () => {
+    await sendPaymentConfirmedEmail(paymentArgs);
+
+    const ownerCall = mockResendSend.mock.calls.find((call) => call[0].to === "owner@example.com");
+    expect(ownerCall![0].subject).not.toMatch(/partial payment/i);
+  });
 });

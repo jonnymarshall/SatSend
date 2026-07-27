@@ -1,4 +1,4 @@
-import { txPaysToAddress, type MempoolTx } from "@/lib/mempool";
+import { txPaysToAddress, confirmationDepth, type MempoolTx } from "@/lib/mempool";
 
 // Index 0 is the publish → first-cron-check delay (referenced by publishStatePatch).
 // Indices 1+ are subsequent retry intervals consumed by decidePaymentSchedule via
@@ -28,19 +28,60 @@ export const POST_MEMPOOL_STAGES: ReadonlyArray<{ count: number; intervalMs: num
   { count: 24, intervalMs: 8 * 60 * 60_000 },
 ];
 
+// Coverage is judged in fiat, priced at the moment the payment is confirmed —
+// never at publish time. A price fixed at publish would drift against the
+// invoice's actual fiat total as BTC moves, making "did they pay enough" wrong
+// by however much the price changed. See v1.4.19-H (S2) planning discussion.
+const UNDERPAID_COVERAGE = 0.95;
+const OVERPAID_COVERAGE = 1.05;
+
+// mempool.space (and esplora-style APIs generally) only report whether a tx
+// is confirmed and which block it landed in — not a live confirmation count,
+// since that's relative to the ever-advancing tip. We require the tip to be
+// at least this many blocks past the tx's block before treating the payment
+// as final, to absorb short reorgs.
+export const CONFIRMATION_DEPTH_REQUIRED = 2;
+
 export interface ScheduleInput {
   status: "pending" | "payment_detected";
   btc_address: string;
   mempool_seen_at: string | null;
   stage_attempt: number;
+  total_fiat: number;
+}
+
+// The caller fetches these (live BTC price, current chain tip) and passes
+// them in so this function stays pure and testable. Either being null means
+// the oracle/tip is unavailable right now — the payment is left unfinalized
+// rather than guessed at.
+export interface PriceContext {
+  btcPrice: number | null;
+  tipHeight: number | null;
 }
 
 export interface ScheduleDecision {
-  newStatus: "pending" | "payment_detected" | "paid";
+  newStatus: "pending" | "payment_detected" | "paid" | "underpaid";
   newMempoolSeenAt: string | null;
   newStageAttempt: number;
   newNextCheckAt: string | null;
   detectedTxid: string | null;
+  amountReceivedSats: number | null;
+  btcPriceAtDetection: number | null;
+  amountReceivedFiat: number | null;
+  overpaid: boolean;
+}
+
+const NO_VERDICT = {
+  amountReceivedSats: null,
+  btcPriceAtDetection: null,
+  amountReceivedFiat: null,
+  overpaid: false,
+} as const;
+
+function sumVouts(tx: MempoolTx, address: string): number {
+  return tx.vout
+    .filter((o) => o.scriptpubkey_address === address)
+    .reduce((sum, o) => sum + o.value, 0);
 }
 
 function postMempoolIntervalForAttempt(attempt: number): number | null {
@@ -59,27 +100,57 @@ function addIso(now: Date, ms: number): string {
 export function decidePaymentSchedule(
   input: ScheduleInput,
   txs: MempoolTx[],
-  now: Date
+  now: Date,
+  price: PriceContext
 ): ScheduleDecision {
   const paying = txs.find((tx) => txPaysToAddress(tx, input.btc_address));
 
-  if (paying?.status.confirmed) {
-    return {
-      newStatus: "paid",
-      newMempoolSeenAt: input.mempool_seen_at ?? now.toISOString(),
-      newStageAttempt: input.stage_attempt,
-      newNextCheckAt: null,
-      detectedTxid: paying.txid,
-    };
-  }
+  if (paying) {
+    const depth = confirmationDepth(price.tipHeight, paying.status.block_height);
+    const finalized =
+      paying.status.confirmed &&
+      depth !== null &&
+      depth >= CONFIRMATION_DEPTH_REQUIRED &&
+      price.btcPrice !== null;
 
-  if (paying && input.mempool_seen_at === null) {
+    if (finalized) {
+      const receivedSats = sumVouts(paying, input.btc_address);
+      const receivedFiat = (receivedSats * price.btcPrice!) / 1e8;
+      const coverage = receivedFiat / input.total_fiat;
+      return {
+        newStatus: coverage < UNDERPAID_COVERAGE ? "underpaid" : "paid",
+        newMempoolSeenAt: input.mempool_seen_at ?? now.toISOString(),
+        newStageAttempt: input.stage_attempt,
+        newNextCheckAt: null,
+        detectedTxid: paying.txid,
+        amountReceivedSats: receivedSats,
+        btcPriceAtDetection: price.btcPrice,
+        amountReceivedFiat: receivedFiat,
+        overpaid: coverage > OVERPAID_COVERAGE,
+      };
+    }
+
+    // Seen (confirmed-but-shallow, or unconfirmed) but not yet finalized.
+    if (input.mempool_seen_at === null) {
+      return {
+        newStatus: "payment_detected",
+        newMempoolSeenAt: now.toISOString(),
+        newStageAttempt: 0,
+        newNextCheckAt: addIso(now, POST_MEMPOOL_STAGES[0].intervalMs),
+        detectedTxid: paying.txid,
+        ...NO_VERDICT,
+      };
+    }
+
+    const nextAttempt = input.stage_attempt + 1;
+    const interval = postMempoolIntervalForAttempt(nextAttempt);
     return {
       newStatus: "payment_detected",
-      newMempoolSeenAt: now.toISOString(),
-      newStageAttempt: 0,
-      newNextCheckAt: addIso(now, POST_MEMPOOL_STAGES[0].intervalMs),
-      detectedTxid: paying.txid,
+      newMempoolSeenAt: input.mempool_seen_at,
+      newStageAttempt: nextAttempt,
+      newNextCheckAt: interval === null ? null : addIso(now, interval),
+      detectedTxid: null,
+      ...NO_VERDICT,
     };
   }
 
@@ -93,6 +164,7 @@ export function decidePaymentSchedule(
       newStageAttempt: nextAttempt,
       newNextCheckAt: interval === undefined ? null : addIso(now, interval),
       detectedTxid: null,
+      ...NO_VERDICT,
     };
   }
 
@@ -103,5 +175,6 @@ export function decidePaymentSchedule(
     newStageAttempt: nextAttempt,
     newNextCheckAt: interval === null ? null : addIso(now, interval),
     detectedTxid: null,
+    ...NO_VERDICT,
   };
 }
