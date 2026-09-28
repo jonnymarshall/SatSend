@@ -69,6 +69,14 @@ describe("MarkAsMenu — overdue/pending visibility (the four cases)", () => {
     expect(screen.getByRole("menuitem", { name: /^overdue$/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
   });
+
+  it("underpaid + no due date: still treated as unpaid → shows Paid + Overdue, no Pending duplicate", () => {
+    renderMenu({ status: "underpaid", dueDate: null });
+    open();
+    expect(screen.getByRole("menuitem", { name: /^paid$/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /^overdue$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /^pending$/i })).not.toBeInTheDocument();
+  });
 });
 
 describe("MarkAsMenu — paid → pending stays available (out of v1.4.11 scope)", () => {

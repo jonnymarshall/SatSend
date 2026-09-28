@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "brand": "SatSend",
+    "direction": "Option D / Signal Amber",
+    "version": "1.0"
+  },
+  "font": {
+    "display": "Onest",
+    "body": "Geist Sans"
+  },
+  "color": {
+    "ink": "#151C2E",
+    "canvas": "#FCFBF7",
+    "surface": "#FFFFFF",
+    "brand": "#D89B24",
+    "brandHover": "#C48716",
+    "brandSoft": "#F8E9BF",
+    "textSecondary": "#6F7282",
+    "border": "#ECE8DD",
+    "success": "#2F9A74",
+    "successSoft": "#E7F6F0",
+    "sent": "#4776E6",
+    "sentSoft": "#EAF0FF",
+    "detected": "#6E7CF6",
+    "detectedSoft": "#ECEEFF",
+    "warning": "#F0A43B",
+    "warningSoft": "#FFF2DD",
+    "danger": "#D95F5F",
+    "dangerSoft": "#FCE8E8",
+    "neutral": "#7A8190",
+    "neutralSoft": "#F0F1F3"
+  },
+  "space": {
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 24,
+    "6": 32,
+    "7": 48,
+    "8": 64,
+    "9": 96,
+    "10": 128
+  },
+  "radius": {
+    "sm": 6,
+    "md": 10,
+    "lg": 16,
+    "xl": 24,
+    "pill": 999
+  },
+  "shadow": {
+    "card": "0 4px 24px rgba(21, 28, 46, 0.08)",
+    "overlay": "0 12px 36px rgba(21, 28, 46, 0.12), 0 2px 8px rgba(21, 28, 46, 0.06)"
+  }
+}

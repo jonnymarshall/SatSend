@@ -22,9 +22,13 @@ export function txPaysToAddress(tx: MempoolTx, address: string): boolean {
 
 export async function fetchAddressTxs(address: string): Promise<MempoolTx[]> {
   const base = getMempoolBaseUrl();
-  const res = await fetch(`${base}/api/address/${address}/txs`);
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${base}/api/address/${address}/txs`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchTx(txid: string): Promise<MempoolTx | null> {
@@ -32,6 +36,30 @@ export async function fetchTx(txid: string): Promise<MempoolTx | null> {
   const res = await fetch(`${base}/api/tx/${txid}`);
   if (!res.ok) return null;
   return res.json();
+}
+
+export async function fetchTipHeight(): Promise<number | null> {
+  const base = getMempoolBaseUrl();
+  try {
+    const res = await fetch(`${base}/api/blocks/tip/height`);
+    if (!res.ok) return null;
+    const text = await res.text();
+    const height = parseInt(text, 10);
+    return isFinite(height) ? height : null;
+  } catch {
+    return null;
+  }
+}
+
+// Esplora-style APIs (mempool.space included) only expose a tx's block
+// height, not a ready-made "confirmations" count — depth is relative to
+// whatever the current tip is, so the caller must supply both.
+export function confirmationDepth(
+  tipHeight: number | null,
+  blockHeight: number | undefined
+): number | null {
+  if (tipHeight === null || blockHeight === undefined) return null;
+  return tipHeight - blockHeight + 1;
 }
 
 interface AddressStatsResponse {

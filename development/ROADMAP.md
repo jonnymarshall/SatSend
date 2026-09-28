@@ -4,11 +4,12 @@
 > order.** Work top to bottom through the first ⏳ item. The immediate next work
 > is the **Security & Hardening train (v1.4.19-H … v1.4.28-H)** below, which comes
 > from the 2026-07 master architecture audit and takes priority over the older
-> feature queue. Step-by-step detail for each hardening item lives in
-> `development/HARDENING-ROADMAP.md`; the reasoning and full findings live in
-> `development/ARCHITECTURE-AUDIT-2026-07.md`. Those two docs are reference only —
-> **you never need to read anything but this file to know what to do next**; open
-> the hardening doc when you start a specific hardening item, for its exact steps.
+> feature queue. Step-by-step detail for each hardening item is in **Appendix A**
+> and the reasoning and full findings behind every item are in **Appendix B**,
+> both at the end of this file. **This file is the only roadmap document** — the
+> former `HARDENING-ROADMAP.md` and `ARCHITECTURE-AUDIT-2026-07.md` are folded in
+> below. Open Appendix A when you start a specific hardening item, for its exact
+> steps.
 
 ## Status Legend
 
@@ -1387,9 +1388,9 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 > **Do this whole train before resuming the feature queue below and before any
 > mainnet use.** Each item is one branch / one PR, same as any other roadmap
-> version. The one-liner here tells you *what and why*; open the matching item in
-> `development/HARDENING-ROADMAP.md` for the exact numbered steps when you start
-> it. Full findings and reasoning: `development/ARCHITECTURE-AUDIT-2026-07.md`.
+> version. The one-liner here tells you *what and why*; the exact numbered steps
+> are in **Appendix A** at the end of this file, and the full findings and
+> reasoning behind every item are in **Appendix B**.
 >
 > **Absorbed items:** the old `⏳ v1.4.19` (Payment Amount Awareness) is folded
 > into **v1.4.19-H (S2)**, and the old `⏳ v1.4.28` (Cron strategy) is folded into
@@ -1399,7 +1400,7 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 ### Phase 0 — Launch blockers (do in this order)
 
 #### ✅ v1.4.19-H (S0) — Green the build
-**Branch:** `fix/green-the-build` · Detail: HARDENING-ROADMAP.md → S0
+**Branch:** `fix/green-the-build` · Detail: Appendix A → S0
 The test suite is red on `main`: 5 tests in `actions.test.ts` fail because a
 fixture `due_date` (2026-07-10) is now in the past, and lint exits 1
 (`columns.tsx:59`). Freeze time in the test with `vi.setSystemTime`, fix the
@@ -1407,7 +1408,7 @@ display-name lint error. Nothing else proceeds on a red suite.
 **Done when:** `npm run test:run`, `npx tsc --noEmit`, `npm run lint` all exit 0.
 
 #### ✅ v1.4.20-H (S1) — Close the four anon database exposures
-**Branch:** `fix/rls-critical-exposures` · Detail: HARDENING-ROADMAP.md → S1
+**Branch:** `fix/rls-critical-exposures` · Detail: Appendix A → S1
 Highest priority in the project. Fixed: (1) the `invoice_email_summary` view
 leaked all invoices — `set (security_invoker = on)` + revoke anon; (2)
 `webhook_deliveries` had RLS off — enabled it, no policies (server-role-only,
@@ -1461,18 +1462,85 @@ needed); (4) reverted `REPLICA IDENTITY` to `DEFAULT`. Also stripped
 or webhook row; the payer page still updates live; `supabase db lint` is clean.
 Manual test guide: `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
 
-#### 🔴 v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
-**Branch:** `v1.4.19/payment-amount-awareness` · Detail: HARDENING-ROADMAP.md → S2
-The payment-status API trusts the client's `status:"paid"` claim and checks no
-amount, so a 1-sat tx forges a paid invoice. Use the real fetched tx (not the
-synthetic one), persist `expected_sats` at publish, require received ≥ expected
-within tolerance before `paid`, require the access-code cookie, and require a
-confirmation-depth threshold. Implement the full old-v1.4.19 spec (below) on top.
-**Done when:** a forged-`paid` POST cannot move an invoice past `payment_detected`;
-below-tolerance pays land on `underpaid`; amount + price are persisted.
+#### ✅ v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
+**Branch:** `v1.4.19/payment-amount-awareness` · Detail: Appendix A → S2
+The payment-status API trusted the client's `status:"paid"` claim and checked
+no amount, so a 1-sat tx could forge a paid invoice. Fixed: the route now
+passes the REAL fetched tx into the shared scheduler (the synthetic tx is
+gone), requires the access-code cookie, and both detection callsites
+(fast-path route + cron) require a 2-block confirmation depth (computed from
+a fetched chain tip, since mempool.space only exposes a confirmed/not-confirmed
+flag plus block height) and a fiat-coverage check (5% tolerance) before landing
+on `paid`, `underpaid`, or `paid`+`overpaid`.
+
+**Deviation from the original spec (planning discussion, pre-implementation):**
+the spec above called for snapshotting `expected_sats` (and the BTC price used)
+at **publish** time. That was caught as wrong during planning: locking the sats
+target to the publish-time price means a payer who pays the correct fiat amount
+later, after BTC has moved, would be wrongly flagged over/underpaid purely
+because of price drift the invoice never priced in. Implemented instead: no
+publish-time snapshot; the paying tx's sats are converted to fiat using the
+BTC price fetched at confirmation time and compared against `total_fiat`. New
+columns are `amount_received_sats`, `btc_price_at_detection`,
+`amount_received_fiat`, `overpaid` (no `expected_sats` column). If the price
+oracle is unavailable when a tx confirms, the verdict is deferred (invoice
+stays `payment_detected`) rather than guessed, and retried on the next tick.
+
+**Done when:** a forged-`paid` POST cannot move an invoice past
+`payment_detected`; a real but below-tolerance payment lands on `underpaid`;
+the amount received and the price used to judge it are persisted; a confirmed
+tx below 2-block depth does not finalize a verdict.
+
+#### 🔴 v1.4.19.1-H (S2.1) — Restore public invoice live updates
+**Branch:** `fix/public-invoice-realtime-authorization` · Detail: Appendix A → S2.1
+Manual testing found that the public `/invoice/[id]` page is refused access to
+its private `invoice:<id>` broadcast channel. Migration `0023` checks a `topic`
+field in its `realtime.messages` policy, but Supabase Realtime exposes the
+requested channel through `realtime.topic()`. The policy never matches, so the
+page logs `CHANNEL_ERROR` and only shows payment status changes after a refresh.
+Add a migration that recreates the policy with the correct topic helper and
+verify the public page receives status changes without a refresh.
+
+**Done when:** a public invoice page logs `SUBSCRIBED`, never logs a
+`CHANNEL_ERROR`, and its status changes from a service-role update within about
+one second without refreshing the page.
+
+#### 🔴 v1.4.19.2-H (S2.2) — One writer per database (stop cross-version cron writes)
+**Branch:** `fix/environment-and-deployment-hygiene` · Detail: Appendix A → S2.2
+Manual S2 testing was corrupted by a second code version writing to the same
+database. Production is still the `v1.4.18/resend-webhook` build from
+2026-05-19, and its `vercel.json` cron (`* * * * *`) sweeps
+`/api/cron/payment-sweep` against the same Supabase project the local dev server
+uses. That old build predates amount verification, so it finalises payments as
+`paid` and sends the "payment confirmed" email while leaving `amount_received_*`
+null and `overpaid` false — the exact shape on `f94a5826`/`a5c3b5bf` (confirmed
+2026-09-12 00:49:43, same batch), while the branch's own finalisation at
+23:49:06 recorded amounts correctly. Until this is fixed, per-feature manual
+testing is unreliable and production runs pre-fix code.
+**Done when:** only one code version can write to a given database; a fresh local
+test invoice is never touched by another environment's cron and its
+`paid`/`underpaid` verdict always carries amounts; and production serves the
+current branch.
+
+#### 🟢 v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
+**Branch:** none — test + config only · Detail: Appendix A → S2.3
+The mainnet dry-run has never succeeded and is the highest-risk unverified path
+in a Bitcoin product. Today it is gated behind all of Phase 0, but the money-safety
+prereqs land in S2 (done) and the reliable-environment fix in S2.2 — enough to run
+a first *controlled* real payment on mainnet early, so real-BTC exposure is
+validated while S3/S4 continue.
+Prereqs: S2 merged; S2.2 done (one writer, no stale cron); a real HD-wallet receive
+address with no history; `NEXT_PUBLIC_BTC_NETWORK=mainnet`; a deliberately tiny
+amount (small enough that a total loss is acceptable); the payer page kept open (the
+fast path detects it — the cron is not per-minute yet).
+**Done when:** a real mainnet invoice transitions `pending → payment_detected →
+paid`, records `amount_received_sats` / `btc_price_at_detection` /
+`amount_received_fiat`, sets `overpaid` correctly, and emails both parties.
+Note the result in the outstanding-verifications tracker; it de-risks the
+phase-end mainnet check.
 
 #### 🔴 v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
-**Branch:** `v1.4.28/cron-strategy` · Detail: HARDENING-ROADMAP.md → S3
+**Branch:** `v1.4.28/cron-strategy` · Detail: Appendix A → S3
 The daily Vercel cron burns the per-minute `stage_attempt` schedule and stops
 monitoring after ~7 days. Decided: keep Hobby tier, drive `/api/cron/payment-sweep`
 every minute from a free external scheduler (GitHub Actions / cron-job.org) with
@@ -1482,7 +1550,7 @@ every minute from a free external scheduler (GitHub Actions / cron-job.org) with
 → paid` within minutes via the external scheduler, independent of stage exhaustion.
 
 #### 🔴 v1.4.21-H (S4) — DB defends money state
-**Branch:** `fix/db-money-invariants` · Detail: HARDENING-ROADMAP.md → S4
+**Branch:** `fix/db-money-invariants` · Detail: Appendix A → S4
 One migration: CHECK constraints (amounts ≥ 0, tax 0-100, currency whitelist,
 totals consistent, line_items shape) added `NOT VALID` then validated; an
 immutability trigger on paid/payment_detected rows; a delete-guard trigger for
@@ -1490,21 +1558,30 @@ non-draft rows; a status guard on `bulkDelete`.
 **Done when:** a PATCH to a paid invoice's total is rejected by the DB, non-draft
 deletes are rejected, and negative/inconsistent amounts cannot be written.
 
-> **END OF PHASE 0 = safe for mainnet.** Before flipping
-> `NEXT_PUBLIC_BTC_NETWORK=mainnet`, do the outstanding **mainnet dry-run** (real
-> receive address, small real payment, confirm the full flow through the external
-> cron). This has never succeeded and is the single highest-risk unverified path —
-> tracked in `development/OUTSTANDING-VERIFICATIONS.md`.
+> **END OF PHASE 0 = safe for mainnet.** A first **controlled real-bitcoin smoke
+> test (S2.3)** runs earlier, right after S2.2, on a deliberately tiny amount — so
+> real mainnet exposure is validated while S3/S4 continue. Full mainnet readiness
+> still requires all of Phase 0. The phase-end check is the same flow repeated
+> through the external cron once S3 lands; that mainnet path has never succeeded
+> and remains the top unverified risk.
 
 ### Phase 1 — Correctness & hygiene (before real volume)
 
-Each is one branch. Detail for all of these: HARDENING-ROADMAP.md → Phase 1.
+Each is one branch. Detail for all of these: Appendix A → Phase 1.
 
 - 🔴 **v1.4.22-H — Detection robustness** (`v1.4.22-H/detection-robustness`): cron
   CAS checks `.select("id")` before sending email (no duplicate emails); `markUnpaid`
-  / `bulkUnarchive` reset the schedule columns + clear `btc_txid`; `fetchAddressTxs`
-  throws + times out and doesn't burn an attempt on failure; scheduler picks the
-  confirmed tx over an unconfirmed dust tx; freshness check fails closed.
+  / `bulkUnarchive` reset the schedule columns + clear `btc_txid`; give the cron
+  a way to tell "mempool.space is down" apart from "no tx yet" so an outage
+  doesn't burn a `stage_attempt`, plus `AbortSignal.timeout` (the client-side half
+  of this — `fetchAddressTxs` crashing `payment-watcher.tsx`'s poll loop — was
+  already fixed 2026-07-27, see Appendix B → M-MONEY-2);
+  scheduler picks the confirmed tx over an unconfirmed dust tx; freshness check
+  fails closed; the mempool.space client WebSocket in `payment-watcher.tsx` never
+  reconnects after a close/error, so the fastest detection path silently dies for
+  the rest of the page load (confirmed 2026-09-28, see Appendix B
+  → M-MONEY-2) — add bounded reconnect/backoff; and the M-MONEY-4 remainder
+  (bounded revert-to-pending when a previously-seen tx disappears via RBF/eviction).
 - 🔴 **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`):
   `pre_archive_status` → enum + CHECK; enumerate the summary view's columns;
   `user_id` index + wrapped `auth.uid()`; webhook dedupe `23505`-only + retention;
@@ -1523,7 +1600,7 @@ Each is one branch. Detail for all of these: HARDENING-ROADMAP.md → Phase 1.
 
 ### Phase 2 — Structural single-sources-of-truth
 
-Each is one branch. Detail: HARDENING-ROADMAP.md → Phase 2.
+Each is one branch. Detail: Appendix A → Phase 2.
 
 - ⏳ **v1.4.27-H — Generate Supabase types** (`chore/supabase-types`): generate
   `database.types.ts`, thread `Database` through the three client factories, delete
@@ -1547,18 +1624,21 @@ Each is one branch. Detail: HARDENING-ROADMAP.md → Phase 2.
   + `manual-tests/README.md`; banner `PRD.md` as historical + finish the SatSend
   rename; add `.env.example`; set `package.json` to `1.4.18` + backfill git tags;
   `git rm --cached` the `.DS_Store` files; delete the stale `master` branch. Detail:
-  HARDENING-ROADMAP.md → "Roadmap & docs restructure".
+  Appendix A → "Roadmap & docs restructure".
 - ⏳ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): add the
   test-must-pass commit gate, typecheck-on-Stop, version-sync-on-PR, and roadmap-size
   hooks; add the pre-merge-verification, migration-safety, and deploy-checklist
-  skills. Detail: HARDENING-ROADMAP.md → "Claude Code workflow".
+  skills. Detail: Appendix A → "Claude Code workflow".
 
-### Phase 3 — Feature queue resumes
+### Phase 3 — Redesign, then the feature queue resumes
 
-After the hardening train is merged, resume the ⏳ feature items below in order
-(v1.4.20 auto-overdue emails onward). They are unchanged by the audit. Note again
-that the old v1.4.19 and v1.4.28 sections are **superseded** by v1.4.19-H and
-v1.4.28-H above — keep them for reference but do not re-implement.
+Once Phase 0 and Phase 1 are green (the tech works), do **v1.5 (Full Site
+Redesign)** first — the design direction is locked and the brand handoff is in the
+repo, so it should not wait behind the entire feature queue. Then resume the ⏳
+feature items below in order (v1.4.20 auto-overdue emails onward). They are
+unchanged by the audit. Note again that the old v1.4.19 and v1.4.28 sections are
+**superseded** by v1.4.19-H and v1.4.28-H above — keep them for reference but do
+not re-implement.
 
 ---
 
@@ -1920,23 +2000,119 @@ Acceptable while there are zero real paying users; must be resolved before launc
 
 ---
 
-### ⏳ v1.5 — Design System Overhaul
+### ⏳ v1.4.34: Legal & Compliance Bundle (pre-launch, non-urgent)
 
-**Branch:** `v1.5/design-system`
+**Branch:** `v1.4.34/legal-compliance-bundle`
 
-> **Block:** Colour scheme decision needed from you before implementation begins. See notes below.
+> **Priority:** Not urgent. Slot it anywhere before launch. Nothing else in the
+> train depends on it, and it blocks nothing in the hardening train or the rest
+> of the feature queue.
 
-**Colour scheme**
-- [ ] DECISION: You to choose new colour scheme — current palette (near-black bg, dark surface, red `#DE3C4B` accent) lacks visual variety and makes it hard to differentiate button intent (e.g. primary action vs destructive vs secondary). New scheme should include at least one additional highlight colour and provide enough contrast between action types.
-- [ ] Implement new colour scheme across CSS variables / Tailwind config
-- [ ] Audit all buttons and badges to ensure each action type (primary, secondary, destructive, neutral) is visually distinct under the new scheme
+**Context:** A legal-risk audit flagged six items to handle before the product
+takes real users or sends real marketing. Five are code or config work; one
+(DMCA agent) is a registration walkthrough. Grouped into one branch because they
+are all compliance-shaped and each is individually too small for its own PR.
 
-**Light / dark mode**
-- [ ] Add dark/light mode toggle to the navbar
-- [ ] Ensure all components render correctly in both modes (Tailwind `dark:` variants)
-- [ ] Persist mode preference to `localStorage`
+**Scope**
 
-**Done when:** Colour scheme decision is made and implemented, all button states are visually distinct, and both dark and light mode work correctly throughout the app.
+1. **Age gate at signup.** Add a minimum-age confirmation to the signup flow so
+   under-age users cannot create an account (COPPA / GDPR-K). Match the existing
+   magic-link signup UX and record an `age_confirmed_at` timestamp on the user.
+2. **Self-host fonts.** Stop loading fonts from Google Fonts (or any third-party
+   font CDN) and serve them from our own domain so no visitor IP is handed to a
+   third party. Switch to `next/font/local` with the font files committed.
+3. **Session replay.** Either turn session-replay tooling off entirely, or (if
+   we keep it) add an explicit consent banner plus input masking so no email,
+   access code, or payment detail is ever recorded. Audit which replay or
+   analytics tools are actually loaded first; if none, close this item as a
+   no-op with a note.
+4. **Marketing-email compliance.** Every marketing email must carry a working
+   one-click unsubscribe link and a physical postal address in the footer
+   (CAN-SPAM). Transactional emails (invoice published, payment
+   detected/confirmed) are exempt, but should share the same footer component so
+   the split stays deliberate.
+5. **Renewal terms next to the subscribe button.** Any auto-renewing purchase
+   must show its renewal terms immediately adjacent to the call to action
+   (amount, cadence, cancellation policy), not buried in a linked policy. Applies
+   to the v2.0 premium upgrade flow when it lands; wire it in there if that ships
+   first.
+6. **Register a DMCA agent.** Walk the user through registering a designated
+   DMCA agent with the US Copyright Office (filing fee is currently $6), then add
+   the agent name and contact details to the site's copyright/terms page and a
+   new `/dmca` policy page.
+
+**Notes**
+- Items 4 and 5 depend on surfaces that do not exist yet (marketing email, the
+  premium subscribe flow). If those ship first, fold these in there; otherwise
+  keep this item as the catch-all and finish them here.
+- Item 6 is non-code and needs the user's input, so split it out if it stalls the
+  code work.
+
+**Tests**
+- [ ] Signup without confirming the age gate is rejected; with it, an
+      `age_confirmed_at` timestamp is written.
+- [ ] No network request leaves the app to a third-party font host on any page.
+- [ ] Session replay (if enabled) masks input fields in a recorded session; if
+      disabled, no replay script is loaded.
+- [ ] Every marketing-email snapshot contains an unsubscribe link and a postal
+      address.
+- [ ] Renewal-terms copy renders adjacent to the subscribe button (once that
+      surface exists).
+- [ ] `/dmca` page renders the registered agent details.
+
+**Done when:** all six items are either done or explicitly closed as
+not-applicable with the reason recorded, and no marketing email, signup path, or
+subscribe button ships without its required disclosure.
+
+---
+
+### ⏳ v1.5 — Full Site Redesign (Brand Handoff — "Signal Amber", Option D)
+
+**Branch:** `v1.5/redesign`
+
+> **Design source of truth:** `satsend-brand-handoff/` — read `DESIGN.md` first,
+> then `design-tokens.css` and `agent-implementation-brief.md`. Written tokens and
+> component rules win over any generated reference imagery. The supplied
+> `SatSendLogo.tsx` is the wordmark component to use.
+>
+> **Sequencing:** run this immediately after the hardening train's Phase 0 + Phase
+> 1 are green (tech working), and before the remaining feature queue — so the
+> redesign is only built once. The old "pick a colour scheme" blocker is resolved
+> by this handoff.
+
+**Locked brand decisions**
+- Direction: Option D / Signal Amber.
+- Display/logo font: **Onest**. UI/body font: **Geist Sans**.
+- Primary: `#D89B24`. Canvas: `#FCFBF7`. Text: `#151C2E`.
+- Not green-led. Green = success/Paid; violet = Payment detected; blue = Sent;
+  warning orange = Underpaid; red = Overdue.
+- Bitcoin visual explicitness ≈ 2–2.5 / 5.
+
+**Scope**
+- [ ] Load Onest + Geist Sans; import `design-tokens.css` globally; retire the
+      current near-black + red `#DE3C4B` palette.
+- [ ] Rebuild the base primitives against the tokens: Button, Input, Card,
+      StatusBadge.
+- [ ] Use the supplied `SatSendLogo.tsx` inline-SVG lockup (do not rebuild the
+      wordmark from separately positioned spans).
+- [ ] Apply neutral surfaces and borders across the product **before** adding amber.
+- [ ] Apply the semantic status colours across badge, email templates, and PDF.
+- [ ] Refactor the dashboard, invoice detail, and public payer pages onto the new
+      spacing and type scales.
+- [ ] Build marketing pages using the product UI itself as the core visual.
+- [ ] Mobile: 44px minimum touch targets.
+- [ ] Accessibility/contrast pass before completion.
+- [ ] Light/dark: the handoff defines a light canvas and dark text. Decide whether
+      the app becomes light-first (retiring the old dark-only theme) or ships both;
+      record the decision in the PR. The old mandatory dark/light toggle is
+      superseded.
+
+**Coordinates with:** Appendix A → A-3 (realtime & styling unification) — its
+styling half lands here, not separately.
+
+**Done when:** every surface (dashboard, invoice detail, public payer page, emails,
+PDF) renders in the Signal Amber system, the logo is the supplied component, the
+status-colour mapping is exactly as locked above, and an accessibility pass is clean.
 
 ---
 
@@ -2204,3 +2380,846 @@ Project is not yet linked to Vercel. Before first deployment, run `vercel link` 
 - [ ] **Sender identity unified (v1.4.4)** — set `EMAIL_FROM="SatSend <team@mail.satsend.me>"` in `.env` and in Vercel project env vars (Production, Preview, Development). Confirm the Supabase custom SMTP "Sender" address (dashboard → Project Settings → Auth → SMTP Settings → Sender) is set to the same `team@mail.satsend.me` so transactional mail and auth mail share a single `From:` identity.
 - [x] **Supabase custom SMTP → Resend** — configured 2026-04-24 in Supabase dashboard (Project Settings → Auth → SMTP Settings) pointing at `smtp.resend.com:465` with the `RESEND_API_KEY` as the password and a sender on the verified `mail.satsend.me` domain. This routes all Supabase auth emails (magic link, signup confirmation, password reset) through Resend and bypasses Supabase's default ~4/hour rate limit. Project-level setting — applies to both local dev and production automatically.
 - [ ] Any other secrets present in `.env` at deploy time
+
+---
+
+## Appendix A — Hardening execution detail (folded in from the former HARDENING-ROADMAP.md)
+
+
+> **`ROADMAP.md` is the single source of truth for sequence.** Every item below
+> is listed there (as `v1.4.NN-H`) in the order to do it. This document holds only
+> the detailed numbered steps for each item — open the matching S-number or -H
+> version here when you start it. If this doc and `ROADMAP.md` ever disagree on
+> *what's next*, `ROADMAP.md` wins.
+
+This turns the findings in Appendix B into sequenced,
+modular work. It is written to be executed one branch at a time by a model that
+follows steps literally. **Do the phases in order.** Phase 0 and Phase 1 are
+launch-blockers and money-safety; do not deploy to mainnet or invite any user
+until they are green.
+
+## How to use this document (rules for the implementing model)
+
+1. **One version = one branch = one PR**, per the `git-workflow` skill. Branch
+   names are given per item. Never commit to `main`/`master`.
+2. **Before writing code on an item, invoke the `next-feature` planning gate**:
+   read the item, produce the plan, STOP, and wait for the user's go-ahead.
+3. **Every item ends green**: `npm run test:run` (0 failures), `npx tsc --noEmit`
+   (0 errors), `npm run lint` (0 errors). If the suite is red when you start,
+   fix Phase 0 item S0 first — do not add work on top of a red suite.
+4. **Migrations**: the next number is `max(existing) + 1`. List
+   `supabase/migrations/` and verify ordering before writing. Apply to the remote
+   with the `supabase-migrate` skill and confirm success BEFORE opening the PR.
+   Prefer `NOT VALID` + backfill + `VALIDATE CONSTRAINT` over destructive deletes.
+5. **After each merge**: bump `package.json` version to match, add the git tag
+   (`git tag -a vX.Y.Z -m "..."`), update `CHANGELOG.md`, and move the item's
+   section to `ROADMAP-ARCHIVE.md`.
+6. Each item has a **Done when** line. It is not done until that is literally true.
+
+---
+
+## PHASE 0 — Stop the bleeding (launch-blockers, do first, in order)
+
+### S0 — Green the build (branch `fix/green-the-build`)
+The suite is red on `main`; nothing else can proceed safely on top of it.
+
+Steps:
+1. In `src/app/(dashboard)/invoices/actions.test.ts`, the 5 failing tests fail
+   because fixture `PUBLISHABLE_INVOICE.due_date = "2026-07-10"` is now in the
+   past. At the top of that test file, freeze time:
+   `beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-06-01T00:00:00Z")))`
+   and `afterEach(() => vi.useRealTimers())`. Confirm the 5 tests pass. (Model on
+   `payment-schedule.test.ts`, which injects a fixed `NOW` correctly.)
+2. Fix the lint error at `src/app/(dashboard)/invoices/columns.tsx:59`: give the
+   component returned by `sortableHeader` a `displayName`, or name the function.
+3. Run all three gates; all must be clean.
+
+**Done when:** `npm run test:run`, `npx tsc --noEmit`, and `npm run lint` all exit
+0 on a fresh checkout.
+
+### S1 — Close the four database exposures (branch `fix/rls-critical-exposures`)
+One migration, four fixes. This is the highest-priority item in the whole
+document. (Findings CRIT-1, CRIT-2, CRIT-3, plus the realtime re-architecture.)
+
+Steps (new migration `00XX_close_anon_exposures.sql`):
+1. `alter view invoice_email_summary set (security_invoker = on);`
+   then `revoke all on invoice_email_summary from anon;`
+2. `alter table webhook_deliveries enable row level security;` (no policies —
+   the service role bypasses RLS; the webhook handler keeps working).
+3. Replace the blanket anon policy. First drop it:
+   `drop policy "anon_select_non_draft" on invoices;`
+   Then re-architect the payer-page realtime so it no longer needs anon table
+   reads. Preferred approach: publish status changes from the server over a
+   Supabase **broadcast** channel keyed on the invoice id, from a trigger on
+   `invoices` (or from the cron/fast-path after a status write). Update
+   `src/app/invoice/[id]/use-public-invoice-realtime.ts` to subscribe to that
+   broadcast channel instead of `postgres_changes`. (If broadcast is too big a
+   step for this branch, ship steps 1-2 immediately as their own PR and do the
+   anon-policy replacement in a fast follow — but steps 1-2 must not wait.)
+4. Reduce the realtime blast radius:
+   `alter publication supabase_realtime drop table public.invoices;`
+   `alter publication supabase_realtime add table public.invoices with (publish = 'insert,update');`
+   and revert to `alter table public.invoices replica identity default;`
+   (nothing in the app reads `payload.old`; confirm with a grep for `payload.old`
+   before shipping).
+5. In `src/lib/invoice-public.ts`, stop returning `access_code` and `user_id` to
+   the client component — select explicit columns or strip them before crossing
+   the boundary.
+6. Add `import "server-only";` to the top of `src/lib/supabase/admin.ts`, and fix
+   `src/app/invoice/[id]/invoice-payment-view.tsx` to `import type { Invoice }`.
+7. Verify: with the anon key, `GET /rest/v1/invoice_email_summary?select=*`,
+   `GET /rest/v1/invoices?select=*`, and any `webhook_deliveries` read all return
+   403/empty. Run `supabase db lint` and confirm the security-definer-view and
+   rls-disabled advisors no longer fire.
+
+**Done when:** no anonymous request with the public key can read any invoice,
+summary, or webhook row; the payer page still updates live; `supabase db lint` is
+clean of those rules.
+
+### S2 — Fix payment forgery + verify amount (branch `v1.4.19/payment-amount-awareness`)
+This is CRIT-4 plus the existing roadmap item v1.4.19, which belong together —
+implement them as one branch. The v1.4.19 spec (schema, `decidePaymentOutcome`,
+tolerance band, UI, tests) is already written in `ROADMAP.md` and is good; follow
+it, and additionally:
+
+1. In `src/app/api/invoices/[id]/payment-status/route.ts`, **delete the synthetic
+   tx**. Pass the real `tx` fetched on line 62 into the scheduler so
+   `status.confirmed` comes from mempool.space, not the request body. Treat the
+   client POST purely as a "check now" hint.
+2. Persist `expected_sats` (and the price + timestamp used) on the invoice at
+   publish time, so detection has a fixed reference amount (finding M-MONEY-1).
+   This is the "snapshot the quote" work; do it here since v1.4.19 needs the
+   reference value anyway.
+3. In detection, sum the vout values paying the invoice address and require
+   `received >= expected * (1 - tolerance)` before `paid`; below that, the
+   `underpaid` status from the v1.4.19 spec.
+4. Require the access-code cookie on the payment-status route (reuse
+   `isAccessCodeValid`); return 404 otherwise.
+5. Require a confirmation-depth threshold (tip height − tx block height ≥ N)
+   before `paid`, not just `confirmed: true`.
+
+**Done when:** a POST with a real 1-sat unconfirmed tx and `status:"paid"` cannot
+move the invoice past `payment_detected`, and cannot mark it `paid`; a
+below-tolerance payment lands on `underpaid`; the amount and price used are
+persisted; all v1.4.19 tests pass plus a new regression test for the forgery
+POST.
+
+### S2.1 — Restore public invoice live updates (branch `fix/public-invoice-realtime-authorization`)
+Manual v1.4.19-H testing found that the public payer page is denied access to
+its own private broadcast channel. The client already calls `setAuth()` before
+subscribing and migrations `0022` through `0025` are applied. The remaining bug
+is the policy from `0023_broadcast_guard_and_authorization.sql`: it checks a
+`topic` field instead of the `realtime.topic()` helper that Supabase uses to
+expose the channel being authorized.
+
+Steps:
+1. Create a new migration that drops and recreates
+   `anon_select_invoice_status_broadcast` on `realtime.messages`. Keep the
+   `to anon` and `extension = 'broadcast'` restrictions, but match
+   `(select realtime.topic())` against the existing `^invoice:[0-9a-fA-F-]{36}$`
+   pattern.
+2. Keep the public client channel private and keep the existing awaited
+   `supabase.realtime.setAuth()` call. This is a database-policy correction, not
+   a reason to weaken the channel or restore anon access to `invoices`.
+3. Add a regression test for the client configuration if needed, then apply the
+   migration to the remote project before opening the PR.
+4. Manually verify with a published invoice left open in a browser. Update that
+   invoice through the service-role helper, confirm the page status changes
+   without a refresh, and confirm the browser console reports `SUBSCRIBED` with
+   no `CHANNEL_ERROR`.
+
+**Done when:** the public payer page receives its own status broadcast without a
+refresh, while anonymous database reads of `invoices` remain blocked.
+
+### S2.2 — One writer per database (branch `fix/environment-and-deployment-hygiene`)
+Surfaced during v1.4.19-H manual testing. Two code versions were writing to one
+database. The live production deployment (`v1.4.18/resend-webhook`, built
+2026-05-19, commit `ad677d47`) runs a cron from its own `vercel.json`
+(`"schedule": "* * * * *"`) against the same Supabase project the local dev server
+uses, with code that predates the amount-verification work. Evidence: `f94a5826`
+and `a5c3b5bf` both received a `payment_confirmed` email and reached `paid` with
+`amount_received_*` null and `overpaid` false, confirmed in the same second
+(2026-09-12 00:49:43 — one batch), while the branch's own finalisation
+(`3e4fc221`, 2026-09-11 23:49:06) recorded `amount_received_sats: 1253` and
+`btc_price_at_detection: 77170.58`.
+
+Steps:
+1. Stop the stale writer now: remove the cron from the old production deployment,
+   or delete that deployment, so no pre-fix code can mutate money state.
+2. Give local development its own database (a dedicated Supabase project or a
+   Supabase branch) so test invoices never live in production data and the
+   production cron can never touch them. Split this out only if it grows too large
+   for one PR; the guard in step 3 is the minimum.
+3. Add a single-writer guard: gate `/api/cron/payment-sweep` behind an explicit env
+   flag (e.g. `PAYMENT_SWEEP_ENABLED`) set only in the environment that should
+   sweep, so a stray or stale deployment cannot quietly run the sweep.
+4. Add a pre-merge/deploy checklist line: confirm exactly one live code version
+   targets a given database, and that production is on the current build.
+5. Document the rule in `AGENTS.md` and the manual-test template: local dev must
+   not point at the production database.
+
+**Done when:** a fresh local test invoice is never modified by any other
+environment; its `paid`/`underpaid`/`overpaid` verdict always carries amounts; and
+production is running the current branch with a single sweep owner.
+
+### S3 — Restore sub-daily detection (branch `v1.4.28/cron-strategy`)
+Decided: external scheduler on Hobby tier (CRIT-5). Also fix the schedule math.
+
+Steps:
+1. Keep `vercel.json` — but leave a comment that the daily entry is a Hobby-tier
+   placeholder and the real cadence is external.
+2. Add a GitHub Actions workflow `.github/workflows/payment-sweep.yml` on
+   `schedule: - cron: "* * * * *"` (GitHub's minimum effective cadence is ~5 min;
+   accept that, or use cron-job.org for true 1-min) that does
+   `curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://<prod-domain>/api/cron/payment-sweep`.
+   Add `CRON_SECRET` to the repo's Actions secrets.
+3. In `payment-schedule.ts`, make the schedule **time-based, not attempt-count
+   based**: derive the current stage from elapsed time since publish (pre-mempool)
+   or since `mempool_seen_at` (post-mempool), so a missed or sparse tick doesn't
+   burn a stage. Keep the same delay tables as the boundaries.
+4. In the sweep route, add `.order("next_check_at", { ascending: true })`, include
+   `overdue` in the status filter (M-DB-2), loop until the due queue drains
+   (paginate past `BATCH_SIZE`), and add `export const maxDuration = 60`.
+5. Update the route header comment, the README latency claims, and the v1.4.1
+   roadmap note to describe the external-cron reality.
+
+**Done when:** an abandoned testnet invoice (payer closes the tab) transitions
+`pending → payment_detected → paid` within minutes via the external scheduler,
+with no dependence on `stage_attempt` exhaustion, and overdue invoices still get
+checked.
+
+### S4 — DB defends money state (branch `fix/db-money-invariants`)
+Findings H-DB-1, H-DB-2. One migration.
+
+Steps (new migration, add constraints `NOT VALID` then validate):
+1. `amounts_non_negative` (subtotal/tax/total ≥ 0); `tax_percent_range` (0-100);
+   `currency_whitelist` (start `('USD')`, widen when v2.6 lands);
+   `totals_consistent` (`total_fiat = round(subtotal_fiat + tax_fiat, 2)`).
+2. `line_items` shape: an `immutable` helper function `line_items_valid(jsonb)`
+   asserting array-of-objects with numeric `quantity`/`unit_price`, wired into a
+   CHECK.
+3. Immutability trigger: block UPDATE of `total_fiat`/`subtotal_fiat`/`tax_fiat`/
+   `line_items`/`currency`/`btc_address` when `old.status in ('paid','payment_detected')`.
+4. Delete-guard trigger: `raise exception` on DELETE when `old.status <> 'draft'`.
+5. Add a status guard to `bulkDelete` in
+   `src/app/(dashboard)/invoices/bulk-actions.ts` (draft-only) so the UI matches.
+6. Reconcile any existing rows that would violate the new constraints *before*
+   `VALIDATE` — report them, don't blind-delete (contrast the 0018-0020 pattern).
+
+**Done when:** a PATCH to a paid invoice's `total_fiat` is rejected by the DB, a
+non-draft delete is rejected, and negative/ inconsistent amounts cannot be
+written.
+
+**End of Phase 0 = safe to run on mainnet and invite users.** Before flipping
+`NEXT_PUBLIC_BTC_NETWORK=mainnet`, do the outstanding **mainnet dry-run** (publish
+an invoice to a real receive address, pay a small real amount, confirm the full
+`pending → payment_detected → paid` flow through the external cron) — this has
+never succeeded and is the single highest-risk unverified path.
+
+---
+
+## PHASE 1 — Correctness and hygiene (before real volume)
+
+Order within the phase is flexible; each is its own branch.
+
+- **v1.4.x/detection-robustness** — M-DB-1 (cron CAS `.select("id")` + skip side
+  effects on empty; optional unique index on `email_events`), M-DB-3 (`markUnpaid`
+  / `bulkUnarchive` reset schedule columns + clear `btc_txid`), remainder of
+  M-MONEY-2 (the client-crash / dead-poll-loop half already shipped 2026-07-27 —
+  `fetchAddressTxs` now try/catches and returns `[]`; still needed here: give the
+  cron a way to tell "mempool.space is down" apart from "no tx yet" so an outage
+  doesn't burn a `stage_attempt`, plus `AbortSignal.timeout`. See the M-MONEY-2
+  update in Appendix B),
+  M-MONEY-3 (pick confirmed-then-unconfirmed tx), M-MONEY-5 (freshness fails
+  closed). Also the mempool.space client WebSocket in `payment-watcher.tsx` never
+  reconnects after a close/error (its `onclose` is an intentional no-op), so the
+  fastest detection path dies for the rest of the page load once mempool.space
+  drops the socket — add bounded reconnect/backoff. And the M-MONEY-4 remainder:
+  a seen tx that disappears (RBF/eviction) leaves the invoice stuck in
+  `payment_detected`; add a bounded revert-to-pending. Bundle these — they all
+  touch the detection path.
+- **v1.4.x/rls-and-indexes** — M-DB-4 (`pre_archive_status` → enum + CHECK),
+  M-DB-5 (enumerate the view's columns), M-DB-6 (`user_id` index + wrap
+  `auth.uid()`), M-DB-7 (webhook dedupe: `23505`-only + retention sweep),
+  `email_events.updated_at` trigger, `(user_id, invoice_number)` uniqueness.
+- **fix/proxy-and-boundaries** — H-FE-2 (`proxyConfig` → `config`), H-FE-4 (root
+  `error.tsx` + `not-found.tsx`, dashboard/invoice `loading.tsx`), M-FE-4 (proxy
+  `getSession` → `getUser`), M-FE-5 (security headers in `next.config.ts`).
+- **fix/public-endpoint-hardening** — H-SEC-1 (access-code check on the public PDF
+  route), M-FE-6 (cap `line_items` length, cache PDF by `updated_at`), the
+  `btc-price` currency allowlist, `timingSafeEqual` for `CRON_SECRET`, `secure`
+  cookie flag.
+- **fix/rate-limiting** — H-SEC-2 + H-SEC-3 + M-FE-6 abuse surface. Vercel WAF
+  rate-limit rules give immediate coverage with no code (access-code verify, email
+  send, PDF route); add server-side `client_email` validation and a per-user daily
+  send cap; enforce a minimum access-code length and store a hash.
+
+---
+
+## PHASE 2 — Structural single-sources-of-truth (pays for itself over time)
+
+- **A-1: Generate Supabase types** (branch `chore/supabase-types`). H-FE-5. Run
+  `supabase gen types typescript` into `src/lib/database.types.ts`, thread the
+  `Database` generic through `server.ts`/`client.ts`/`admin.ts`, derive the
+  `Invoice`/`InvoiceRow` types from it, delete the hand-declared duplicates. Add a
+  hook/CI step so the file regenerates on migration change.
+- **A-2: Adopt Zod + typed action results** (branch `refactor/zod-validation`).
+  H-FE-3, M-FE-2. Introduce one `invoiceSchema` in `src/lib/invoices/schema.ts`
+  imported by both `invoice-form.tsx` and the server actions; convert action
+  validation errors from thrown strings to `{ ok: false, field, message }` return
+  values; collapse the form's three parallel arrays into one `LineItemState[]`.
+- **A-3: Unify realtime + styling sources of truth** (branch
+  `refactor/realtime-and-styling`). M-FE-3 (one `useInvoiceChannel` hook with
+  bounded resubscribe on terminal states), M-MONEY-4 partial (document reorg risk),
+  and pick one color source of truth (derive `brand-colors.ts` from the CSS tokens
+  or add a test that parses `globals.css`). Do the styling half opportunistically
+  during v1.5.
+- **A-4: Integration test layer** (branch `test/supabase-integration`). M-FE-1,
+  H-FE (PRD promise). Stand up the promised integration suite against a real
+  Supabase test instance, starting with address-uniqueness (H-DB-3) and status
+  transitions — exactly where the chain mocks are weakest. Fix H-DB-3 here (the
+  `security definer` boolean RPC + `23505` catch for a friendly message).
+
+---
+
+## PHASE 3 — Product roadmap resumes
+
+Once Phase 0-1 are green, resume the existing `ROADMAP.md` queue. The remaining
+UX/feature items (v1.4.20 auto-overdue emails, v1.4.21 watcher dedup, v1.4.22
+activity feed, v1.4.23 marketing landing page [launch-blocking], v1.4.24 row-action
+availability, v1.4.25 duplicate cleanup, v1.4.26/27 email rework, then v1.5 design
+system, v1.6 BTC discount, v1.7 address fields) are well-specified and unchanged by
+this audit — proceed with them as written. v1.4.19 and v1.4.28 are absorbed into
+Phase 0 above (S2, S3); mark them done there. The v2 growth block stays deferred.
+
+---
+
+## Roadmap & docs restructure (do alongside Phase 0)
+
+1. **Split ROADMAP.md** (M-PROC-1). Move every ✅ section (v1.0 through v1.4.18,
+   ~lines 20-1370) into a new `development/ROADMAP-ARCHIVE.md` verbatim. Leave in
+   `ROADMAP.md`: the legend, a ~15-line "shipped so far" index table (version /
+   one-line / PR# / date), the 🔄 and ⏳ sections in full, v1.5-v1.7, the v2 block,
+   Notes, and the Pre-deployment Checklist. Target under 500 lines. Update
+   `next-feature`'s step 1 to read only `ROADMAP.md`.
+2. **Fix stale markers** (M-PROC-3): flip v1.4.14.1/.2/.3 to ✅; tick the
+   done-but-unchecked test boxes in merged sections.
+3. **One tracker for outstanding verifications** (M-PROC-2): new
+   `development/OUTSTANDING-VERIFICATIONS.md` listing the mainnet dry-run (launch
+   blocker), v1.4.18 TESTS 3/6/7, and the Resend-webhook prod config, each with
+   status and blocking-for. Add a `manual-tests/README.md` index.
+4. **Banner PRD.md** (M-PROC-4) as historical/superseded; finish the rename
+   (M-PROC-5) in PRD.md and the one live ROADMAP line, and extend
+   `rename-to-satsend.test.ts` to cover `development/`.
+5. **Add `.env.example`** at root (and `!.env.example` to `.gitignore`) with every
+   var one-line-commented: `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
+   `EMAIL_FROM`, `CRON_SECRET`, `RESEND_WEBHOOK_SECRET`, `NEXT_PUBLIC_BTC_NETWORK`
+   (flag this one — the mainnet detection failure was caused by it pointing at
+   testnet), and the site-URL var.
+6. **Fix version identity** (H-PROC-1): set `package.json` to `1.4.18`, backfill a
+   `v1.4.18` tag on merge commit `6af7c73`, and add "bump + tag on merge" to the
+   git-workflow skill.
+7. **Repo hygiene**: `git rm --cached` the committed `.DS_Store` files; delete the
+   stale `master` branch (local + origin) after confirming it's behind `main`;
+   prune merged feature branches; note preserved-WIP branches in ROADMAP Notes.
+
+---
+
+## Claude Code workflow: recommended new hooks & skills
+
+The current setup is good (the `next-feature` planning gate and the migration
+nudge are the right instincts). For a solo dev shipping a money app with a weaker
+model, add these — they convert "the model remembered" into "the harness
+enforced."
+
+**Hooks** (in `.claude/settings.json`):
+1. **test-must-pass gate on `git commit`** — block/warn unless `npm run test:run`
+   and `npx tsc --noEmit` exited 0 since the last edit. Highest value; the entire
+   quality gate is currently the model remembering to run tests.
+2. **typecheck-on-Stop** — run `npx tsc --noEmit` on Stop and surface failures, so
+   a session never ends green-looking with a broken build.
+3. **version-sync on `gh pr create`** — verify `CHANGELOG.md` has the branch's
+   version and `package.json` matches. Closes H-PROC-1 permanently.
+4. **roadmap-size tripwire** — warn when `ROADMAP.md` exceeds ~40KB, so the archive
+   discipline self-enforces.
+
+**Skills**:
+5. **pre-merge-verification** — run the full gate (tests, typecheck, lint, the
+   rename guard, grep for stray `console.log`/`.only`, CHANGELOG entry present,
+   manual-test doc exists) and emit a pass/fail table before every `gh pr create`.
+6. **migration-safety** — codify the 0018/0019 lessons: next number = max+1,
+   `NOT VALID` + validate over destructive delete, apply-to-remote-before-PR,
+   view drop/recreate for `select *` dependents. (The existing migration nudge can
+   trigger it.)
+7. **deploy-checklist** — walk the launch checklist + `vercel env` mirror, confirm
+   the external cron fired, confirm the webhook endpoint is live, before any prod
+   promote.
+
+Also: shrink the two overlapping items — have `write-a-prd` invoke `grill-me`
+rather than restating it — and put a 20-30 line project brief in `CLAUDE.md`/
+`AGENTS.md` (run `npm run test:run` + `npx tsc` before any commit; migrations
+applied to remote before PR; versions come from `ROADMAP.md`; never touch main).
+Keep it short — don't recreate the roadmap context problem.
+
+---
+
+## Appendix B — Findings reference (folded in from the former ARCHITECTURE-AUDIT-2026-07.md)
+
+
+Senior-engineer review of the whole project: code, schema, security, frontend,
+tests, roadmap, docs, and the Claude Code workflow. Findings are grouped by
+severity. Every CRITICAL and HIGH item was traced to specific files; the
+highest-stakes ones were independently found by more than one reviewer and then
+re-verified by hand against the source.
+
+**Context for this audit:** SatSend is a serious side project, pre-launch, on
+testnet only. No real BTC has moved yet. That is the one piece of good luck
+running through this whole report: the money-critical bugs below are all fixable
+*before* anyone can be hurt by them. They must be fixed before mainnet.
+
+The step-by-step plans for every actionable finding here are in Appendix A at
+the end of this file.
+
+---
+
+## 1. The headline: four ways the entire database is exposed, plus one payment-forgery bug
+
+These five are the reason this audit exists. Each is independently exploitable by
+anyone who opens the site and reads its JavaScript. Four are one-line-ish
+database fixes. They should ship in a single migration before anything else.
+
+### CRIT-1 — `invoice_email_summary` view bypasses RLS and is world-readable
+`supabase/migrations/0012_invoice_email_summary.sql:17`
+
+The view is created without `security_invoker`, so Postgres runs it as its owner
+(`postgres`, which has `BYPASSRLS`), and Supabase's default grants make it
+readable by the `anon` role. The header comment claims "RLS is inherited from
+the underlying tables" — that is factually wrong for a non-invoker view.
+
+**Exploit:** `GET /rest/v1/invoice_email_summary?select=*` with the public anon
+key (which ships in the browser bundle) returns every column of every invoice for
+every user — *including drafts* — with `access_code`, `client_email`,
+`client_tax_id`, `your_address`, `your_tax_id`, `btc_address`, `btc_txid`, and
+email error messages. It is a complete customer + revenue + address-graph dump.
+
+**Fix:** `alter view invoice_email_summary set (security_invoker = on);` plus
+`revoke all on invoice_email_summary from anon;`.
+
+### CRIT-2 — `anon_select_non_draft` policy exposes all non-draft invoices
+`supabase/migrations/0009_anon_select_for_realtime.sql:13`
+
+`for select to anon using (status != 'draft')` has no per-row predicate. It was
+written so one Realtime subscription would work, but an RLS policy is not scoped
+to the subscription that motivated it.
+
+**Exploit A:** `GET /rest/v1/invoices?select=*` with the anon key returns every
+non-draft invoice — again including `access_code` (defeating the access-code
+gate) and every UUID (defeating "the UUID is the secret").
+**Exploit B:** an anon client subscribes to `postgres_changes` on `invoices`
+with no filter and, because `REPLICA IDENTITY FULL` is set (migration 0006),
+receives the full row of every invoice mutation across all tenants in real time.
+
+**Fix:** drop the policy. The public page reads via the service-role admin
+client and does not need it. Re-architect the payer-page realtime onto a
+server-published broadcast channel (see Appendix A → S1).
+
+### CRIT-3 — `webhook_deliveries` has RLS disabled in a public schema anon can write
+`supabase/migrations/0021_resend_webhook_lifecycle.sql:28`
+
+RLS is never enabled; the comment "server-role-only writes, no anon reads" is
+false under Supabase's default `GRANT ALL ... TO anon`. Anyone with the anon key
+can `SELECT`, `INSERT`, and **`DELETE`** rows. `DELETE FROM webhook_deliveries`
+wipes the dedupe table and re-enables webhook replay; mass-insert is a storage
+DoS.
+
+**Fix:** `alter table webhook_deliveries enable row level security;` (no
+policies needed — the service role bypasses RLS). Audit every other public table
+for `relrowsecurity = false`.
+
+### CRIT-4 — Payment-status API trusts the client's "confirmed" claim; no amount check
+`src/app/api/invoices/[id]/payment-status/route.ts:62-84` (verified)
+
+The route fetches the real transaction from mempool.space (line 62) — which
+carries the true `status.confirmed` — then **discards it** and builds a synthetic
+tx whose confirmation state is `status === "paid"` from the *client-supplied
+request body* (lines 70-74). The endpoint has no authentication. Combined with
+the total absence of amount verification (the synthetic vout hardcodes
+`value: 0`, and neither `txPaysToAddress` nor `decidePaymentSchedule` reads
+`value`), this is a remote "mark any invoice paid" primitive.
+
+**Exploit:** POST `{txid: <a real 1-satoshi unconfirmed tx to the address>,
+status: "paid"}`. `fetchTx` succeeds, `txPaysToAddress` succeeds, the synthetic
+tx is marked confirmed, the invoice flips to `paid`, and a "payment confirmed
+on-chain" email fires — for zero real payment. The payer then RBFs the 1 sat
+back to themselves. Because the cron only re-examines `pending`/`payment_detected`
+rows, the false `paid` state is permanent.
+
+**Fix (in order):** (1) use the fetched `tx`, not the synthetic one, so
+confirmation comes from mempool.space; (2) verify received sats ≥ expected
+(persist `expected_sats` at publish); (3) require a confirmation-depth threshold;
+(4) require the access-code cookie so this is a "please check now" hint, not a
+command.
+
+### CRIT-5 — The daily cron silently breaks background detection entirely
+`vercel.json:3` (verified: `"0 0 * * *"`)
+
+Commit 82aa343 downgraded the cron to daily for Hobby-tier compatibility, but the
+whole `next_check_at`/`stage_attempt` schedule in `payment-schedule.ts` was
+designed for a per-minute tick. The failure is worse than "slower":
+
+- Every pre-mempool interval (30s…30min) is shorter than 24h, so **every daily
+  tick consumes exactly one `stage_attempt`**. The invoice gets one mempool check
+  per day for ~7 days, then `next_check_at` is set to null and monitoring
+  **stops forever**. A payment made on day 8+ is never detected server-side.
+- Confirmation latency after `payment_detected` is likewise up to 24h.
+- `BATCH_SIZE = 50` with no `.order()`: under a daily cron everything is due at
+  once, so with >50 monitorable invoices an arbitrary subset waits another day,
+  repeatedly.
+- The README and the route's own header comment still promise "every minute" and
+  "p50 < 15s" detection. Those claims are false in production today.
+
+Because CRIT-4's client path is currently the *only* timely detection path, the
+forgery bug and the broken cron compound each other.
+
+**Fix (decided):** keep Hobby tier and drive the sweep every minute from a free
+external scheduler (GitHub Actions or cron-job.org) using `CRON_SECRET`; also make
+the schedule time-based rather than attempt-count-based, add `.order`, and loop
+until the due queue drains. This is roadmap item v1.4.28 — promote it.
+
+---
+
+## 2. Everything else that's wrong (by severity)
+
+### HIGH
+
+- **H-SEC-1 — Public PDF endpoint bypasses the access-code gate.**
+  `src/app/api/invoice/[id]/pdf/route.ts` has no auth and no cookie check, so the
+  access code protects the HTML page and nothing else. Anyone with the UUID gets
+  the full rendered invoice (both parties' names, addresses, tax IDs, emails, BTC
+  address). Add the same `isAccessCodeValid` cookie check the page uses.
+
+- **H-SEC-2 — Access-code gate is brute-forceable; codes are unconstrained.**
+  No rate limiting anywhere in the app. Comparison is non-constant-time. Real
+  codes are user-typed (the `generateAccessCode` helper is dead code), only
+  lowercased and truncated to 16 chars, with no minimum length — an owner can set
+  `1`. Codes are optional, and CRIT-2 hands out the UUIDs for free. Rate-limit by
+  invoice+IP, enforce a minimum length, store a hash.
+
+- **H-SEC-3 — Authenticated email send is an unmetered spam/phishing vector.**
+  Open signup + magic link + no per-user send quota + `client_email` never
+  validated server-side. Mail goes out from the app's DKIM-signed domain with
+  attacker-controlled sender/client names in subject and body. (No header
+  injection — Resend posts JSON and React Email escapes — the risk is volume and
+  brand abuse.) Add server-side email validation and a daily send cap.
+
+- **H-DB-1 — No money-integrity constraints at all.** `total_fiat`,
+  `subtotal_fiat`, `tax_fiat` can be negative or mutually inconsistent;
+  `tax_percent` allows ±999.99; `currency` is free text (a user can PATCH it to
+  anything, and it flows straight into `fetchBtcPrice`); `line_items` JSONB has
+  zero shape validation. Stored `subtotal + tax` is not guaranteed to equal
+  stored `total`. Add CHECK constraints (`NOT VALID` first, then validate).
+
+- **H-DB-2 — Paid invoices are fully mutable and deletable by their owner.**
+  RLS `owner_all` checks ownership only — never status or column immutability. A
+  user can `PATCH` a paid invoice's `total_fiat` to 0 via PostgREST with their own
+  JWT, and `bulkDelete` has no status guard and cascade-deletes the financial
+  audit trail (`email_events`, `invoice_events`). Add immutability + delete-guard
+  triggers for non-draft rows.
+
+- **H-DB-3 — Address uniqueness is app-checked per-tenant but DB-enforced
+  globally.** `assertAddressUniqueness` runs on the RLS-scoped client so it can't
+  see other users' rows, but the unique index is global. Result: (a) publishing
+  an address another user already uses passes every app check then throws a raw
+  Postgres error at the UI, and (b) that distinguishable failure is a cross-tenant
+  oracle for "is this BTC address registered on the platform." Use a
+  `security definer` RPC returning a boolean, and catch `23505` for a friendly
+  message.
+
+- **H-FE-1 — Test suite is RED on main.** 5 tests in `actions.test.ts` fail
+  because a fixture `due_date = "2026-07-10"` is now in the past, so publish flips
+  to `overdue` and the assertions expect `pending`. They started failing silently
+  on 2026-07-10 with no code change. A red suite masks all future regressions.
+  Use `vi.setSystemTime()` (as `payment-schedule.test.ts` already does correctly).
+
+- **H-FE-2 — Proxy route matcher is silently ignored.** `src/proxy.ts:49`
+  exports `proxyConfig`; Next 16 recognizes `export const config`. So the matcher
+  never applies and the auth proxy (which constructs a Supabase client and calls
+  `auth.getSession()`) runs on *every* request including static assets. Rename to
+  `export const config`.
+
+- **H-FE-3 — Server-action validation errors won't survive production.** Field
+  errors are thrown as `Error("btc_address: message")` strings and regex-parsed on
+  the client. Next.js masks uncaught Server Function messages in production (the
+  project's own bundled docs say to model expected errors as return values). In
+  prod, "duplicate address", "address has history", etc. all collapse to a generic
+  error and the user can't see why publishing failed. Convert to typed
+  `{ ok: false, field, message }` return values (pairs naturally with adopting
+  Zod — see A-2).
+
+- **H-FE-4 — No error/loading/not-found boundaries anywhere.** Zero `error.tsx`,
+  `loading.tsx`, `not-found.tsx`, `global-error.tsx` in `src/app`. `notFound()` on
+  the public invoice URL renders the unstyled framework 404. Add at least root
+  `error.tsx` + `not-found.tsx` and dashboard/invoice `loading.tsx`.
+
+- **H-FE-5 — No generated Supabase types; four hand-declared row shapes drift.**
+  No `database.types.ts`; the three client factories are untyped so every query
+  returns `any`. `Invoice` is declared differently in `invoice-public.ts`,
+  `actions.ts`, and `columns.tsx`. A renamed column type-checks fine and fails at
+  runtime. Generate types and thread `Database` through the factories.
+
+- **H-PROC-1 — Version identity is broken across three sources of truth.**
+  `package.json` says `0.1.0`, CHANGELOG says `1.4.18`, and there are zero git
+  tags ever — despite the git-workflow skill mandating a tag per version. No way
+  to correlate a deployed build with a roadmap version. Bump package.json, backfill
+  tags, and enforce it with a hook.
+
+### MEDIUM
+
+- **M-DB-1 — Optimistic-concurrency check silently passes on 0 rows in the
+  cron.** `payment-sweep/route.ts:88` does `.eq("status", inv.status)` but never
+  checks whether a row matched, so if the client path transitions the row first,
+  the cron's no-op update still proceeds to send duplicate detected/confirmed
+  emails. (The fast-path route handles this correctly via PGRST116.) Add
+  `.select("id")` and skip side effects on empty. Optionally a partial unique index
+  on `email_events (invoice_id, email_type, recipient)` as a hard exactly-once
+  backstop.
+
+- **M-DB-2 — Overdue invoices are excluded from background detection.** The
+  sweep filters `status in (pending, payment_detected)` but `overdue` is payable.
+  The moment the daily sweep flips a row to `overdue`, the cron stops checking that
+  address for payment forever; an invoice published already-past-due goes straight
+  to `overdue` with a `next_check_at` the sweep will never read. Include `overdue`.
+
+- **M-DB-3 — `markUnpaid` doesn't reset polling state.** It sets only
+  `status: "pending"`, leaving `next_check_at` null (was paid) so monitoring never
+  resumes, or leaving stale `mempool_seen_at` so the next sweep can flip the row
+  back to `payment_detected` with no transaction existing. Reset the schedule
+  columns and clear `btc_txid`. Same for `bulkUnarchive`.
+
+- **M-DB-4 — `pre_archive_status` is unconstrained `text`, not the enum.**
+  `bulkUnarchive` writes it straight back into the enum column; any stale value
+  (e.g. `marked_as_paid` from the reverted 0015 era) throws mid-loop after earlier
+  rows committed. The `?? "pending"` fallback can silently downgrade a paid
+  invoice. Convert to the enum type + a CHECK.
+
+- **M-DB-5 — `invoice_email_summary` view uses `select i.*`**, freezing the
+  column list at creation — any future `add column` silently won't appear, any
+  `drop column` fails until the view is dropped (0017/0018 already hit this).
+  Enumerate columns or accept the drop/recreate dance.
+
+- **M-DB-6 — Missing index on `invoices.user_id`.** Every RLS check and the
+  dashboard's `.eq("user_id", ...)` is a seq scan; `auth.uid()` is unwrapped so
+  it's re-evaluated per row. Add `(user_id, created_at desc)` and wrap as
+  `(select auth.uid())`.
+
+- **M-DB-7 — Webhook dedupe has two holes.** Any insert error is treated as
+  "duplicate" and returns 200 (transient failures silently drop events Svix won't
+  retry); the dedupe row is inserted before `email_events` is updated, so a fast
+  `delivered` webhook can permanently block the row. Check for `23505`
+  specifically; add a retention sweep.
+
+- **M-MONEY-1 — BTC amount is quoted at view time and never locked.** Two
+  viewers (or one across a refresh) can see different BTC amounts; nothing records
+  what the payer was actually asked to pay, so disputes are unresolvable and
+  amount verification (CRIT-4 fix) has no reference value. Snapshot
+  `btc_amount_sats`/`price`/`quoted_at` at publish or first reveal.
+
+- **M-MONEY-2 — mempool.space failures are swallowed as "no transactions".**
+  `fetchAddressTxs` returns `[]` on any non-OK response and has no timeout
+  (unlike `btc-price.ts`). In the cron, an outage looks identical to "not paid",
+  so `stage_attempt` still increments and can exhaust the schedule during an
+  outage. Make it throw/return null on failure and don't consume an attempt; add
+  `AbortSignal.timeout`.
+  - **Confirmed 2026-07-27 (manual v1.4.19-H-S2 testing):** the "no timeout"
+    half bit the client too. On a real mempool.space outage/unreachability,
+    `fetchAddressTxs` had no try/catch of its own — the raw network exception
+    (`TypeError: Failed to fetch`) propagated up uncaught, surfacing as an
+    unhandled promise rejection (a Next.js dev-overlay "Runtime TypeError") in
+    the browser. Worse, in `payment-watcher.tsx`'s `scheduleActivePoll`, the
+    `setTimeout` callback does `await checkRestAndUpdate(); scheduleActivePoll();`
+    — the throw skipped the second call, so the active-poll loop **permanently
+    stopped re-arming itself** after a single network blip, for the rest of
+    that page load (the WS `onerror` comment claims a "fallback to polling"
+    that, post-throw, no longer existed).
+  - **Fixed 2026-07-27:** `fetchAddressTxs` now wraps its fetch in try/catch and
+    returns `[]` on any failure (network throw or non-OK response alike),
+    matching the file's other functions. This closes the client-crash /
+    dead-poll-loop symptom above. **Still outstanding, deferred to v1.4.22-H**:
+    the cron can't yet tell "mempool.space is down" apart from "no transactions
+    yet" (both now read as `[]`), so an outage during the cron's pre-mempool
+    phase still silently burns a `stage_attempt` instead of being retried
+    without penalty — that part needs the scheduler-level change (return
+    null/throw distinctly to the cron, don't consume an attempt on failure,
+    add `AbortSignal.timeout`), not just the try/catch.
+  - **Confirmed 2026-09-28 (manual v1.4.19-H-S2 testing):** the mempool.space
+    WebSocket in `payment-watcher.tsx` (a separate socket from the Supabase
+    Realtime channel) has an `onclose` that deliberately does nothing. Once
+    mempool.space drops that connection — routine on testnet, and visible in the
+    dev log as `[PaymentWatcher] WebSocket error, falling back to polling` — the
+    fastest detection path stays dead for the rest of that page load; the comment
+    claims a "fallback to polling" but the socket is never re-opened. Fold a
+    bounded reconnect/backoff into **v1.4.22-H**, alongside the M-MONEY-4
+    remainder below (bounded revert-to-pending when a seen tx disappears).
+
+- **M-MONEY-3 — `decidePaymentSchedule` picks the first paying tx, not the
+  best.** mempool.space returns unconfirmed first, so a dust tx alongside a
+  confirmed real payment leaves the invoice stuck in `payment_detected`. Search
+  confirmed first, then unconfirmed (and prefer the amount-matching tx).
+
+- **M-MONEY-4 — RBF/eviction leaves invoices stuck in `payment_detected`
+  forever**, and 1-conf → paid has no reorg handling. Both undocumented. Add a
+  bounded revert-to-pending on repeated misses; document the 1-conf reorg risk.
+
+- **M-MONEY-5 — Address freshness check fails open.** `assertAddressFreshness`
+  skips the reuse check with a console warning when mempool.space is unreachable,
+  so an address with prior history can pass publish and its old tx immediately
+  flips the new invoice to paid. Fail closed, or flag "freshness unverified".
+
+- **M-FE-1 — Brittle Supabase chain mocks.** Tests dispatch on the literal
+  `select()` column string, so reordering columns breaks tests with no behavior
+  change. Build one shared typed query-builder fake; stand up the PRD-promised
+  integration suite for the query layer (it does not exist — all 40 test files are
+  unit tests over mocks).
+
+- **M-FE-2 — `invoice-form.tsx` is 683 lines with three index-synced arrays**
+  (`line_items`, `rawAmounts`, `itemKeys`) mutated in four places each; one missed
+  parallel update reorders prices against descriptions. No schema-validation
+  library anywhere in the repo. Collapse to one `LineItemState[]` and a shared Zod
+  schema imported by both form and server action.
+
+- **M-FE-3 — Realtime hooks duplicate lifecycle logic and don't reconnect.**
+  Two near-identical hooks diverge subtly and neither handles
+  `CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED` beyond `console.warn` — a dropped channel
+  stays dead until remount. Extract one `useInvoiceChannel` with bounded
+  resubscribe.
+
+- **M-FE-4 — Proxy uses `getSession()` not `getUser()`.** Server-side
+  `getSession()` trusts the cookie without revalidation; the redirect decision is
+  spoofable (the layout backstops with `getUser()`, so this is defense-in-depth,
+  but the proxy is the wrong place to trust a cookie).
+
+- **M-FE-5 — No security headers.** `next.config.ts` sets none — no CSP,
+  `X-Frame-Options`, `Referrer-Policy`, HSTS. The public payer page is framable,
+  making "Mark as Payment Sent" clickjackable. Add a `headers()` block.
+
+- **M-FE-6 — Unauthenticated PDF generation is a CPU DoS** (react-pdf on every
+  request, no cache, no rate limit) amplified by unvalidated `line_items` (create
+  one invoice with 100k line items, hammer the public PDF URL). Cap array length,
+  cache by `updated_at`, rate-limit.
+
+- **M-PROC-1 — ROADMAP.md is a 63k-token context bomb.** ~68% is completed
+  history with full specs and SQL, and two skills (`next-feature`,
+  `roadmap-progress`) re-read it every session. Split completed sections into
+  `ROADMAP-ARCHIVE.md`.
+
+- **M-PROC-2 — Deferred verifications have no reliable home.** The v1.4.1
+  mainnet dry-run (never succeeded — the single highest-risk unverified path in a
+  BTC product), v1.4.18 TESTS 3/6/7, and the v1.4.18 Resend-webhook prod config
+  each live in a different file. Consolidate into one tracked list and mark the
+  launch-blockers.
+
+- **M-PROC-3 — Stale roadmap markers.** v1.4.14.1/.2/.3 are 🔄 but merged
+  (PRs #31-33); several ✅ sections have unchecked test boxes. A weak model can't
+  tell "done but not ticked" from "not done".
+
+- **M-PROC-4 — PRD.md is dead documentation.** Still titled "Paybitty", still
+  describes auto-generated codes, `tax_fiat`, the login sweep, and lists PDF
+  download as out of scope (all superseded). Any session reading it as ground
+  truth is misled. Banner it as historical.
+
+- **M-PROC-5 — Rename to SatSend is incomplete.** PRD.md, one live ROADMAP line,
+  and the Supabase project name still say Paybitty. The
+  `rename-to-satsend.test.ts` guard deliberately doesn't cover PRD.md.
+
+### LOW (do in passing)
+
+- `CRON_SECRET` compared with `!==` (use `timingSafeEqual`); auth-callback `next`
+  param allows any internal path (not an open redirect, but harden to `/`-prefixed);
+  access cookie lacks `secure`; `btc-price` currency param has no ISO-4217
+  allowlist; `admin.ts` lacks `import "server-only"` and `invoice-payment-view.tsx`
+  value-imports a type from it (elided today, one refactor from leaking the service
+  key); full invoice row (incl. `access_code`, `user_id`) serialized to the payer's
+  browser; `.DS_Store` committed under `.claude/skills/`; dual `main`/`master`
+  branches + 40 stale local branches; no `.env.example`; `@types/qrcode` in
+  `dependencies`; lint exits 1 (`columns.tsx:59` display-name); `Math.random()` in
+  the dead `generateAccessCode`; no `(user_id, invoice_number)` uniqueness;
+  `email_events.updated_at` has no trigger; `config.toml` pins Postgres 15 while
+  hosted defaults to 17 and leaves signup open with no rate-limit block.
+
+---
+
+## 3. Architecture, grilled
+
+**The good bones.** The instinct to extract pure, side-effect-free logic with
+injected clocks is genuinely strong: `payment-schedule.ts`, `overdue-actions.ts`,
+`can-publish.ts`, `pdf-filename.ts` are all testable in isolation and well-covered
+at their boundaries. BTC address validation is real cryptographic checksum
+validation (bech32/bech32m/base58check), not a regex. The server-action / API-route
+split is principled (actions = authed owner mutations + the progressive-enhancement
+public form; routes = callers that can't invoke actions: the unauth watcher, cron,
+the svix webhook, binary PDFs, the price proxy). Money is `numeric(12,2)`, never
+float — the single most common invoicing-schema mistake, avoided from migration
+0001. RLS is enabled on every user-scoped table from creation, and the event tables
+are correctly write-only-via-admin. The Resend webhook is the best-built endpoint in
+the app (raw-body HMAC verify, all three headers required, DB-backed replay dedupe,
+a status-precedence table so a late `delivered` can't overwrite a `bounced`). And
+every one of the 15 dashboard server actions is correctly authorized with an
+explicit `user_id` check *and* the RLS-scoped client — not one relies on RLS alone,
+not one uses the admin client. That is the strongest part of the codebase.
+
+**Where the architecture is actually wrong, not just buggy.** The recurring flaw is
+a **single trust boundary assumed to hold in three places where it doesn't.** The
+mental model is "the invoice UUID is the secret and the service-role admin client is
+the only reader." But PostgREST and Realtime are separate front doors that never run
+the page's cookie gate, and the anon key is public. So every place that leaned on
+"the app checks it" (the anon RLS policy, the non-invoker view, the RLS-off webhook
+table, the client-trusting payment endpoint) is bypassable. The fix isn't spot
+patches — it's adopting the principle that **the database is a public API and must
+defend itself**: RLS/grants scoped per-row, views as `security_invoker`, money
+invariants as CHECK constraints, paid rows immutable at the DB, and the payment
+endpoint treated as an untrusted hint that triggers server-side verification rather
+than a state-transition command.
+
+**The second structural theme is drift from missing single-sources-of-truth.** Row
+types are hand-declared four times and can silently diverge from the schema (no
+generated types). Validation lives in scattered hand-rolled regexes duplicated and
+divergent between client and server (no Zod). Brand colors exist in three mechanisms
+(CSS tokens, inline-style workarounds, a hand-maintained hex mirror). The BTC amount
+has no locked value. Version identity has three disagreeing sources. Each of these is
+a place where two representations of one fact are maintained by hand and *will*
+drift — several already have.
+
+**Stack choices are sound.** Next 16 App Router + Supabase + Vercel + mempool.space +
+Resend is a coherent, low-cost, non-custodial stack that fits the product. `tsc` is
+clean under `strict`. The choice to keep invoices fiat-denominated with BTC as the
+rail is right. Nothing here calls for a rewrite — the foundation is good and the
+remediation is surgical.
+
+---
+
+## 4. What's working well (keep doing this)
+
+- **Pure-logic extraction with injected clocks and boundary tests** — the model
+  to extend, not fix.
+- **Real cryptographic BTC address validation** with negative tests.
+- **Correct authorization on every dashboard action** — explicit `user_id` +
+  RLS-scoped client, never admin, never RLS-alone.
+- **The Resend webhook**: HMAC verify, replay dedupe, status-precedence table.
+- **Money as `numeric(12,2)`** from day one; RLS on every user table from creation;
+  event tables write-only-via-admin.
+- **Optimistic CAS on the fast-path payment route** (`.eq("status", prev)` +
+  PGRST116) — correct, just needs applying consistently.
+- **Spec quality of the upcoming roadmap** (v1.4.19-28): locked decisions, schema
+  SQL, named files, enumerated tests, out-of-scope fences — among the most
+  weak-model-ready specs one could ask for.
+- **Process discipline**: 38 PRs, branch-per-version, zero direct commits to main,
+  Keep-a-Changelog format 36 versions deep, per-release manual-test guides, honest
+  in-spec deviation notes, decision records embedded in the roadmap.
+- **The `next-feature` planning gate** (plan → stop → await approval, with a
+  mandatory scope critique) is exactly the right adaptation for driving a weak
+  model, and the migration-nudge hook + `supabase-migrate` pairing is a good
+  instinct.
+- **`rename-to-satsend.test.ts`** — a self-excluding permanent regression guard.
+- **Excellent migration comments** — this audit was possible largely because of
+  them.

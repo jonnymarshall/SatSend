@@ -111,7 +111,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
   );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([
-    { id: "status", value: ["draft", "pending", "payment_detected", "paid", "overdue"] },
+    { id: "status", value: ["draft", "pending", "payment_detected", "paid", "underpaid", "overdue"] },
   ]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -201,8 +201,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
 
   React.useEffect(() => {
     const statusValues = showArchived
-      ? ["draft", "pending", "payment_detected", "paid", "overdue", "archived"]
-      : ["draft", "pending", "payment_detected", "paid", "overdue"];
+      ? ["draft", "pending", "payment_detected", "paid", "underpaid", "overdue", "archived"]
+      : ["draft", "pending", "payment_detected", "paid", "underpaid", "overdue"];
     table.getColumn("status")?.setFilterValue(statusValues);
   }, [showArchived, table]);
 

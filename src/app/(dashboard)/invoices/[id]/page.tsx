@@ -65,6 +65,17 @@ export default async function InvoiceDetailPage({
         )}
       </div>
 
+      {invoice.status === "underpaid" && invoice.amount_received_fiat !== null && (
+        <p id="invoice-detail--underpaid-indicator" className="text-sm text-amber-500">
+          Received ${Number(invoice.amount_received_fiat).toFixed(2)} of ${Number(invoice.total_fiat).toFixed(2)}
+        </p>
+      )}
+      {invoice.overpaid && invoice.amount_received_fiat !== null && (
+        <p id="invoice-detail--overpaid-indicator" className="text-sm text-amber-500">
+          Overpaid by ${(Number(invoice.amount_received_fiat) - Number(invoice.total_fiat)).toFixed(2)}
+        </p>
+      )}
+
       {/* YOU / CLIENT */}
       {(invoice.your_name || invoice.client_company || invoice.client_address || invoice.client_tax_id) && (
         <div id="invoice-detail--parties" className="grid grid-cols-2 gap-6 text-sm">

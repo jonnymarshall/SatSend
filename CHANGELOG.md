@@ -9,14 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Master architecture audit.** Five-dimension senior review (payment
-  correctness, DB/RLS, security, frontend, process). Findings in
-  `development/ARCHITECTURE-AUDIT-2026-07.md`; sequenced fix plan in
-  `development/HARDENING-ROADMAP.md`.
-- **Security & Hardening train** wired into `development/ROADMAP.md` as the
-  next-priority work (Phase 0 launch-blockers → Phase 2 structural), taking
-  precedence over the older feature queue. Establishes `ROADMAP.md` as the single
-  source of truth, with the two audit docs as reference-only detail.
+- **Master architecture audit** — five-dimension senior review (payment
+  correctness, DB/RLS, security, frontend, process). Its findings are now folded
+  into `development/ROADMAP.md` as **Appendix B (findings reference)** and its
+  sequenced fix plan as **Appendix A (hardening execution detail)**. The former
+  standalone `ARCHITECTURE-AUDIT-2026-07.md` and `HARDENING-ROADMAP.md` files were
+  removed, so `ROADMAP.md` is the single roadmap document.
+- **Security & Hardening train** in `development/ROADMAP.md`: Phase 0
+  launch-blockers → Phase 2 structural, ahead of the older feature queue. Items
+  added during S2 manual testing: **v1.4.19.1-H (S2.1)** restore the public
+  invoice's live updates (migration `0023`'s `realtime.messages` policy matches a
+  `topic` column instead of `realtime.topic()`, so anon is refused and the page
+  only updates on refresh); **v1.4.19.2-H (S2.2)** one-writer-per-database (a
+  stale `v1.4.18` production deployment shares the DB and its cron finalises
+  payments with pre-fix code); **v1.4.19.3-H (S2.3)** first controlled mainnet
+  real-bitcoin smoke test.
+- **Brand handoff assets** (`satsend-brand-handoff/`): the locked Option D /
+  "Signal Amber" design system (`DESIGN.md`, `design-tokens.css`,
+  `SatSendLogo.tsx`, logo SVGs, `agent-implementation-brief.md`). `ROADMAP.md`
+  v1.5 is rewritten as the full redesign driven by this handoff; the previous
+  "choose a colour scheme" blocker is resolved.
+- **OpenCode project config** (`.opencode/opencode.json`): project MCP servers
+  (Playwright, Supabase, Vercel) and instruction files, for the move from Claude
+  Code to OpenCode.
 
 ### Changed
 
@@ -33,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixture date. Also fixed the `react/display-name` lint error in
   `columns.tsx`'s `sortableHeader` by naming the returned component. All three
   gates (`test:run`, `tsc --noEmit`, `lint`) now exit 0.
+- **`fetchAddressTxs` no longer throws on a mempool.space outage.** It now wraps
+  its fetch in try/catch and returns `[]` on any failure (network throw or non-OK
+  response), matching the file's other functions. Previously an outage surfaced as
+  an uncaught `TypeError: Failed to fetch` (a red dev-overlay error on the invoice
+  page) and, in `payment-watcher.tsx`, permanently stopped the active-poll loop
+  re-arming. Found during v1.4.19-H manual testing. The deeper cron-side half
+  (telling "mempool.space is down" apart from "no tx yet") is tracked under
+  v1.4.22-H, along with the mempool.space client WebSocket never reconnecting
+  after a drop. Test added in `mempool.test.ts`.
 
 ### Security
 
@@ -65,14 +89,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edits, cron sweeps) from the moment migration `0022` was applied. Fixed in
   migration `0024_fix_broadcast_type_search_path.sql` by qualifying the
   reference as `public.invoice_broadcast_record`.
+- **v1.4.19-H (S2) — Payment forgery fix + amount verification.** The
+  payment-status API previously trusted the client-supplied `status:"paid"`
+  claim to build a synthetic transaction, so a POST claiming `paid` for any
+  real (or even 1-sat) tx paying the invoice address would forge a fully-paid
+  invoice with no amount check. Fixed: the route now passes the REAL fetched
+  tx into the shared `decidePaymentSchedule` scheduler (the synthetic tx is
+  deleted), requires the invoice's access-code cookie, and both detection
+  callsites (the fast-path route and the background cron) now require a
+  2-block confirmation depth (computed from a fetched chain tip — mempool.space
+  only exposes confirmed/not + block height, not a live confirmation count)
+  and a fiat-coverage check (5% tolerance against `total_fiat`, priced at
+  confirmation time) before landing on `paid`, the new `underpaid` status, or
+  `paid` with the new `overpaid` flag. If the BTC price oracle is unavailable
+  when a tx confirms, the verdict is deferred rather than guessed. New columns:
+  `amount_received_sats`, `btc_price_at_detection`, `amount_received_fiat`,
+  `overpaid` (migration `0025_payment_amount_awareness.sql`). Payment-confirmed
+  emails and the invoice detail page now surface the under/overpaid amount.
+  See `manual-tests/v1.4.19-H-payment-amount-awareness.md`.
 
 ### Notes
 
-- No application code changed by the audit/roadmap entry above — docs and
+- No application code changed by the audit/roadmap consolidation — docs and
   roadmap only. The audit found 5 CRITICAL issues (4 anonymous-key database
-  exposures + 1 payment-forgery bug) and a broken background-detection cron;
-  all are pre-launch/testnet so fixable before mainnet. Fixes are sequenced in
-  the hardening train; the first (S1, the 4 database exposures) is fixed above.
+  exposures + 1 payment-forgery bug) and a broken background-detection cron; all
+  are pre-launch/testnet so fixable before mainnet. S1 (the 4 database exposures)
+  and S2 (the payment-forgery fix) are done above; the rest are sequenced in the
+  hardening train.
+- **Testing caveat (v1.4.19.2-H / S2.2):** manual S2 testing was unreliable
+  because a stale `v1.4.18` production deployment shares the database and its cron
+  finalises payments with pre-fix code (no amount verification), leaving
+  `amount_received_*` null. Until S2.2 is done, local manual tests can be
+  overwritten by that old deployment.
 
 ## [1.4.18] - 2026-05-19
 

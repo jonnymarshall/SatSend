@@ -20,7 +20,7 @@ export interface MarkAsMenuProps {
   busy?: boolean;
 }
 
-const UNPAID_STATES = new Set(["pending", "payment_detected"]);
+const UNPAID_STATES = new Set(["pending", "payment_detected", "underpaid"]);
 
 export function MarkAsMenu({
   invoiceId,

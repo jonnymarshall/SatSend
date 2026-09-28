@@ -54,7 +54,7 @@ Once the user has agreed to the plan (and any amendments):
 1. Invoke the `git-workflow` skill to scaffold the branch using the branch name from the roadmap section.
 2. Invoke the `tdd` skill with the version name and the Scope / Tests checklist items. Work through items in order, red-green-refactor per item.
 3. Mark each checklist item with `[x]` in `development/ROADMAP.md` as it is completed.
-4. **Before opening the PR**, write the manual-tests doc agreed in Phase 1 to `manual-tests/vX.Y.Z-<slug>.md`. Use the existing files in `manual-tests/` as the template. Each test should have: a one-line "Proves" claim, Setup, Run, Expect, and (where relevant) a DB confirmation snippet. Keep it as simple as possible to follow without prior context. Include a short "Quick smoke test" section listing the 2 or 3 tests the user should run if they only have a couple of minutes.
+4. **Before opening the PR**, write the manual-tests doc agreed in Phase 1 to `manual-tests/vX.Y.Z-<slug>.md`. Use the existing files in `manual-tests/` as the template. Each test should have: a one-line "Proves" claim, Setup, Run, Expect, and (where relevant) a DB confirmation snippet. Keep it as simple as possible to follow without prior context. Include a short "Quick smoke test" section listing the 2 or 3 tests the user should run if they only have a couple of minutes. For every HTTP test, make the command print the HTTP status code as well as the response body, and state that exact status code in **Expect**.
 5. When all checklist items are done, change the section header emoji from ⏳ to ✅, tell the user the version is implementation-complete, point them at the manual-tests doc, and remind them what comes next in the roadmap. Do NOT auto-merge (see `no-auto-merge`).
 
 ---

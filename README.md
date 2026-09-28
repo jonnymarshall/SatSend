@@ -167,7 +167,7 @@ File: `src/app/invoice/[id]/payment-watcher.tsx`
 
 1. Opens a **WebSocket to mempool.space** and subscribes to the invoice's BTC address.
 2. On a **0-conf** event (tx broadcast) → POST `/api/invoices/[id]/payment-status` with `status=payment_detected`.
-3. On a **1-conf** event (first confirmation) → POST with `status=paid`.
+3. On a **1-conf** event (first confirmation) → POST with `status=paid`. **Note (v1.4.19-H):** this POST body is only a "check now" hint — the route re-fetches the real transaction from mempool.space itself and decides the actual outcome (see "Payment amount verification" below). It cannot be forged by POSTing a claimed status directly.
 4. **Active alongside-WebSocket poll (v1.4.13.1, refined through v1.4.13.4):** when `paymentRevealed=true` (payer has clicked "Pay now in Bitcoin", or the invoice is already in a detected/paid state), the watcher *also* fires REST polls in parallel with the WS, on the v1.4.13.4 phased schedule (5 s × 12, then 10 s × 6, then 15 s × 4, then 30 s × 2, then 60 s × 1 = 25 polls over 5 min). Closes the "WS connected but silently missing pushes" gap. Stops entirely once all phases are exhausted; pauses while the tab is hidden. **This is the only client-side polling path.** The v1.4.13 exp-backoff fallback was removed in v1.4.13.3 — it was vestigial once the active poll covered the same cases.
 5. The WebSocket is closed once the invoice reaches `paid`.
 6. **Detected txid is pushed back to the view** via `onStatusChange(status, txid)`, so the public payer page can render the mempool.space transaction link the moment we report a payment — no manual refresh, no Supabase realtime roundtrip required (v1.4.13).
@@ -250,9 +250,25 @@ The per-invoice schedule is **two-stage**:
 | 4     | 8 h      | 24    | ~8 days        | 45               |
 | —     | stop     | —     | —              | —                |
 
-Total post-mempool window before giving up: ~11 days. Any confirmed tx seen at any point promotes the invoice straight to `paid` and `next_check_at = null`.
+Total post-mempool window before giving up: ~11 days. A confirmed tx that clears the amount/depth checks below (see "Payment amount verification") promotes the invoice to `paid` (or `underpaid`) and `next_check_at = null`.
 
 The fast-path route `/api/invoices/[id]/payment-status` (triggered by path A) **delegates to the same `decidePaymentSchedule` helper**, so whichever path fires first writes the same row shape — the two systems stay in lock-step.
+
+---
+
+### Payment amount verification (v1.4.19-H)
+
+Both detection paths above (the fast-path route and the cron) run every payment through the same two gates before finalizing a `paid`/`underpaid` verdict — neither path trusts a claimed status on its own:
+
+1. **Confirmation depth ≥ 2 blocks.** mempool.space's API only reports "confirmed: true/false" plus which block a tx landed in — not a live confirmation count, since that's relative to whatever the current tip is. The scheduler fetches the current tip height and computes `tip − block_height + 1`; a tx sitting at depth 1 is treated the same as unconfirmed (still `payment_detected`, no verdict yet).
+2. **Amount coverage, priced at confirmation time.** The paying tx's own vouts to the invoice address are summed to sats, converted to fiat using the BTC price fetched **at the moment the payment is being judged** (not a price locked in at publish — an earlier design considered snapshotting the expected sat amount at publish time, but that would make correctly-priced late payments look wrong purely due to BTC price movement between publish and payment), and compared against `total_fiat` with a 5% tolerance band:
+   - `< 95%` → `underpaid` (a new invoice status, mirrors `paid`/`overdue`; the owner can manually override via the Mark As menu)
+   - `95–105%` → `paid`
+   - `> 105%` → `paid`, plus an `overpaid: true` flag surfaced next to the badge
+
+If the BTC price oracle is unavailable at the moment a tx confirms, the verdict is **deferred** (invoice stays `payment_detected`) rather than guessed — the next poll tries again.
+
+The fast-path route additionally requires the invoice's access-code cookie (if one is set) before processing a POST at all, closing off callers who know an invoice ID but not its access code.
 
 ---
 
@@ -417,3 +433,10 @@ Migration `0008_background_payment_schedule.sql`:
 - `stage_attempt INT DEFAULT 0` — counter the scheduler uses to index into the delay tables.
 
 Partial index `invoices_next_check_at_idx` on `next_check_at WHERE next_check_at IS NOT NULL` keeps the cron's `SELECT … WHERE next_check_at <= now()` fast.
+
+Migration `0025_payment_amount_awareness.sql` (v1.4.19-H — see "Payment amount verification" above):
+
+- `amount_received_sats BIGINT` — sats actually received at the invoice's `btc_address`, summed from the paying tx's matching vouts. Populated once the payment clears the confirmation-depth gate.
+- `btc_price_at_detection NUMERIC` — the BTC/currency price used to convert `amount_received_sats` to fiat, fetched at confirmation time.
+- `amount_received_fiat NUMERIC` — `amount_received_sats` converted using `btc_price_at_detection`.
+- `overpaid BOOLEAN DEFAULT false` — true when `amount_received_fiat` exceeds `total_fiat` beyond the tolerance band. The invoice status stays `paid`; this is a flag alongside it.

@@ -7,6 +7,9 @@ export interface PaymentConfirmedPayerProps {
   txid: string;
   mempoolUrl: string;
   invoiceUrl: string;
+  underpaid?: boolean;
+  overpaid?: boolean;
+  amountReceivedDisplay?: string | null;
 }
 
 export function PaymentConfirmedPayerEmail({
@@ -16,6 +19,9 @@ export function PaymentConfirmedPayerEmail({
   txid,
   mempoolUrl,
   invoiceUrl,
+  underpaid,
+  overpaid,
+  amountReceivedDisplay,
 }: PaymentConfirmedPayerProps) {
   const label = invoiceNumber ? `invoice ${invoiceNumber}` : "the invoice";
   return (
@@ -23,8 +29,17 @@ export function PaymentConfirmedPayerEmail({
       <Head />
       <Body style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#f6f6f6", padding: "24px" }}>
         <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
-          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>Your payment is confirmed</Heading>
-          <Text>Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} is now confirmed on-chain. Thanks!</Text>
+          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>
+            {underpaid ? "Your partial payment was received" : "Your payment is confirmed"}
+          </Heading>
+          {underpaid && amountReceivedDisplay ? (
+            <Text>We received <strong>{amountReceivedDisplay}</strong> of the <strong>{totalDisplay}</strong> due to {senderName} for {label} — this does not fully cover the invoice. Please reach out to {senderName} about the remaining balance.</Text>
+          ) : (
+            <Text>Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} is now confirmed on-chain. Thanks!</Text>
+          )}
+          {overpaid && amountReceivedDisplay && (
+            <Text>Your payment overpaid the invoice: {amountReceivedDisplay} sent against a {totalDisplay} total.</Text>
+          )}
           <Section style={{ margin: "20px 0" }}>
             <Link href={mempoolUrl}>View transaction on mempool.space</Link>
           </Section>

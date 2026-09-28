@@ -17,6 +17,10 @@ describe("canMarkAsOverdue — when the manual button should appear", () => {
     expect(canMarkAsOverdue({ status: "payment_detected", due_date: null })).toBe(true);
   });
 
+  it("case #3 (variant): no due date + underpaid → button visible (still owed the shortfall)", () => {
+    expect(canMarkAsOverdue({ status: "underpaid", due_date: null })).toBe(true);
+  });
+
   it("case #1: pending + past due → button hidden (cron auto-flips)", () => {
     expect(canMarkAsOverdue({ status: "pending", due_date: PAST_DATE })).toBe(false);
   });

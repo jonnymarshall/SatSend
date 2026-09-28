@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-labelledby="title desc">
+  <title id="title">SatSend.me</title>
+  <desc id="desc">Reversed SatSend wordmark for dark backgrounds.</desc>
+  <text x="24" y="82" font-family="Onest, Arial, sans-serif" dominant-baseline="alphabetic">
+    <tspan fill="#FCFBF7" font-size="72" font-weight="750" letter-spacing="-4.3">SatSend</tspan><tspan dx="-1.5" fill="#D89B24" font-size="42" font-weight="700" letter-spacing="-1.4">.me</tspan>
+  </text>
+</svg>

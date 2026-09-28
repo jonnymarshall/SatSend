@@ -7,7 +7,8 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchAddressTxs } from "@/lib/mempool";
+import { fetchAddressTxs, fetchTipHeight } from "@/lib/mempool";
+import { fetchBtcPrice } from "@/lib/btc-price";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
@@ -60,19 +61,30 @@ export async function GET(request: NextRequest) {
   const invoices = (rows ?? []) as InvoiceRow[];
   let transitions = 0;
   let errors = 0;
+  const tipHeight = await fetchTipHeight();
 
   for (const inv of invoices) {
     try {
       const txs = await fetchAddressTxs(inv.btc_address);
+
+      let btcPrice: number | null = null;
+      try {
+        btcPrice = (await fetchBtcPrice(inv.currency)).price;
+      } catch {
+        // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
+      }
+
       const decision = decidePaymentSchedule(
         {
           status: inv.status,
           btc_address: inv.btc_address,
           mempool_seen_at: inv.mempool_seen_at,
           stage_attempt: inv.stage_attempt,
+          total_fiat: inv.total_fiat,
         },
         txs,
-        now
+        now,
+        { btcPrice, tipHeight }
       );
 
       const update: Record<string, unknown> = {
@@ -80,6 +92,10 @@ export async function GET(request: NextRequest) {
         mempool_seen_at: decision.newMempoolSeenAt,
         stage_attempt: decision.newStageAttempt,
         next_check_at: decision.newNextCheckAt,
+        amount_received_sats: decision.amountReceivedSats,
+        btc_price_at_detection: decision.btcPriceAtDetection,
+        amount_received_fiat: decision.amountReceivedFiat,
+        overpaid: decision.overpaid,
       };
       if (decision.detectedTxid) {
         update.btc_txid = decision.detectedTxid;
@@ -114,8 +130,13 @@ export async function GET(request: NextRequest) {
             currency: inv.currency,
             txid: decision.detectedTxid,
           };
-          if (decision.newStatus === "paid") {
-            await sendPaymentConfirmedEmail(emailArgs);
+          if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
+            await sendPaymentConfirmedEmail({
+              ...emailArgs,
+              status: decision.newStatus,
+              amountReceivedFiat: decision.amountReceivedFiat,
+              overpaid: decision.overpaid,
+            });
           } else {
             await sendPaymentDetectedEmail(emailArgs);
           }

@@ -32,12 +32,26 @@ vi.mock("@/lib/email/send", () => ({
   sendPaymentConfirmedEmail: (...args: unknown[]) => mockSendConfirmed(...args),
 }));
 
-// Mock mempool fetchTx
+// Mock mempool fetchTx / fetchTipHeight
 const mockFetchTx = vi.fn();
-vi.mock("@/lib/mempool", () => ({
-  fetchTx: (...args: unknown[]) => mockFetchTx(...args),
-  txPaysToAddress: (tx: { vout: { scriptpubkey_address?: string }[] }, addr: string) =>
-    tx.vout.some((o) => o.scriptpubkey_address === addr),
+const mockFetchTipHeight = vi.fn();
+vi.mock("@/lib/mempool", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/mempool")>("@/lib/mempool");
+  return {
+    ...actual,
+    fetchTx: (...args: unknown[]) => mockFetchTx(...args),
+    fetchTipHeight: (...args: unknown[]) => mockFetchTipHeight(...args),
+  };
+});
+
+const mockFetchBtcPrice = vi.fn();
+vi.mock("@/lib/btc-price", () => ({
+  fetchBtcPrice: (...args: unknown[]) => mockFetchBtcPrice(...args),
+}));
+
+const mockCookieGet = vi.fn();
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: (...args: unknown[]) => mockCookieGet(...args) }),
 }));
 
 async function postRequest(invoiceId: string, body: object) {
@@ -67,15 +81,20 @@ const pendingInvoice = {
   your_email: "charles@example.com",
 };
 
+// 500,000 sats @ $50,000/BTC = $250 — matches pendingInvoice.total_fiat exactly
+// so confirmed-and-finalized tests land on a clean "paid", not under/overpaid.
 const matchingTx = {
   txid: "txabc",
   status: { confirmed: false },
-  vout: [{ scriptpubkey_address: "tb1qtarget", value: 50000 }],
+  vout: [{ scriptpubkey_address: "tb1qtarget", value: 500000 }],
 };
 
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  mockFetchTipHeight.mockResolvedValue(900_001);
+  mockFetchBtcPrice.mockResolvedValue({ price: 50_000, source: "coinbase" });
+  mockCookieGet.mockReturnValue(undefined);
 });
 
 describe("POST /api/invoices/[id]/payment-status", () => {
@@ -169,7 +188,9 @@ describe("POST /api/invoices/[id]/payment-status", () => {
     mockSingle
       .mockResolvedValueOnce({ data: pendingInvoice, error: null })
       .mockResolvedValueOnce({ data: { status: "paid" }, error: null });
-    mockFetchTx.mockResolvedValueOnce(matchingTx);
+    // Must be a REALLY confirmed tx at sufficient depth for the email to fire —
+    // a claimed status alone (matchingTx is unconfirmed) is not enough.
+    mockFetchTx.mockResolvedValueOnce({ ...matchingTx, status: { confirmed: true, block_height: 900_000 } });
     mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
 
     await postRequest("inv-1", { txid: "txabc", status: "paid" });
@@ -186,12 +207,11 @@ describe("POST /api/invoices/[id]/payment-status", () => {
   });
 
   it("rejects with 409 when current status is draft (v1.4.12 hotfix — never auto-flip a draft)", async () => {
-    // Mock a matching tx so the route would otherwise proceed to the DB write —
-    // the assertion is that the status gate stops it before that.
     mockSingle.mockResolvedValueOnce({ data: { ...pendingInvoice, status: "draft" }, error: null });
-    mockFetchTx.mockResolvedValueOnce(matchingTx);
     const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
     expect(res.status).toBe(409);
+    // Status gate stops it before ever fetching the tx or writing the DB.
+    expect(mockFetchTx).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockSendConfirmed).not.toHaveBeenCalled();
     expect(mockSendDetected).not.toHaveBeenCalled();
@@ -199,9 +219,9 @@ describe("POST /api/invoices/[id]/payment-status", () => {
 
   it("rejects with 409 when current status is archived (v1.4.12 hotfix)", async () => {
     mockSingle.mockResolvedValueOnce({ data: { ...pendingInvoice, status: "archived" }, error: null });
-    mockFetchTx.mockResolvedValueOnce(matchingTx);
     const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
     expect(res.status).toBe(409);
+    expect(mockFetchTx).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -209,7 +229,7 @@ describe("POST /api/invoices/[id]/payment-status", () => {
     mockSingle
       .mockResolvedValueOnce({ data: { ...pendingInvoice, status: "overdue" }, error: null })
       .mockResolvedValueOnce({ data: { status: "paid" }, error: null });
-    mockFetchTx.mockResolvedValueOnce({ ...matchingTx, status: { confirmed: true } });
+    mockFetchTx.mockResolvedValueOnce({ ...matchingTx, status: { confirmed: true, block_height: 900_000 } });
     mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
 
     const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
@@ -232,5 +252,83 @@ describe("POST /api/invoices/[id]/payment-status", () => {
       ownerEmail: "owner@example.com",
       payerEmail: null,
     }));
+  });
+
+  describe("forgery regression (CRIT-4)", () => {
+    it("a claimed status:'paid' does not move the invoice past payment_detected when the real tx is unconfirmed", async () => {
+      // The real fetched tx is unconfirmed even though the client claims "paid".
+      // Pre-fix, the route built a synthetic tx trusting the client's claim
+      // instead of the real one — this is the regression test for that bug.
+      mockSingle
+        .mockResolvedValueOnce({ data: pendingInvoice, error: null })
+        .mockResolvedValueOnce({ data: { status: "payment_detected" }, error: null });
+      mockFetchTx.mockResolvedValueOnce(matchingTx); // matchingTx is unconfirmed
+      mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("payment_detected");
+      expect(mockSendConfirmed).not.toHaveBeenCalled();
+    });
+
+    it("a real but underpaying confirmed tx lands on underpaid, not paid, even when the client claims 'paid'", async () => {
+      mockSingle
+        .mockResolvedValueOnce({ data: pendingInvoice, error: null }) // total_fiat: 250
+        .mockResolvedValueOnce({ data: { status: "underpaid" }, error: null });
+      // 50,000 sats @ $50,000/BTC = $25 — 10% of the $250 total.
+      mockFetchTx.mockResolvedValueOnce({
+        txid: "txabc",
+        status: { confirmed: true, block_height: 900_000 },
+        vout: [{ scriptpubkey_address: "tb1qtarget", value: 50_000 }],
+      });
+      mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("underpaid");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "underpaid", amount_received_sats: 50_000 })
+      );
+    });
+  });
+
+  describe("access-code gate", () => {
+    const gatedInvoice = { ...pendingInvoice, access_code: "secret123" };
+
+    it("returns 404 when the invoice has an access code and no cookie is present", async () => {
+      mockSingle.mockResolvedValueOnce({ data: gatedInvoice, error: null });
+      mockCookieGet.mockReturnValue(undefined);
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "payment_detected" });
+
+      expect(res.status).toBe(404);
+      expect(mockFetchTx).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when the invoice has an access code and the cookie value is wrong", async () => {
+      mockSingle.mockResolvedValueOnce({ data: gatedInvoice, error: null });
+      mockCookieGet.mockReturnValue({ value: "wrong-code" });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "payment_detected" });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("accepts the request when the access-code cookie matches", async () => {
+      mockSingle
+        .mockResolvedValueOnce({ data: gatedInvoice, error: null })
+        .mockResolvedValueOnce({ data: { status: "payment_detected" }, error: null });
+      mockCookieGet.mockReturnValue({ value: "secret123" });
+      mockFetchTx.mockResolvedValueOnce(matchingTx);
+      mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "payment_detected" });
+
+      expect(res.status).toBe(200);
+    });
   });
 });
