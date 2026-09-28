@@ -60,6 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **v1.4.19.1-H (S2.1) — Public invoice live updates restored.** The public
+  `/invoice/[id]` page's private broadcast channel was refused
+  (`Unauthorized ... Channel topic`), so status changes only appeared on a
+  refresh. Migration `0023` wrote the `realtime.messages` policy against the
+  `topic` column; Supabase evaluates it against the requested topic via the
+  `realtime.topic()` helper. Migration `0026_fix_invoice_realtime_policy.sql`
+  recreates the policy with `(select realtime.topic())` and widens it from
+  `to anon` to `to anon, authenticated` (an owner previewing their own public
+  link is signed in, so their socket counts as `authenticated`). Manual tests:
+  `manual-tests/v1.4.19.1-H-public-invoice-live-updates.md`; regression guard in
+  `src/lib/realtime-policy.test.ts`.
+
 - **v1.4.20-H (S1) — Closed the four anon database exposures.** The
   `invoice_email_summary` view ran with owner privileges (not the caller's),
   bypassing RLS entirely and handing the anon key every invoice including
