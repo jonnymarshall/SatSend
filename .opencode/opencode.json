@@ -1,0 +1,36 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest",
+        "--output-dir",
+        ".playwright-mcp"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp",
+      "enabled": true,
+      "timeout": 30000
+    },
+    "vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com",
+      "enabled": true,
+      "timeout": 30000
+    }
+  },
+  "experimental": {
+    "mcp_timeout": 30000
+  }
+}
