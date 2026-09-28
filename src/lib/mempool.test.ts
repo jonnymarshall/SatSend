@@ -60,6 +60,11 @@ describe("fetchAddressTxs", () => {
     );
     expect(await fetchAddressTxs("tb1qtarget")).toEqual([]);
   });
+
+  it("returns empty array when fetch throws (network failure)", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await fetchAddressTxs("tb1qtarget")).toEqual([]);
+  });
 });
 
 describe("fetchTx", () => {

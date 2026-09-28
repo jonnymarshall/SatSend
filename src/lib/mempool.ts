@@ -22,9 +22,13 @@ export function txPaysToAddress(tx: MempoolTx, address: string): boolean {
 
 export async function fetchAddressTxs(address: string): Promise<MempoolTx[]> {
   const base = getMempoolBaseUrl();
-  const res = await fetch(`${base}/api/address/${address}/txs`);
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${base}/api/address/${address}/txs`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchTx(txid: string): Promise<MempoolTx | null> {
