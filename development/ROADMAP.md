@@ -1529,7 +1529,7 @@ test invoice is never touched by another environment's cron and its
 `paid`/`underpaid` verdict always carries amounts; and production serves the
 current branch.
 
-#### 🟢 v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
+#### ⏳ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
 **Branch:** none — test + config only · Detail: Appendix A → S2.3
 The mainnet dry-run has never succeeded and is the highest-risk unverified path
 in a Bitcoin product. Today it is gated behind all of Phase 0, but the money-safety
