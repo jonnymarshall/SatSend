@@ -1384,6 +1384,34 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ---
 
+## Developer Enablement (do first — unblocks testing and speeds everything up)
+
+> **Current priority.** This lets the agent write and test features end to end
+> (create an invoice, pay it, wait for detection and confirmations, assert the
+> result) without the human doing manual testing. Dev-only tooling, never shipped
+> to production. Run it before and alongside the hardening train.
+
+### 🔴 v1.4.36 — Test automation harness
+**Branch:** `chore/test-automation`
+
+- **Testnet wallet tool** (`test-automation/wallet.mjs`) — done. Derives addresses
+  from a testnet seed, locates funds, selects coins, signs, and broadcasts.
+  Verified with a 1000-sat self-transfer.
+- **Dev-only automation API** — create/publish/read invoices without a browser;
+  the seed of the v2.1 agent API. Queued.
+- **End-to-end runner** — create → publish → pay (exact / under / over) → wait for
+  detection + confirmations → assert verdict, database row, and email → report.
+  Queued.
+- **Separate Supabase test project** — local development stops sharing the
+  production database. This also completes the environment half of S2.2, so test
+  results can no longer be corrupted by the stale production deployment.
+
+**Done when:** the agent can run a full payment scenario start to finish against a
+disposable database and report a pass/fail result, with the human only approving
+merges.
+
+---
+
 ## Security & Hardening Train (from the 2026-07 master audit)
 
 > **Do this whole train before resuming the feature queue below and before any
