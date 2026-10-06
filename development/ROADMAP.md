@@ -1548,19 +1548,26 @@ stays `payment_detected`) rather than guessed, and retried on the next tick.
 the amount received and the price used to judge it are persisted; a confirmed
 tx below 2-block depth does not finalize a verdict.
 
-#### 🔴 v1.4.19.1-H (S2.1) — Restore public invoice live updates
+#### ✅ v1.4.19.1-H (S2.1) — Restore public invoice live updates
 **Branch:** `fix/public-invoice-realtime-authorization` · Detail: Appendix A → S2.1
-Manual testing found that the public `/invoice/[id]` page is refused access to
-its private `invoice:<id>` broadcast channel. Migration `0023` checks a `topic`
-field in its `realtime.messages` policy, but Supabase Realtime exposes the
-requested channel through `realtime.topic()`. The policy never matches, so the
-page logs `CHANNEL_ERROR` and only shows payment status changes after a refresh.
-Add a migration that recreates the policy with the correct topic helper and
-verify the public page receives status changes without a refresh.
+The public `/invoice/[id]` page was refused access to its private `invoice:<id>`
+broadcast channel, so payment status changes only appeared on a refresh. Migration
+`0023` wrote the `realtime.messages` policy against the `topic` **column**;
+Supabase evaluates it against the **requested** topic, exposed via the
+`realtime.topic()` helper, so the predicate never matched. Fixed in migration
+`0026_fix_invoice_realtime_policy.sql`, which recreates the policy with
+`(select realtime.topic())`.
+
+**Also widened from `to anon` to `to anon, authenticated`:** payers are anonymous,
+but an owner previewing their own public link is signed in, and their socket
+connects with the `authenticated` role, which the old `to anon` rule did not cover.
+No new exposure — the invoice UUID is already the capability for anon, a draft
+never broadcasts, and the payload is only `{id, status, btc_txid}`.
 
 **Done when:** a public invoice page logs `SUBSCRIBED`, never logs a
 `CHANNEL_ERROR`, and its status changes from a service-role update within about
 one second without refreshing the page.
+Manual test guide: `manual-tests/v1.4.19.1-H-public-invoice-live-updates.md`.
 
 #### 🔴 v1.4.19.2-H (S2.2) — One writer per database (stop cross-version cron writes)
 **Branch:** `fix/environment-and-deployment-hygiene` · Detail: Appendix A → S2.2
@@ -1579,7 +1586,7 @@ test invoice is never touched by another environment's cron and its
 `paid`/`underpaid` verdict always carries amounts; and production serves the
 current branch.
 
-#### 🟢 v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
+#### ⏳ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
 **Branch:** none — test + config only · Detail: Appendix A → S2.3
 The mainnet dry-run has never succeeded and is the highest-risk unverified path
 in a Bitcoin product. Today it is gated behind all of Phase 0, but the money-safety
@@ -2587,6 +2594,12 @@ Steps:
 
 **Done when:** the public payer page receives its own status broadcast without a
 refresh, while anonymous database reads of `invoices` remain blocked.
+
+**Outcome:** shipped in `0026_fix_invoice_realtime_policy.sql`. Step 1 was widened
+beyond the original plan — the policy now covers `to anon, authenticated`, not
+`to anon` alone, because a signed-in owner previewing their own public link
+connects as `authenticated` and the old rule excluded them. Regression guard in
+`src/lib/realtime-policy.test.ts`.
 
 ### S2.2 — One writer per database (branch `fix/environment-and-deployment-hygiene`)
 Surfaced during v1.4.19-H manual testing. Two code versions were writing to one
