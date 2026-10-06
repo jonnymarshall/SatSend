@@ -25,7 +25,7 @@ Both pages need to update **as soon as the status changes**, no matter who trigg
 | **Confirmation** | A miner has put the tx into a block. 0 confirmations = "broadcast, in mempool, not yet in a block". 1+ confirmations = "in a block on the chain". |
 | **WebSocket** | A long-lived connection between your browser and a server that lets the server push messages **whenever something happens**. No need for the browser to keep asking. We use one to mempool.space and one to Supabase. |
 | **Polling** | The opposite of a WebSocket. The browser (or server) repeatedly asks "anything new?" on a timer. Slower and chattier than a push, but works as a fallback when sockets aren't available. |
-| **Cron** | A scheduled job. Vercel runs ours every minute, in the background, with no browser involved. Think of it as a server-side alarm clock that wakes up, checks the mempool for every active invoice, and goes back to sleep. |
+| **Cron** | A scheduled job that runs in the background with no browser involved. An external scheduler (a GitHub Actions workflow) hits ours about every 5 minutes. Think of it as a server-side alarm clock that wakes up, checks the mempool for every active invoice, and goes back to sleep. |
 | **Realtime (Supabase)** | A separate WebSocket from the browser to Supabase that delivers **database changes** as they happen. Anything that updates an invoice row anywhere in the system shows up on the page within ~1 second. |
 
 ### How a payment gets noticed (the three watchers)
@@ -48,12 +48,12 @@ The moment a wallet broadcasts a payment to that address, mempool.space pushes a
 
 > **You do not need to click the "Pay now in Bitcoin" button for this to work.** That button only reveals the QR code; the watcher runs in the background regardless. Closing the tab stops the watcher.
 
-#### 2. The cron sweep (system-wide every minute, but each invoice on its own schedule)
+#### 2. The cron sweep (system-wide every ~5 minutes, but each invoice on its own schedule)
 
 There are **two clocks** here, and it's worth keeping them straight:
 
-- **System clock** — Vercel Cron hits `/api/cron/payment-sweep` exactly once a minute, forever, regardless of how many invoices exist. This is what "every minute, no browser needed" refers to.
-- **Per-invoice clock** — each invoice has its own scheduled next check (`next_check_at`). When the system clock fires, the endpoint **only checks invoices whose own scheduled time has come up** — typically a small handful per minute, not every outstanding invoice.
+- **System clock** — an external scheduler hits `/api/cron/payment-sweep` about every 5 minutes (GitHub Actions' minimum interval), forever, regardless of how many invoices exist. This is what "no browser needed" refers to. Vercel's own cron is capped at once a day on the Hobby plan, so it is not the trigger.
+- **Per-invoice clock** — each invoice has its own scheduled next check (`next_check_at`). When the system clock fires, the endpoint **only checks invoices whose own scheduled time has come up** — typically a small handful per tick, not every outstanding invoice.
 
 Each invoice's schedule is **front-loaded**, then tapers off:
 
@@ -61,9 +61,9 @@ Each invoice's schedule is **front-loaded**, then tapers off:
 - **Once a tx hits the mempool** — schedule speeds back up: every 10 min × 3, then every 1 h × 6, then every 4 h × 12, then every 8 h × 24, over a total window of ~11 days.
 - **A confirmed tx at any point** promotes the invoice straight to **Paid** and the schedule stops.
 
-So: the cron itself runs every minute (system-wide), but a given invoice is **not** checked every minute — most of the time it's resting between scheduled checks. This avoids hammering mempool.space and burning cron compute on invoices nobody is paying.
+So: the scheduler fires every ~5 minutes (system-wide), but a given invoice is **not** checked every 5 minutes — most of the time it's resting between scheduled checks. This avoids hammering mempool.space and burning compute on invoices nobody is paying.
 
-This is what catches payments while everyone's tabs are closed. It's slower than the mempool socket (up to ~60 s for the next cron tick + however long mempool.space takes to see the tx + the per-invoice schedule gap) but it's tireless and unattended.
+This is what catches payments while everyone's tabs are closed. It's slower than the mempool socket (up to ~5 min for the next scheduled tick + however long mempool.space takes to see the tx + the per-invoice schedule gap) but it's tireless and unattended.
 
 #### 3. The page's active REST poll (v1.4.13.1+, only after the payer clicks "Pay now in Bitcoin")
 
@@ -107,12 +107,12 @@ When this happens, the cron eventually finds it → updates the database → Rea
 
 **Latency targets (v1.4.13):**
 
-- **p50 < 15 s** — including the "paid but didn't click the button" case. The first cron-side check fires 15 s post-publish (down from 60 s).
-- **p95 < 60 s** — the worst case is a closed tab + a missed mempool socket: bounded by the 1/min Vercel Cron tick falling after the +15 s threshold, so first poll lands at +15 s..+75 s.
+- **p50 < 15 s (page open)** — the mempool socket or the fast-path API catches the tx directly when a page is open.
+- **p95 within ~5 min (no page open)** — the worst case is a closed tab plus a missed socket, bounded by the external scheduler's ~5-minute cadence: the first sweep tick after the tx lands detects it.
 
 ### What happens when nothing is open
 
-Just the cron, plus a tapering schedule. After publish, checks happen at **+15 s** (v1.4.13: was +1 min), then +5 min, +10 min, +30 min, then **stop** if nothing has hit the mempool — at that point we assume the payer has abandoned the invoice. As soon as a tx **does** hit the mempool, the cron speeds back up: 10 min ×3, then 1 h ×6, then 4 h ×12, then 8 h ×24, then stop after ~11 days. A confirmation at any point promotes the invoice straight to **Paid**.
+Just the scheduler, plus a tapering schedule. After publish, checks are due at **+15 s**, +45 s, +1 min 45 s and so on out to **+48 min**, then **stop** if nothing has hit the mempool — at that point we assume the payer has abandoned the invoice. (The actual polls land on the ~5-minute scheduler ticks, not the exact due times.) As soon as a tx **does** hit the mempool, the schedule speeds back up: 10 min ×3, then 1 h ×6, then 4 h ×12, then 8 h ×24, then stop after ~11 days. A confirmation at any point promotes the invoice straight to **Paid**.
 
 ### Two extras
 
@@ -212,10 +212,10 @@ The detected dialog also **auto-pops** on any `pending/overdue → payment_detec
 
 Files: `src/app/api/cron/payment-sweep/route.ts` + `src/lib/invoices/payment-schedule.ts` + `vercel.json`.
 
-A Vercel Cron hits `/api/cron/payment-sweep` **every minute** (`* * * * *`). **Note: Vercel Cron only fires in deployed environments — locally (`npm run dev`), the route exists but nothing calls it automatically.** For local manual testing, run the curl loop documented in `manual-tests/v1.4.13-payment-detection-latency.md` (Setup → Cron requirement). The endpoint:
+An external scheduler (`.github/workflows/payment-sweep.yml`, a GitHub Actions workflow) hits `/api/cron/payment-sweep` **about every 5 minutes** (`*/5 * * * *`). **Note: the scheduler only runs against deployed environments — locally (`npm run dev`), the route exists but nothing calls it automatically.** For local manual testing, run the curl loop documented in `manual-tests/v1.4.13-payment-detection-latency.md` (Setup → Cron requirement). The endpoint:
 
 1. Bearer-auths the incoming request against `CRON_SECRET`.
-2. Fetches up to **50 invoices** where `next_check_at <= now()` AND `status IN ('pending', 'payment_detected')`.
+2. Fetches up to **50 invoices** where `next_check_at <= now()` AND `status IN ('pending', 'payment_detected', 'overdue')`, oldest `next_check_at` first, then loops to drain the due queue (up to 500 per run).
 3. For each, calls mempool.space's `GET /api/address/<addr>/txs`, then runs the pure decision function `decidePaymentSchedule(…)` which produces the next state and the next `next_check_at`.
 4. Writes the decision with optimistic concurrency (`.eq('status', prior)`).
 5. If the status changed, dispatches a "Payment detected" or "Payment confirmed" email via Resend.
@@ -223,7 +223,7 @@ A Vercel Cron hits `/api/cron/payment-sweep` **every minute** (`* * * * *`). **N
 
 The per-invoice schedule is **two-stage**:
 
-**Pre-mempool** (`mempool_seen_at IS NULL` — nothing broadcast yet). After publish, checks at +15 s, +30 s, +60 s, +2 min, +5 min, +10 min, +30 min. If still nothing by ~48 minutes total, polling stops for that invoice (the passive watcher and the fast-path API still work if the payer returns to the page). The intervals live in `PRE_MEMPOOL_DELAYS_MS` (`src/lib/invoices/payment-schedule.ts`); index 0 is the publish → first-check delay, consumed by `publishStatePatch` in `src/app/(dashboard)/invoices/actions.ts` so there is a single source of truth.
+**Pre-mempool** (`mempool_seen_at IS NULL` — nothing broadcast yet). After publish, checks at +15 s, +30 s, +60 s, +2 min, +5 min, +10 min, +30 min. If still nothing by ~48 minutes total, polling stops for that invoice (the passive watcher and the fast-path API still work if the payer returns to the page). The intervals live in `PRE_MEMPOOL_DELAYS_MS` (`src/lib/invoices/payment-schedule.ts`); index 0 is the publish → first-check delay, consumed by `publishStatePatch` in `src/app/(dashboard)/invoices/actions.ts` so there is a single source of truth. As of v1.4.28 (S3) the schedule is **time-based**: the next check is the first boundary past `now − published_at`, so a late or missed tick lands on the right boundary instead of consuming a stage.
 
 | Attempt | Delay from previous | Elapsed since publish |
 |---------|---------------------|-----------------------|
@@ -236,7 +236,7 @@ The per-invoice schedule is **two-stage**:
 | 7       | + 30 min            | 48 min 45 s           |
 | —       | stop (`next_check_at = null`) | —           |
 
-> **Note on the cron tick.** Vercel Cron fires the `payment-sweep` route exactly once per minute. The schedule's per-attempt delay is the *earliest* moment the invoice is eligible — the actual poll lands on the next minute boundary after that. So the dense early entries (15 s, 30 s, 60 s) translate into roughly one cron poll per minute boundary in the first ~3 minutes, giving cron-side detection within ~2 minutes for a typical testnet broadcast that mempool.space indexes at t=60–120 s.
+> **Note on the tick.** The external scheduler fires the `payment-sweep` route about every 5 minutes. The schedule's delay is the *earliest* moment the invoice is eligible — the actual poll lands at the next scheduled tick after that. So the dense early entries (15 s, 30 s, 60 s) mostly collapse into the first few ticks, and a browserless payment is typically detected within ~5 minutes (depending on when in the window the tx lands). The mempool socket and the fast-path API remain the sub-second paths when a page is open.
 
 > **Pre-v1.4.13.5 history.** The schedule used to be `[15 s, 5 min, 10 min, 30 min]` — i.e. only *two* polls in the first 5 minutes. If mempool.space hadn't indexed the broadcast tx by the t=60 s first-poll window (very common on testnet), the next attempt was 5 minutes out. v1.4.13.5 fills in that gap.
 

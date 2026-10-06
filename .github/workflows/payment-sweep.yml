@@ -1,0 +1,43 @@
+name: payment-sweep
+
+# v1.4.28-H (S3): the external scheduler that gives the payment sweep a
+# sub-daily cadence. Vercel's Hobby plan caps its own cron at once a day, which
+# left invoices unwatched for up to 24h and burned their schedule before their
+# time. This workflow hits the production sweep endpoint every 5 minutes
+# (GitHub's minimum effective schedule interval).
+#
+# Requires the repository secret CRON_SECRET to equal the CRON_SECRET env var on
+# the production deployment. To point at a different host, set a repository
+# variable SATSEND_BASE_URL (Settings → Secrets and variables → Actions →
+# Variables); it defaults to the Vercel production domain below.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: payment-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger payment sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ vars.SATSEND_BASE_URL || 'https://satsendofficial.vercel.app' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET secret is not set"
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/sweep.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${BASE_URL}/api/cron/payment-sweep")
+          echo "HTTP ${code}"
+          cat /tmp/sweep.json
+          echo
+          test "${code}" = "200"

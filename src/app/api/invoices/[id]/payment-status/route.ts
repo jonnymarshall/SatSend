@@ -42,7 +42,7 @@ export async function POST(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, btc_address, status, user_id, invoice_number, client_name, client_email, total_fiat, currency, mempool_seen_at, stage_attempt, your_name, your_company, your_email, access_code"
+      "id, btc_address, status, user_id, invoice_number, client_name, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code"
     )
     .eq("id", id)
     .single();
@@ -85,9 +85,10 @@ export async function POST(
 
   const decision = decidePaymentSchedule(
     {
-      status: invoice.status as "pending" | "payment_detected",
+      status: invoice.status as "pending" | "payment_detected" | "overdue",
       btc_address: invoice.btc_address,
       mempool_seen_at: invoice.mempool_seen_at,
+      published_at: invoice.published_at,
       stage_attempt: invoice.stage_attempt,
       total_fiat: invoice.total_fiat,
     },
