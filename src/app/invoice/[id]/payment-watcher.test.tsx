@@ -388,6 +388,40 @@ describe("PaymentWatcher", () => {
     }
   });
 
+  it("reopens the mempool.space WebSocket after it closes, with bounded backoff (v1.4.22-H / M-MONEY-2)", async () => {
+    const instances: MockWebSocket[] = [];
+    class CapturingWebSocket extends MockWebSocket {
+      constructor(...args: ConstructorParameters<typeof MockWebSocket>) {
+        super(...args);
+        instances.push(this);
+      }
+    }
+    vi.stubGlobal("WebSocket", CapturingWebSocket);
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(
+        <PaymentWatcher
+          invoiceId="inv-1"
+          btcAddress="tb1qtarget"
+          status="pending"
+          onStatusChange={() => {}}
+        />
+      );
+      await vi.waitFor(() => expect(instances.length).toBe(1));
+
+      // The socket drops.
+      instances[0].onclose?.();
+
+      // The first reconnect fires after ~1s of backoff.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(instances.length).toBe(2);
+    } finally {
+      vi.useRealTimers();
+      vi.stubGlobal("WebSocket", MockWebSocket);
+    }
+  });
+
   // v1.4.13.3: removed two tests that asserted the WS-close exp-backoff
   // fallback (added in v1.4.13, gated in v1.4.13.2). The fallback was vestigial
   // once the v1.4.13.1 active alongside-WS poll subsumed it. Coverage of the
