@@ -1418,6 +1418,21 @@ Do this on whichever branch is live once no further on-chain tests are needed.
 disposable database and report a pass/fail result, with the human only approving
 merges.
 
+### 🟡 v1.4.37 — Schema cleanups (agreed during the test-harness work)
+
+- **`tax_fiat` → computed column.** Keep `tax_percent` as the input and make
+  `tax_fiat` `GENERATED ALWAYS AS (round(subtotal_fiat * tax_percent / 100, 2))
+  STORED`, so it can never drift. Update the app to stop writing it. Pair with the
+  total-consistency CHECK from S4.
+- **`invoice_events` completeness.** Add typed `from_status` and `to_status`
+  columns (the invoice status type) and log the *automatic* payment transitions
+  (payment_detected → paid / underpaid / overpaid) as well as the manual ones the
+  feed records today. Typed columns, no JSON blob.
+- **`delivery_status`.** Replace the inferred combination of `sent_at` /
+  `send_method` / `email_attempted_at` with one explicit `delivery_status` value as
+  the authoritative state; keep `sent_at` as the timestamp and let `email_events`
+  hold the detailed history. Lower priority than the two above.
+
 ---
 
 ## Security & Hardening Train (from the 2026-07 master audit)
