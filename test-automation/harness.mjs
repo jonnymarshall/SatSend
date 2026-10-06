@@ -276,7 +276,13 @@ async function main() {
     return;
   }
 
-  console.log("usage: harness.mjs user | create <fiat> | balance | consolidate | send <address> <sats> [feeRate] | show <id> | emails <id> | confs <txid> | detect <id> <txid> [status] | sweep | run <fiat> <exact|under|over> [maxWaitMin] | hot");
+  if (cmd === "rm") {
+    await sb(env, `invoices?id=eq.${args[0]}`, { method: "DELETE" });
+    console.log(`deleted ${args[0]}`);
+    return;
+  }
+
+  console.log("usage: harness.mjs user | create <fiat> | balance | consolidate | send <address> <sats> [feeRate] | show <id> | emails <id> | confs <txid> | detect <id> <txid> [status] | sweep | rm <id> | run <fiat> <exact|under|over> [maxWaitMin] | hot");
 }
 
 main().catch((error) => {

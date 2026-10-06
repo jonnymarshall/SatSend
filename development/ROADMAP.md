@@ -1585,22 +1585,19 @@ current branch.
 environment owns the sweep (production, or the external scheduler) — see the
 pre-deployment checklist and `AGENTS.md`.
 
-#### ⏳ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
-**Branch:** none — test + config only · Detail: Appendix A → S2.3
-The mainnet dry-run has never succeeded and is the highest-risk unverified path
-in a Bitcoin product. Today it is gated behind all of Phase 0, but the money-safety
-prereqs land in S2 (done) and the reliable-environment fix in S2.2 — enough to run
-a first *controlled* real payment on mainnet early, so real-BTC exposure is
-validated while S3/S4 continue.
-Prereqs: S2 merged; S2.2 done (one writer, no stale cron); a real HD-wallet receive
-address with no history; `NEXT_PUBLIC_BTC_NETWORK=mainnet`; a deliberately tiny
-amount (small enough that a total loss is acceptable); the payer page kept open (the
-fast path detects it — the cron is not per-minute yet).
-**Done when:** a real mainnet invoice transitions `pending → payment_detected →
-paid`, records `amount_received_sats` / `btc_price_at_detection` /
-`amount_received_fiat`, sets `overpaid` correctly, and emails both parties.
-Note the result in the outstanding-verifications tracker; it de-risks the
-phase-end mainnet check.
+#### ✅ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
+**Branch:** `chore/mainnet-smoke-tooling` · Detail: Appendix A → S2.3
+The mainnet dry-run had never succeeded and was the highest-risk unverified path in
+a Bitcoin product. Done: a real mainnet payment was made to an invoice and the app
+detected, confirmed, and judged it correctly.
+**Result (2026-10-06):** invoice `MAINNET-SMOKE` for $1, paid 1,169 sats (fee 141
+sats) in tx `3424e270…`; after 2 confirmations it landed on `paid` with
+`amount_received_sats=1169`, `btc_price_at_detection=85587`,
+`amount_received_fiat=1.0005`, `overpaid=false`.
+Tooling: `test-automation/mainnet-smoke.mjs`, with the shared library made
+network-aware. Prereqs were: S2 merged; S2.2 done; a real receive address;
+`NEXT_PUBLIC_BTC_NETWORK=mainnet`; a tiny amount; the payer page open (the cron is
+not per-minute yet).
 
 #### 🔴 v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
 **Branch:** `v1.4.28/cron-strategy` · Detail: Appendix A → S3
