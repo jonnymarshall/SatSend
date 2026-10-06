@@ -231,11 +231,13 @@ describe("bulkUnarchive", () => {
 });
 
 describe("bulkDelete", () => {
-  it("deletes all given invoices regardless of status", async () => {
+  it("deletes only drafts among the given invoices", async () => {
     const { deleteFilters } = makeSupabase();
     await bulkDelete(["inv-1", "inv-2", "inv-3"]);
     const inCall = deleteFilters.find((f) => f.method === "in");
     expect(inCall?.args).toEqual(["id", ["inv-1", "inv-2", "inv-3"]]);
+    const statusCall = deleteFilters.find((f) => f.method === "eq" && f.args[0] === "status");
+    expect(statusCall?.args).toEqual(["status", "draft"]);
   });
 
   it("scopes the delete to the authenticated user", async () => {

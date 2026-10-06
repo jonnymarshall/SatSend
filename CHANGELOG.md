@@ -60,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **v1.4.21-H (S4) — The database now defends money state.** Migration
+  `0027_money_invariants.sql` adds CHECK constraints (amounts >= 0, tax percent
+  0-100, currency USD, `total_fiat = subtotal + tax`, and a valid line_items
+  shape), added `NOT VALID` then validated; a trigger that freezes a paid or
+  mid-payment invoice's money and payment fields; and a delete-guard trigger that
+  lets only drafts be deleted. `bulkDelete` is now draft-only to match. If
+  existing rows break a rule the migration reports and stops (nothing is silently
+  rewritten). Verified on the test database.
+
 - **v1.4.19.1-H (S2.1) — Public invoice live updates restored.** The public
   `/invoice/[id]` page's private broadcast channel was refused
   (`Unauthorized ... Channel topic`), so status changes only appeared on a
