@@ -38,6 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flipped stale `🔄` markers on v1.4.14.1/.2/.3 to `✅` (merged in PRs #31-33).
 - Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
   hardening-train equivalents (v1.4.19-H / v1.4.28-H).
+- **v1.4.28-H (S3) — Background detection restored to a sub-daily cadence.**
+  Vercel Hobby caps its own cron at once a day, which left browserless payments
+  unnoticed for up to 24h and burned each invoice's polling schedule before its
+  time. A new GitHub Actions workflow (`.github/workflows/payment-sweep.yml`) now
+  drives `/api/cron/payment-sweep` about every 5 minutes. The per-invoice schedule
+  is now **time-based** — anchored on the new `published_at` column (migration
+  `0028`) pre-mempool and on `mempool_seen_at` post-mempool — so a late or missed
+  tick lands on the correct boundary instead of consuming a stage. The sweep also
+  orders due invoices oldest-first, includes `overdue` invoices, drains the due
+  queue past one batch, and allows up to 60s per run. `vercel.json`'s daily cron
+  remains only as a Hobby-tier placeholder. **Setup required:** add the repo
+  Actions secret `CRON_SECRET` (must equal the value on the production
+  deployment). Live verification is post-merge.
 
 ### Fixed
 

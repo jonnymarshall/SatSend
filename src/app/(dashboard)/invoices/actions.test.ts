@@ -360,7 +360,7 @@ describe("publishInvoice (publish-only, no email)", () => {
     warnSpy.mockRestore();
   });
 
-  it("initialises background-polling columns (next_check_at = +15s, stage_attempt = 0, mempool_seen_at = null) alongside the status change", async () => {
+  it("initialises background-polling columns (published_at set, next_check_at = +15s, stage_attempt = 0, mempool_seen_at = null) alongside the status change", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const before = Date.now();
     await publishInvoice("inv-1");
@@ -369,6 +369,12 @@ describe("publishInvoice (publish-only, no email)", () => {
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.stage_attempt).toBe(0);
     expect(payload.mempool_seen_at).toBeNull();
+
+    // v1.4.28-H (S3): the pre-mempool schedule is time-based, anchored on the
+    // publish moment.
+    const publishedAt = new Date(payload.published_at as string).getTime();
+    expect(publishedAt).toBeGreaterThanOrEqual(before - 1_000);
+    expect(publishedAt).toBeLessThanOrEqual(after + 1_000);
 
     // v1.4.13: tightened from +60s → +15s so a tab-closed payer reaches the
     // first cron-side mempool poll well before the prior 60–120s worst case.

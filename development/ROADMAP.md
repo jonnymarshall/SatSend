@@ -418,6 +418,8 @@ Batch cap (50) protects against mempool.space rate limits (~10/s).
 
 Every minute. Vercel's current policy (2025) supports per-minute cron on Hobby with up to 2 crons.
 
+> **Correction (v1.4.28-H / S3).** That policy did not hold: Hobby-tier deploys reject sub-daily schedules, so this was downgraded to a daily placeholder and the real cadence moved to an external scheduler (`.github/workflows/payment-sweep.yml`, every ~5 min). See Appendix A → S3.
+
 #### Payment-status route — consolidate shared logic
 
 `src/app/api/invoices/[id]/payment-status/route.ts` currently has near-duplicate transition logic. After the route's existing txid validation, replace its ad-hoc status-update block with a call into a thin wrapper around `decidePaymentSchedule` (or a helper that accepts a known txid rather than raw mempool txs). The route still exists — it's the fast path when the client-side watcher fires — but it now shares one schedule / one state-update shape with the cron.
@@ -1599,15 +1601,17 @@ network-aware. Prereqs were: S2 merged; S2.2 done; a real receive address;
 `NEXT_PUBLIC_BTC_NETWORK=mainnet`; a tiny amount; the payer page open (the cron is
 not per-minute yet).
 
-#### 🔴 v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
+#### ✅ v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
 **Branch:** `v1.4.28/cron-strategy` · Detail: Appendix A → S3
-The daily Vercel cron burns the per-minute `stage_attempt` schedule and stops
-monitoring after ~7 days. Decided: keep Hobby tier, drive `/api/cron/payment-sweep`
-every minute from a free external scheduler (GitHub Actions / cron-job.org) with
-`CRON_SECRET`. Also make the schedule time-based (not attempt-count based), add
-`.order`, include `overdue`, loop until the queue drains, set `maxDuration`.
-**Done when:** an abandoned testnet invoice transitions `pending → payment_detected
-→ paid` within minutes via the external scheduler, independent of stage exhaustion.
+Shipped: `.github/workflows/payment-sweep.yml` drives `/api/cron/payment-sweep`
+every ~5 min (GitHub Actions' minimum; Vercel Hobby's own cron stays as a daily
+placeholder). The schedule is now time-based — anchored on `published_at`
+(pre-mempool) and `mempool_seen_at` (post-mempool) — so a late or missed tick
+lands on the correct boundary instead of burning a stage. The sweep orders by
+`next_check_at`, includes `overdue` (M-DB-2), drains the due queue past one batch,
+and sets `maxDuration = 60`. New column `published_at` (migration `0028`).
+**Verified:** unit + route tests; live end-to-end confirmation is post-merge (the
+workflow only exists on `main`, and needs the `CRON_SECRET` Actions secret).
 
 #### ✅ v1.4.21-H (S4) — DB defends money state
 **Branch:** `fix/db-money-invariants` · Detail: Appendix A → S4
@@ -2638,8 +2642,14 @@ Steps:
 environment; its `paid`/`underpaid`/`overpaid` verdict always carries amounts; and
 production is running the current branch with a single sweep owner.
 
-### S3 — Restore sub-daily detection (branch `v1.4.28/cron-strategy`)
+### S3 ✅ — Restore sub-daily detection (branch `v1.4.28/cron-strategy`)
 Decided: external scheduler on Hobby tier (CRIT-5). Also fix the schedule math.
+
+**Implemented (v1.4.28-H):** GitHub Actions workflow (`*/5 * * * *`) + a time-based
+schedule anchored on `published_at` (pre-mempool) / `mempool_seen_at` (post-mempool)
++ the `published_at` column (migration `0028`) + sweep `.order`/`overdue`/drain/
+`maxDuration`. Live end-to-end check is post-merge (the workflow and the
+`CRON_SECRET` Actions secret only exist on `main`).
 
 Steps:
 1. Keep `vercel.json` — but leave a comment that the daily entry is a Hobby-tier

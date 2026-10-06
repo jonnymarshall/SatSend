@@ -80,6 +80,7 @@ function makeSelectBuilder(rows: unknown[]) {
   builder.lte = chain("lte");
   builder.lt = chain("lt");
   builder.limit = chain("limit");
+  builder.order = chain("order");
   builder.not = chain("not");
   builder.then = (onFulfilled: (v: unknown) => unknown) =>
     Promise.resolve({ data: rows, error: null }).then(onFulfilled);
@@ -143,17 +144,20 @@ describe("GET /api/cron/payment-sweep — single-writer guard", () => {
 });
 
 describe("GET /api/cron/payment-sweep — scope", () => {
-  it("queries invoices where status is pending/payment_detected, next_check_at <= now, with a limit", async () => {
+  it("queries pending/payment_detected/overdue invoices due now, oldest first, with a limit", async () => {
     const { builder, calls } = makeSelectBuilder([]);
     mockFrom.mockReturnValue(builder);
 
     await getRequest(authHeaders());
 
     const inStatus = calls.find((c) => c.method === "in" && c.args[0] === "status");
-    expect(inStatus?.args).toEqual(["status", ["pending", "payment_detected"]]);
+    expect(inStatus?.args).toEqual(["status", ["pending", "payment_detected", "overdue"]]);
 
     const lteCheck = calls.find((c) => c.method === "lte" && c.args[0] === "next_check_at");
     expect(lteCheck).toBeDefined();
+
+    const order = calls.find((c) => c.method === "order" && c.args[0] === "next_check_at");
+    expect(order?.args[1]).toEqual({ ascending: true });
 
     const limit = calls.find((c) => c.method === "limit");
     expect(limit?.args[0]).toBe(50);
@@ -382,6 +386,7 @@ function makeDualSelectBuilder({
     builder.lte = chain("lte");
     builder.lt = chain("lt");
     builder.limit = chain("limit");
+    builder.order = chain("order");
     builder.not = chain("not");
     builder.then = (onFulfilled: (v: unknown) => unknown) => {
       // The overdue scan filters on `due_date` (via .lt or .not("due_date", ...)).

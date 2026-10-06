@@ -277,6 +277,9 @@ async function main() {
   }
 
   if (cmd === "rm") {
+    // v1.4.21-H (S4) blocks deletes of non-draft invoices at the DB level, so
+    // force the row to draft before deleting.
+    await sb(env, `invoices?id=eq.${args[0]}`, { method: "PATCH", body: { status: "draft" } });
     await sb(env, `invoices?id=eq.${args[0]}`, { method: "DELETE" });
     console.log(`deleted ${args[0]}`);
     return;

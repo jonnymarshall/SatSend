@@ -252,6 +252,10 @@ async function loadAndAuthorise(invoiceId: string): Promise<{
 
 const publishStatePatch = () => ({
   status: "pending",
+  // Anchor for the time-based payment schedule (v1.4.28-H / S3). The pre-mempool
+  // delay boundaries are measured from here, so this must be the publish moment,
+  // not the draft-creation moment.
+  published_at: new Date().toISOString(),
   // First cron-side mempool poll lands at publish + PRE_MEMPOOL_DELAYS_MS[0]
   // (single source of truth with the schedule module).
   next_check_at: new Date(Date.now() + PRE_MEMPOOL_DELAYS_MS[0]).toISOString(),

@@ -32,17 +32,20 @@ const NO_VERDICT = {
   overpaid: false,
 };
 
+// Time-based scheduling (v1.4.28-H / S3): the next check is the first cumulative
+// boundary past the elapsed time measured from the invoice's anchor
+// (published_at pre-mempool, mempool_seen_at post-mempool).
 describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at=null)", () => {
-  // v1.4.13.5 schedule: [15s (publish-time), 30s, 60s, 2min, 5min, 10min, 30min].
-  // Pre-v1.4.13.5 was [15s, 5min, 10min, 30min] — the post-first-miss leap to
-  // 5min meant tx broadcasts that mempool.space indexed at t=60–120s sat
-  // undetected by cron until t=300s. New schedule fills in the gap.
-  it("after attempt 0 with no paying tx, schedules next check 30s out and increments stage_attempt (v1.4.13.5)", () => {
+  // Pre-mempool boundaries (ms from published_at): 15s, 45s, 105s, 225s, 525s,
+  // 1125s, 2925s — cumulative sums of [15s, 30s, 60s, 2min, 5min, 10min, 30min].
+
+  it("a freshly published invoice schedules its first check at anchor + 15s", () => {
     const decision = decidePaymentSchedule(
       {
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
+        published_at: NOW.toISOString(),
         stage_attempt: 0,
         total_fiat: TOTAL_FIAT,
       },
@@ -55,19 +58,20 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
       newStatus: "pending",
       newMempoolSeenAt: null,
       newStageAttempt: 1,
-      newNextCheckAt: new Date(NOW.getTime() + 30_000).toISOString(),
+      newNextCheckAt: new Date(NOW.getTime() + 15_000).toISOString(),
       detectedTxid: null,
       ...NO_VERDICT,
     });
   });
 
-  it("after attempt 1 with no paying tx, schedules next check 60s out (v1.4.13.5)", () => {
+  it("a tick landing at anchor + 15s schedules the next boundary at anchor + 45s", () => {
     const decision = decidePaymentSchedule(
       {
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
-        stage_attempt: 1,
+        published_at: new Date(NOW.getTime() - 15_000).toISOString(),
+        stage_attempt: 0,
         total_fiat: TOTAL_FIAT,
       },
       [],
@@ -75,17 +79,21 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
       PRICE_FINALIZED
     );
 
-    expect(decision.newStageAttempt).toBe(2);
-    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 60_000).toISOString());
+    expect(decision.newStageAttempt).toBe(1);
+    // anchor + 45s = (NOW - 15s) + 45s = NOW + 30s
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 30_000).toISOString());
   });
 
-  it("after attempt 2 with no paying tx, schedules next check 2min out (v1.4.13.5)", () => {
+  it("a missed tick does not burn stages: a tick 10 min late jumps to the correct boundary", () => {
+    // The old attempt-count schedule would have advanced one step (~10 min).
+    // Time-based instead lands on the 1125s (18.75 min) boundary.
     const decision = decidePaymentSchedule(
       {
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
-        stage_attempt: 2,
+        published_at: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
+        stage_attempt: 0,
         total_fiat: TOTAL_FIAT,
       },
       [],
@@ -93,34 +101,18 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
       PRICE_FINALIZED
     );
 
-    expect(decision.newStageAttempt).toBe(3);
-    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 2 * 60_000).toISOString());
+    expect(decision.newStageAttempt).toBe(1); // one tick, not several
+    // 1125s boundary − 600s elapsed = 525s from now (8.75 min)
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 525_000).toISOString());
   });
 
-  it("after attempt 3 with no paying tx, schedules next check 5min out (v1.4.13.5)", () => {
+  it("stops polling once the final pre-mempool boundary is in the past", () => {
     const decision = decidePaymentSchedule(
       {
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
-        stage_attempt: 3,
-        total_fiat: TOTAL_FIAT,
-      },
-      [],
-      NOW,
-      PRICE_FINALIZED
-    );
-
-    expect(decision.newStageAttempt).toBe(4);
-    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 5 * 60_000).toISOString());
-  });
-
-  it("after attempt 6 (final pre-mempool, was attempt 3 pre-v1.4.13.5) with no paying tx, stops polling", () => {
-    const decision = decidePaymentSchedule(
-      {
-        status: "pending",
-        btc_address: "bc1qaddr",
-        mempool_seen_at: null,
+        published_at: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
         stage_attempt: 6,
         total_fiat: TOTAL_FIAT,
       },
@@ -134,12 +126,32 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
     expect(decision.detectedTxid).toBeNull();
   });
 
+  it("an overdue invoice rests as overdue while it keeps polling", () => {
+    const decision = decidePaymentSchedule(
+      {
+        status: "overdue",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: null,
+        published_at: NOW.toISOString(),
+        stage_attempt: 0,
+        total_fiat: TOTAL_FIAT,
+      },
+      [],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newStatus).toBe("overdue");
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 15_000).toISOString());
+  });
+
   it("with an unconfirmed paying tx, transitions pending → payment_detected, resets stage_attempt to 0, sets mempool_seen_at, schedules +10m", () => {
     const decision = decidePaymentSchedule(
       {
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
+        published_at: NOW.toISOString(),
         stage_attempt: 1,
         total_fiat: TOTAL_FIAT,
       },
@@ -164,6 +176,7 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
+        published_at: NOW.toISOString(),
         stage_attempt: 2,
         total_fiat: TOTAL_FIAT,
       },
@@ -186,6 +199,7 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
         status: "pending",
         btc_address: "bc1qaddr",
         mempool_seen_at: null,
+        published_at: NOW.toISOString(),
         stage_attempt: 0,
         total_fiat: TOTAL_FIAT,
       },
@@ -196,21 +210,23 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
 
     expect(decision.newStatus).toBe("pending");
     expect(decision.detectedTxid).toBeNull();
-    // v1.4.13.5: attempt-0 retry is now 30s (was 5min)
-    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 30_000).toISOString());
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 15_000).toISOString());
   });
 });
 
 describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () => {
-  const SEEN = new Date("2026-04-23T10:00:00.000Z").toISOString();
+  // Post-mempool boundaries (ms from mempool_seen_at): 10m, 20m, 30m, 90m, 150m,
+  // 210m, 270m, 330m, 390m, then +4h ×12, then +8h ×24.
 
-  it("at the end of the 10-minute stage (attempt 2), the next interval is 1 hour", () => {
+  it("a tick at seen + 10m schedules the next boundary at seen + 20m", () => {
+    const seen = new Date(NOW.getTime() - 10 * 60_000);
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
-        stage_attempt: 2,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
+        stage_attempt: 1,
         total_fiat: TOTAL_FIAT,
       },
       [unconfirmedTx("tx-still", "bc1qaddr")],
@@ -219,18 +235,40 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
     );
 
     expect(decision.newStatus).toBe("payment_detected");
-    expect(decision.newMempoolSeenAt).toBe(SEEN);
-    expect(decision.newStageAttempt).toBe(3);
-    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 60 * 60_000).toISOString());
+    expect(decision.newMempoolSeenAt).toBe(seen.toISOString());
+    expect(decision.newStageAttempt).toBe(2);
+    // seen + 20m = NOW + 10m
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 10 * 60_000).toISOString());
     expect(decision.detectedTxid).toBeNull();
   });
 
-  it("at the end of the 1-hour stage (attempt 8), the next interval is 4 hours", () => {
+  it("at the end of the 10-minute stage, the next boundary is 1 hour after seen", () => {
+    const seen = new Date(NOW.getTime() - 30 * 60_000);
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
+        stage_attempt: 2,
+        total_fiat: TOTAL_FIAT,
+      },
+      [unconfirmedTx("tx-still", "bc1qaddr")],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 60 * 60_000).toISOString());
+  });
+
+  it("at the end of the 1-hour stage, the next boundary is 4 hours after seen", () => {
+    const seen = new Date(NOW.getTime() - 390 * 60_000); // 6.5h
+    const decision = decidePaymentSchedule(
+      {
+        status: "payment_detected",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
         stage_attempt: 8,
         total_fiat: TOTAL_FIAT,
       },
@@ -243,12 +281,14 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
     expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 4 * 60 * 60_000).toISOString());
   });
 
-  it("at the end of the 4-hour stage (attempt 20), the next interval is 8 hours", () => {
+  it("at the end of the 4-hour stage, the next boundary is 8 hours after seen", () => {
+    const seen = new Date(NOW.getTime() - 3270 * 60_000); // 54.5h
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
         stage_attempt: 20,
         total_fiat: TOTAL_FIAT,
       },
@@ -261,12 +301,14 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
     expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 8 * 60 * 60_000).toISOString());
   });
 
-  it("at the final attempt (44) with still-unconfirmed tx, stops polling", () => {
+  it("stops polling after the final post-mempool boundary", () => {
+    const seen = new Date(NOW.getTime() - 300 * 60 * 60_000); // 300h
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
         stage_attempt: 44,
         total_fiat: TOTAL_FIAT,
       },
@@ -281,11 +323,13 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
   });
 
   it("when the tx confirms at sufficient depth with a clean amount, transitions to paid and stops polling", () => {
+    const seen = new Date(NOW.getTime() - 60 * 60_000);
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
         stage_attempt: 5,
         total_fiat: TOTAL_FIAT,
       },
@@ -300,11 +344,13 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
   });
 
   it("preserves mempool_seen_at when the tx has not yet confirmed", () => {
+    const seen = new Date(NOW.getTime() - 10 * 60_000);
     const decision = decidePaymentSchedule(
       {
         status: "payment_detected",
         btc_address: "bc1qaddr",
-        mempool_seen_at: SEEN,
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
         stage_attempt: 0,
         total_fiat: TOTAL_FIAT,
       },
@@ -313,7 +359,7 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
       PRICE_FINALIZED
     );
 
-    expect(decision.newMempoolSeenAt).toBe(SEEN);
+    expect(decision.newMempoolSeenAt).toBe(seen.toISOString());
   });
 });
 
@@ -323,7 +369,7 @@ describe("decidePaymentSchedule — amount verification", () => {
   it("90% coverage lands on underpaid", () => {
     // 45,000 sats @ $50,000/BTC = $22.50, against a $25 total = 90% coverage.
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-under", "bc1qaddr", 900_000, 45_000)],
       NOW,
       PRICE_FINALIZED
@@ -339,7 +385,7 @@ describe("decidePaymentSchedule — amount verification", () => {
   it("95% coverage (lower tolerance boundary) lands on paid, not underpaid", () => {
     // 47,500 sats @ $50,000/BTC = $23.75 = 95% of $25.
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-lowbound", "bc1qaddr", 900_000, 47_500)],
       NOW,
       PRICE_FINALIZED
@@ -352,7 +398,7 @@ describe("decidePaymentSchedule — amount verification", () => {
   it("105% coverage (upper tolerance boundary) lands on paid, not overpaid", () => {
     // 52,500 sats @ $50,000/BTC = $26.25 = 105% of $25.
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-highbound", "bc1qaddr", 900_000, 52_500)],
       NOW,
       PRICE_FINALIZED
@@ -365,7 +411,7 @@ describe("decidePaymentSchedule — amount verification", () => {
   it("110% coverage lands on paid + overpaid", () => {
     // 55,000 sats @ $50,000/BTC = $27.50 = 110% of $25.
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-over", "bc1qaddr", 900_000, 55_000)],
       NOW,
       PRICE_FINALIZED
@@ -378,7 +424,7 @@ describe("decidePaymentSchedule — amount verification", () => {
 
   it("defers (no status flip) when the BTC price oracle is unavailable, even at sufficient confirmation depth", () => {
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-confirmed", "bc1qaddr")],
       NOW,
       { btcPrice: null, tipHeight: 900_001 }
@@ -395,7 +441,7 @@ describe("decidePaymentSchedule — amount verification", () => {
   it("does not finalize a confirmed tx below the required confirmation depth", () => {
     // block_height 900_000, tip 900_000 -> depth 1, below CONFIRMATION_DEPTH_REQUIRED (2).
     const decision = decidePaymentSchedule(
-      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-shallow", "bc1qaddr")],
       NOW,
       { btcPrice: 50_000, tipHeight: 900_000 }
@@ -410,7 +456,7 @@ describe("decidePaymentSchedule — amount verification", () => {
 
   it("defers a first-sighting confirmed-but-shallow tx into payment_detected rather than finalizing", () => {
     const decision = decidePaymentSchedule(
-      { status: "pending", btc_address: "bc1qaddr", mempool_seen_at: null, stage_attempt: 1, total_fiat: TOTAL_FIAT },
+      { status: "pending", btc_address: "bc1qaddr", mempool_seen_at: null, published_at: NOW.toISOString(), stage_attempt: 1, total_fiat: TOTAL_FIAT },
       [confirmedTx("tx-shallow-first-seen", "bc1qaddr")],
       NOW,
       { btcPrice: 50_000, tipHeight: 900_000 }
