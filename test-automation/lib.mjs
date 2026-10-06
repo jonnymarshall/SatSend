@@ -1,20 +1,41 @@
 // Shared primitives for the test-automation tooling. Dev-only.
 //
-// Loads config from the local environment file (never printed), derives testnet
-// addresses from the test wallet, signs and broadcasts payments, and talks to
-// the test database with the service role.
+// Network-aware: it derives addresses from the testnet wallet by default, or the
+// mainnet wallet when SATSEND_NETWORK=mainnet is set. It signs and broadcasts
+// payments, and talks to the test database with the service role. Config is read
+// from the local environment file and never printed.
 
 import { readFileSync } from "node:fs";
 import { HDKey } from "@scure/bip32";
 import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { Transaction, p2wpkh, TEST_NETWORK } from "@scure/btc-signer";
+import { NETWORK, TEST_NETWORK, Transaction, p2wpkh } from "@scure/btc-signer";
 
-export const MEMPOOL = process.env.MEMPOOL_TESTNET4_URL ?? "https://mempool.space/testnet4";
+export const NET_NAME = process.env.SATSEND_NETWORK ?? "testnet4";
+
+const NETS = {
+  testnet4: {
+    scureNet: TEST_NETWORK,
+    mempool: process.env.MEMPOOL_TESTNET4_URL ?? "https://mempool.space/testnet4",
+    mnemonicKey: "TESTNET_WALLET_MNEMONIC",
+    account: "m/84'/1'/0'",
+  },
+  mainnet: {
+    scureNet: NETWORK,
+    mempool: process.env.MEMPOOL_MAINNET_URL ?? "https://mempool.space",
+    mnemonicKey: "MAINNET_WALLET_MNEMONIC",
+    account: "m/84'/0'/0'",
+  },
+};
+
+if (!NETS[NET_NAME]) throw new Error(`unknown network: ${NET_NAME}`);
+
+export const NET = NETS[NET_NAME];
+export const MEMPOOL = NET.mempool;
 export const APP_URL = process.env.SATSEND_APP_URL ?? "http://localhost:3000";
 
-export const RECEIVE = "m/84'/1'/0'/0";
-export const CHANGE = "m/84'/1'/0'/1";
+export const RECEIVE = `${NET.account}/0`;
+export const CHANGE = `${NET.account}/1`;
 
 // Where test invoices are paid to, and where the wallet's spendable balance
 // lives, are kept out of the range the wallet has already used.
@@ -42,15 +63,16 @@ export function loadEnv() {
 }
 
 export function walletRoot(env) {
-  const mnemonic = (env.TESTNET_WALLET_MNEMONIC ?? "").trim().replace(/\s+/g, " ");
-  if (!mnemonic) throw new Error("TESTNET_WALLET_MNEMONIC is not set");
-  if (!validateMnemonic(mnemonic, wordlist)) throw new Error("TESTNET_WALLET_MNEMONIC is not a valid BIP39 mnemonic");
+  const key = NET.mnemonicKey;
+  const mnemonic = (env[key] ?? "").trim().replace(/\s+/g, " ");
+  if (!mnemonic) throw new Error(`${key} is not set`);
+  if (!validateMnemonic(mnemonic, wordlist)) throw new Error(`${key} is not a valid BIP39 mnemonic`);
   return HDKey.fromMasterSeed(mnemonicToSeedSync(mnemonic));
 }
 
 export function derive(root, path, index) {
   const child = root.derive(`${path}/${index}`);
-  const p = p2wpkh(child.publicKey, TEST_NETWORK);
+  const p = p2wpkh(child.publicKey, NET.scureNet);
   return { address: p.address, script: p.script, privateKey: child.privateKey };
 }
 
@@ -114,8 +136,8 @@ export async function buildAndSend({ root, inputs, toAddress, sats, changeAddres
     tx.addInput({ txid: u.txid, index: u.vout, witnessUtxo: { script, amount: BigInt(u.value) } });
     keys.push(privateKey);
   }
-  tx.addOutputAddress(toAddress, BigInt(sats), TEST_NETWORK);
-  if (nOut === 2) tx.addOutputAddress(changeAddress, BigInt(change), TEST_NETWORK);
+  tx.addOutputAddress(toAddress, BigInt(sats), NET.scureNet);
+  if (nOut === 2) tx.addOutputAddress(changeAddress, BigInt(change), NET.scureNet);
   keys.forEach((key, i) => tx.signIdx(key, i));
   tx.finalize();
 
