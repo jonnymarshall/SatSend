@@ -1569,22 +1569,21 @@ never broadcasts, and the payload is only `{id, status, btc_txid}`.
 one second without refreshing the page.
 Manual test guide: `manual-tests/v1.4.19.1-H-public-invoice-live-updates.md`.
 
-#### 🔴 v1.4.19.2-H (S2.2) — One writer per database (stop cross-version cron writes)
+#### ✅ v1.4.19.2-H (S2.2) — One writer per database (stop cross-version cron writes)
 **Branch:** `fix/environment-and-deployment-hygiene` · Detail: Appendix A → S2.2
-Manual S2 testing was corrupted by a second code version writing to the same
-database. Production is still the `v1.4.18/resend-webhook` build from
-2026-05-19, and its `vercel.json` cron (`* * * * *`) sweeps
-`/api/cron/payment-sweep` against the same Supabase project the local dev server
-uses. That old build predates amount verification, so it finalises payments as
-`paid` and sends the "payment confirmed" email while leaving `amount_received_*`
-null and `overpaid` false — the exact shape on `f94a5826`/`a5c3b5bf` (confirmed
-2026-09-12 00:49:43, same batch), while the branch's own finalisation at
-23:49:06 recorded amounts correctly. Until this is fixed, per-feature manual
-testing is unreliable and production runs pre-fix code.
+Resolved, in three parts: (1) local development moved to its own Supabase project
+(`SatSend-dev`), so test runs no longer share the production database; (2) the
+stale `v1.4.18` production build was replaced by redeploying `main` to Vercel, so
+production now runs current code; (3) the sweep route gained a single-writer guard
+— it no-ops unless `PAYMENT_SWEEP_ENABLED=true` is set in that environment, so a
+stray, test, or future stale deployment cannot sweep a shared database.
 **Done when:** only one code version can write to a given database; a fresh local
 test invoice is never touched by another environment's cron and its
 `paid`/`underpaid` verdict always carries amounts; and production serves the
 current branch.
+**Note:** the guard must be switched on (`PAYMENT_SWEEP_ENABLED=true`) in whichever
+environment owns the sweep (production, or the external scheduler) — see the
+pre-deployment checklist and `AGENTS.md`.
 
 #### ⏳ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
 **Branch:** none — test + config only · Detail: Appendix A → S2.3
@@ -2426,6 +2425,12 @@ The user has flagged this entry as needing a thorough grilling before any code i
 ## Notes
 
 - Billing (v2.0+) is fully deferred until v1 is stable and in use.
+- **Future: publish under a different GitHub identity.** The project currently lives
+  under the `jonnymarshall` GitHub account. Jonny wants it moved to a separate,
+  anonymous identity before public launch (a concern about anonymity, not
+  plagiarism — the code can stay public). Not done now; revisit before launch. A
+  duplicate private repo (`jonnymarshall/satsendofficial`) was deleted on
+  2026-10-06 and the Vercel project re-pointed at the real `SatSend` repo.
 - **xpub / HD wallet policy.** The platform never accepts an xpub from a *user* for invoice payment addresses — the security trade-off (key leak exposes every derived address) is the wrong one for that surface. **Single deliberate exception:** v2.0 premium-account billing uses a platform-controlled `BILLING_XPUB` to derive a per-user upgrade address. Reasoning: per-user attribution of subscription revenue is non-negotiable, manual address provisioning per signup is not viable, and a leaked billing xpub exposes inbound subscription flows only — a manageable blast radius for the value of automating the billing path.
 - Light mode and colour scheme overhaul are tracked in v1.5.
 
@@ -2440,6 +2445,7 @@ Project is not yet linked to Vercel. Before first deployment, run `vercel link` 
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` (if used server-side)
 - [ ] `RESEND_API_KEY` (added v1.4)
 - [ ] `CRON_SECRET` (added v1.4.1) — bearer token the Vercel Cron endpoint validates. Vercel generates this when you configure the cron in the dashboard; mirror it into `.env.local` for local `curl` testing.
+- [ ] `PAYMENT_SWEEP_ENABLED=true` in the environment that owns the payment sweep (production, or the external scheduler). Without it the sweep route no-ops (single-writer guard, v1.4.19.2-H). Do **not** set it in local development.
 - [ ] **Verify a sending domain in the Resend dashboard** and set `EMAIL_FROM` to an address on that domain. Without a verified domain, Resend only delivers to the email address on the Resend account itself — sends to any other recipient (clients, test addresses) return a 422 and the email never arrives. This is a Resend free-tier safety rail, not a Paybitty bug.
 - [ ] **Sender identity unified (v1.4.4)** — set `EMAIL_FROM="SatSend <team@mail.satsend.me>"` in `.env` and in Vercel project env vars (Production, Preview, Development). Confirm the Supabase custom SMTP "Sender" address (dashboard → Project Settings → Auth → SMTP Settings → Sender) is set to the same `team@mail.satsend.me` so transactional mail and auth mail share a single `From:` identity.
 - [x] **Supabase custom SMTP → Resend** — configured 2026-04-24 in Supabase dashboard (Project Settings → Auth → SMTP Settings) pointing at `smtp.resend.com:465` with the `RESEND_API_KEY` as the password and a sender on the verified `mail.satsend.me` domain. This routes all Supabase auth emails (magic link, signup confirmation, password reset) through Resend and bypasses Supabase's default ~4/hour rate limit. Project-level setting — applies to both local dev and production automatically.

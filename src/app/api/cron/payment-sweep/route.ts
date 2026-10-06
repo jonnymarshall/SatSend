@@ -41,6 +41,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Single-writer guard (v1.4.19.2-H / S2.2). Only the environment that is
+  // explicitly allowed to sweep may run this. Set PAYMENT_SWEEP_ENABLED=true in
+  // exactly one place: the environment that should own the sweep (the current
+  // production deployment, or the external scheduler's environment). A stray,
+  // test, or stale deployment that does not set it no-ops here instead of writing
+  // to the database.
+  if (process.env.PAYMENT_SWEEP_ENABLED !== "true") {
+    console.warn("[cron/payment-sweep] skipped: PAYMENT_SWEEP_ENABLED is not 'true'");
+    return NextResponse.json({ skipped: true, reason: "PAYMENT_SWEEP_ENABLED is not 'true'" });
+  }
+
   const supabase = createAdminClient();
   const now = new Date();
 

@@ -53,6 +53,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   process.env.CRON_SECRET = "test-secret";
+  process.env.PAYMENT_SWEEP_ENABLED = "true";
   mockFetchTipHeight.mockResolvedValue(900_001);
   mockFetchBtcPrice.mockResolvedValue({ price: 50_000, source: "coinbase" });
 });
@@ -120,6 +121,24 @@ describe("GET /api/cron/payment-sweep — auth", () => {
     delete process.env.CRON_SECRET;
     const res = await getRequest({ authorization: "Bearer anything" });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/cron/payment-sweep — single-writer guard", () => {
+  it("no-ops when PAYMENT_SWEEP_ENABLED is not 'true'", async () => {
+    delete process.env.PAYMENT_SWEEP_ENABLED;
+    const res = await getRequest(authHeaders());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skipped: true, reason: "PAYMENT_SWEEP_ENABLED is not 'true'" });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("runs the sweep when PAYMENT_SWEEP_ENABLED is 'true'", async () => {
+    const { builder } = makeSelectBuilder([]);
+    mockFrom.mockReturnValue(builder);
+    const res = await getRequest(authHeaders());
+    expect(res.status).toBe(200);
+    expect(mockFrom).toHaveBeenCalled();
   });
 });
 
