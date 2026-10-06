@@ -1384,6 +1384,63 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ---
 
+## Developer Enablement (do first — unblocks testing and speeds everything up)
+
+> **Current priority.** This lets the agent write and test features end to end
+> (create an invoice, pay it, wait for detection and confirmations, assert the
+> result) without the human doing manual testing. Dev-only tooling, never shipped
+> to production. Run it before and alongside the hardening train.
+
+### 🔴 v1.4.36 — Test automation harness
+**Branch:** `chore/test-automation`
+
+- **Testnet wallet tool** (`test-automation/wallet.mjs`) — done. Derives addresses
+  from a testnet seed, locates funds, selects coins, signs, and broadcasts.
+- **Harness + runner** (`test-automation/lib.mjs`, `harness.mjs`) — done. Creates a
+  test user and published invoices with fresh addresses, pays them, drives the
+  app's payment route, waits for confirmations, and asserts the verdict, the
+  recorded amounts, and the emails. Proven for `underpaid` (automated, PASS) and
+  `paid`/`overpaid` (manually driven).
+- **Separate Supabase test project** (`SatSend-dev`) — done. Local development no
+  longer shares the production database, which completes the environment half of
+  S2.2 and stops the stale production deployment from corrupting test results.
+- **Dev-only automation API** — deferred. Not needed for testing (the harness
+  writes directly with the service role); fold it into the v2.1 agent API instead.
+
+**Leftover — final action before retiring the test wallet.** The wallet's
+spendable balance sits at high address indices that the wallet UI does not display
+(the gap limit is ~20). Sweep every remaining testnet fund back to a
+wallet-visible low address as the last on-chain action: the visible address is
+`m/84'/1'/0'/0/102`; the hidden funds are at indices 300, 500, 1000 and 1001.
+Do this on whichever branch is live once no further on-chain tests are needed.
+
+**Done when:** the agent can run a full payment scenario start to finish against a
+disposable database and report a pass/fail result, with the human only approving
+merges.
+
+### 🟡 v1.4.37 — Schema cleanups (agreed during the test-harness work)
+
+- **`tax_fiat` → computed column.** Keep `tax_percent` as the input and make
+  `tax_fiat` `GENERATED ALWAYS AS (round(subtotal_fiat * tax_percent / 100, 2))
+  STORED`, so it can never drift. Update the app to stop writing it. Pair with the
+  total-consistency CHECK from S4.
+- **`invoice_events` completeness.** Add typed `from_status` and `to_status`
+  columns (the invoice status type) and log the *automatic* payment transitions
+  (payment_detected → paid / underpaid / overpaid) as well as the manual ones the
+  feed records today. Typed columns, no JSON blob.
+- **`delivery_status`.** Replace the inferred combination of `sent_at` /
+  `send_method` / `email_attempted_at` with one explicit `delivery_status` value as
+  the authoritative state; keep `sent_at` as the timestamp and let `email_events`
+  hold the detailed history. Lower priority than the two above.
+- **Surface under/overpaid where the owner actually looks.** Today the overpaid
+  state is shown only on the invoice detail page and in the payment-confirmed
+  email. The `/invoices` list says just "Paid" and the activity feed records
+  nothing, so an owner who never opens the detail page or the email misses it. Add
+  a list indicator for under/overpaid, and let the automatic transitions land in
+  the feed via the item above.
+
+---
+
 ## Security & Hardening Train (from the 2026-07 master audit)
 
 > **Do this whole train before resuming the feature queue below and before any
