@@ -88,6 +88,14 @@ export function PaymentWatcher({
     let activeTimer: ReturnType<typeof setTimeout> | null = null;
     let activeCount = 0;
 
+    // v1.4.22-H (M-MONEY-2): bounded WebSocket reconnect. The mempool.space
+    // socket routinely drops (especially on testnet) and was previously never
+    // reopened, so the fastest detection path stayed dead for the rest of the
+    // page load. The active REST poll and the cron remain the safety nets.
+    const WS_RECONNECT_MAX = 6;
+    let wsAttempts = 0;
+    let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
     const isVisible = () =>
       typeof document === "undefined" || document.visibilityState === "visible";
 
@@ -150,7 +158,29 @@ export function PaymentWatcher({
       }
     }
 
+    function clearWsReconnect() {
+      if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
+      }
+    }
+
+    function scheduleWsReconnect() {
+      if (cancelled || statusRef.current === "paid") return;
+      if (wsAttempts >= WS_RECONNECT_MAX) {
+        console.warn("[PaymentWatcher] WebSocket reconnect gave up; REST poll + cron remain");
+        return;
+      }
+      const delay = Math.min(1_000 * 2 ** wsAttempts, 30_000);
+      wsAttempts += 1;
+      wsReconnectTimer = setTimeout(() => {
+        wsReconnectTimer = null;
+        if (!cancelled && statusRef.current !== "paid") openWebSocket();
+      }, delay);
+    }
+
     function closeWebSocket() {
+      clearWsReconnect();
       const ws = wsRef.current;
       if (!ws) return;
       wsRef.current = null;
@@ -168,6 +198,7 @@ export function PaymentWatcher({
       wsRef.current = ws;
 
       ws.onopen = () => {
+        wsAttempts = 0;
         ws.send(JSON.stringify({ action: "want", data: ["blocks"] }));
         ws.send(JSON.stringify({ action: "track-address", data: btcAddress }));
       };
@@ -208,18 +239,16 @@ export function PaymentWatcher({
       };
 
       ws.onerror = (event) => {
-        console.warn("[PaymentWatcher] WebSocket error, falling back to polling", event);
+        console.warn("[PaymentWatcher] WebSocket error, reconnecting", event);
         ws.close();
       };
 
       ws.onclose = () => {
-        wsRef.current = null;
-        // v1.4.13.3: no client-side fallback when WS dies. The active
-        // alongside-WS poll (scheduleActivePoll) is already running on its
-        // own 5s cadence for revealed payers; for unrevealed viewers, the
-        // cron is the safety net. The vestigial v1.4.13 exp-backoff
-        // fallback was removed because it overlapped with the active poll
-        // and produced irregular polling clusters.
+        if (wsRef.current === ws) wsRef.current = null;
+        // v1.4.22-H: reopen with bounded backoff (see scheduleWsReconnect). This
+        // does NOT add REST polling — the active alongside-WS poll and the cron
+        // remain the safety nets, as before.
+        scheduleWsReconnect();
       };
     }
 
@@ -233,6 +262,7 @@ export function PaymentWatcher({
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
       closeWebSocket();
+      clearWsReconnect();
       clearActive();
     };
   }, [invoiceId, btcAddress, onStatusChange, isPaid, paymentRevealed]);

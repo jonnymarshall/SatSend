@@ -70,6 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (telling "mempool.space is down" apart from "no tx yet") is tracked under
   v1.4.22-H, along with the mempool.space client WebSocket never reconnecting
   after a drop. Test added in `mempool.test.ts`.
+- **v1.4.22-H — Detection robustness (client socket).** The mempool.space
+  WebSocket on the payer's page had an `onclose` that did nothing, so once the
+  connection dropped (routine on testnet) the fastest detection path stayed dead
+  for the rest of the page load. It now reopens with bounded exponential backoff
+  (up to 6 attempts, 1s→30s) and stops once the invoice is paid. This adds no
+  REST polling; the active poll and the cron remain the safety nets. Split out
+  from the server-side v1.4.22-H change.
 
 ### Security
 
