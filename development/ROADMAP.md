@@ -1396,15 +1396,23 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 - **Testnet wallet tool** (`test-automation/wallet.mjs`) — done. Derives addresses
   from a testnet seed, locates funds, selects coins, signs, and broadcasts.
-  Verified with a 1000-sat self-transfer.
-- **Dev-only automation API** — create/publish/read invoices without a browser;
-  the seed of the v2.1 agent API. Queued.
-- **End-to-end runner** — create → publish → pay (exact / under / over) → wait for
-  detection + confirmations → assert verdict, database row, and email → report.
-  Queued.
-- **Separate Supabase test project** — local development stops sharing the
-  production database. This also completes the environment half of S2.2, so test
-  results can no longer be corrupted by the stale production deployment.
+- **Harness + runner** (`test-automation/lib.mjs`, `harness.mjs`) — done. Creates a
+  test user and published invoices with fresh addresses, pays them, drives the
+  app's payment route, waits for confirmations, and asserts the verdict, the
+  recorded amounts, and the emails. Proven for `underpaid` (automated, PASS) and
+  `paid`/`overpaid` (manually driven).
+- **Separate Supabase test project** (`SatSend-dev`) — done. Local development no
+  longer shares the production database, which completes the environment half of
+  S2.2 and stops the stale production deployment from corrupting test results.
+- **Dev-only automation API** — deferred. Not needed for testing (the harness
+  writes directly with the service role); fold it into the v2.1 agent API instead.
+
+**Leftover — final action before retiring the test wallet.** The wallet's
+spendable balance sits at high address indices that the wallet UI does not display
+(the gap limit is ~20). Sweep every remaining testnet fund back to a
+wallet-visible low address as the last on-chain action: the visible address is
+`m/84'/1'/0'/0/102`; the hidden funds are at indices 300, 500, 1000 and 1001.
+Do this on whichever branch is live once no further on-chain tests are needed.
 
 **Done when:** the agent can run a full payment scenario start to finish against a
 disposable database and report a pass/fail result, with the human only approving
