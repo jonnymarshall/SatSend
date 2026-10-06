@@ -1432,6 +1432,12 @@ merges.
   `send_method` / `email_attempted_at` with one explicit `delivery_status` value as
   the authoritative state; keep `sent_at` as the timestamp and let `email_events`
   hold the detailed history. Lower priority than the two above.
+- **Surface under/overpaid where the owner actually looks.** Today the overpaid
+  state is shown only on the invoice detail page and in the payment-confirmed
+  email. The `/invoices` list says just "Paid" and the activity feed records
+  nothing, so an owner who never opens the detail page or the email misses it. Add
+  a list indicator for under/overpaid, and let the automatic transitions land in
+  the feed via the item above.
 
 ---
 

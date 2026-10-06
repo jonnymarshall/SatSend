@@ -103,8 +103,6 @@ async function balance(address) {
   return null;
 }
 
-const hexToBytes = (hex) => Uint8Array.from(hex.match(/.{2}/g).map((b) => parseInt(b, 16)));
-
 async function fetchUtxos(address) {
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt) await sleep(800 * attempt);
