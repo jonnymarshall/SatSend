@@ -42,10 +42,13 @@ export async function bulkDelete(ids: string[]) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Only drafts may be deleted (mirrors the DB delete-guard trigger). Non-draft
+  // rows are silently skipped rather than throwing.
   const { error } = await supabase
     .from("invoices")
     .delete()
     .eq("user_id", user!.id)
+    .eq("status", "draft")
     .in("id", ids);
 
   if (error) throw new Error(error.message);

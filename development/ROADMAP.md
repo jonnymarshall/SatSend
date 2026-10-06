@@ -1612,14 +1612,17 @@ every minute from a free external scheduler (GitHub Actions / cron-job.org) with
 **Done when:** an abandoned testnet invoice transitions `pending → payment_detected
 → paid` within minutes via the external scheduler, independent of stage exhaustion.
 
-#### 🔴 v1.4.21-H (S4) — DB defends money state
+#### ✅ v1.4.21-H (S4) — DB defends money state
 **Branch:** `fix/db-money-invariants` · Detail: Appendix A → S4
-One migration: CHECK constraints (amounts ≥ 0, tax 0-100, currency whitelist,
-totals consistent, line_items shape) added `NOT VALID` then validated; an
-immutability trigger on paid/payment_detected rows; a delete-guard trigger for
-non-draft rows; a status guard on `bulkDelete`.
+Migration `0027_money_invariants.sql`: CHECK constraints (amounts >= 0, tax
+percent 0-100, currency USD, totals consistent, line_items shape) added NOT VALID
+then validated; a trigger freezing a paid / mid-payment invoice's money and payment
+fields; a delete-guard trigger allowing only drafts. Code: `bulkDelete` is now
+draft-only to match. Verified on the test database: a paid invoice's total cannot
+be changed, a non-draft cannot be deleted, a negative or inconsistent total is
+rejected, and a benign update on a paid invoice (the detection flow) still works.
 **Done when:** a PATCH to a paid invoice's total is rejected by the DB, non-draft
-deletes are rejected, and negative/inconsistent amounts cannot be written.
+deletes are rejected, and negative/inconsistent amounts cannot be written. ✅
 
 > **END OF PHASE 0 = safe for mainnet.** A first **controlled real-bitcoin smoke
 > test (S2.3)** runs earlier, right after S2.2, on a deliberately tiny amount — so
