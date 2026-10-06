@@ -125,16 +125,11 @@ describe("saveDraft", () => {
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
-  it("proceeds when mempool.space is unreachable — fail-open (v1.4.12 hotfix)", async () => {
+  it("refuses when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
     const { insertSingle } = makeSupabase();
     vi.mocked(addressHasHistory).mockResolvedValueOnce(null);
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await saveDraft(VALID_DRAFT);
-    expect(insertSingle).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/mempool.*unreachable|address history check skipped/i),
-    );
-    warnSpy.mockRestore();
+    await expect(saveDraft(VALID_DRAFT)).rejects.toThrow(/couldn't verify this address is unused/i);
+    expect(insertSingle).not.toHaveBeenCalled();
   });
 
   it("skips the freshness check when btc_address is absent (no address to check)", async () => {
@@ -348,16 +343,11 @@ describe("publishInvoice (publish-only, no email)", () => {
     expect(updateChain).toHaveBeenCalled();
   });
 
-  it("proceeds when mempool.space is unreachable — fail-open (v1.4.12)", async () => {
+  it("refuses when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(null);
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await publishInvoice("inv-1");
-    expect(updateChain).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/mempool.*unreachable|address history check skipped/i),
-    );
-    warnSpy.mockRestore();
+    await expect(publishInvoice("inv-1")).rejects.toThrow(/couldn't verify this address is unused/i);
+    expect(updateChain).not.toHaveBeenCalled();
   });
 
   it("initialises background-polling columns (published_at set, next_check_at = +15s, stage_attempt = 0, mempool_seen_at = null) alongside the status change", async () => {

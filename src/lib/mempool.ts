@@ -20,14 +20,21 @@ export function txPaysToAddress(tx: MempoolTx, address: string): boolean {
   return tx.vout.some((o) => o.scriptpubkey_address === address);
 }
 
-export async function fetchAddressTxs(address: string): Promise<MempoolTx[]> {
+// Returns `null` when mempool.space could not be reached (network failure,
+// timeout, or a non-OK response) — distinct from `[]`, which means "reached the
+// API, this address has no transactions". Callers must not treat an outage as
+// "nothing paid yet": doing so burns the invoice's polling schedule during an
+// outage and can prematurely stop watching it. (v1.4.22-H / M-MONEY-2)
+export async function fetchAddressTxs(address: string): Promise<MempoolTx[] | null> {
   const base = getMempoolBaseUrl();
   try {
-    const res = await fetch(`${base}/api/address/${address}/txs`);
-    if (!res.ok) return [];
+    const res = await fetch(`${base}/api/address/${address}/txs`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
     return await res.json();
   } catch {
-    return [];
+    return null;
   }
 }
 

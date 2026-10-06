@@ -30,6 +30,7 @@ const NO_VERDICT = {
   btcPriceAtDetection: null,
   amountReceivedFiat: null,
   overpaid: false,
+  revertToPending: false,
 };
 
 // Time-based scheduling (v1.4.28-H / S3): the next check is the first cumulative
@@ -466,5 +467,95 @@ describe("decidePaymentSchedule — amount verification", () => {
     expect(decision.newMempoolSeenAt).toBe(NOW.toISOString());
     expect(decision.detectedTxid).toBe("tx-shallow-first-seen");
     expect(decision.amountReceivedSats).toBeNull();
+  });
+});
+
+describe("decidePaymentSchedule — transaction selection (M-MONEY-3)", () => {
+  it("prefers a confirmed payment over an unconfirmed dust tx, even when the dust is listed first", () => {
+    const dust = unconfirmedTx("tx-dust", "bc1qaddr", 1_000);
+    const real = confirmedTx("tx-real", "bc1qaddr");
+    const decision = decidePaymentSchedule(
+      {
+        status: "pending",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: null,
+        published_at: NOW.toISOString(),
+        stage_attempt: 0,
+        total_fiat: TOTAL_FIAT,
+      },
+      [dust, real],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.detectedTxid).toBe("tx-real");
+  });
+
+  it("prefers the amount-matching payment when two unconfirmed txs both pay", () => {
+    const small = unconfirmedTx("tx-small", "bc1qaddr", 1_000);
+    const right = unconfirmedTx("tx-right", "bc1qaddr", 50_000);
+    const decision = decidePaymentSchedule(
+      {
+        status: "pending",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: null,
+        published_at: NOW.toISOString(),
+        stage_attempt: 0,
+        total_fiat: TOTAL_FIAT,
+      },
+      [small, right],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newStatus).toBe("payment_detected");
+    expect(decision.detectedTxid).toBe("tx-right");
+  });
+});
+
+describe("decidePaymentSchedule — vanished payment revert (M-MONEY-4)", () => {
+  it("reverts to pending once a seen payment has been gone longer than the bound", () => {
+    const seen = new Date(NOW.getTime() - 2 * 60 * 60_000); // 2h ago
+    const decision = decidePaymentSchedule(
+      {
+        status: "payment_detected",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: seen.toISOString(),
+        published_at: new Date(NOW.getTime() - 3 * 60 * 60_000).toISOString(),
+        stage_attempt: 4,
+        total_fiat: TOTAL_FIAT,
+      },
+      [],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newStatus).toBe("pending");
+    expect(decision.newMempoolSeenAt).toBeNull();
+    expect(decision.newStageAttempt).toBe(0);
+    expect(decision.revertToPending).toBe(true);
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 15_000).toISOString());
+  });
+
+  it("keeps watching (no revert) within the bound", () => {
+    const seen = new Date(NOW.getTime() - 30 * 60_000); // 30m ago
+    const decision = decidePaymentSchedule(
+      {
+        status: "payment_detected",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: seen.toISOString(),
+        published_at: seen.toISOString(),
+        stage_attempt: 1,
+        total_fiat: TOTAL_FIAT,
+      },
+      [],
+      NOW,
+      PRICE_FINALIZED
+    );
+
+    expect(decision.newStatus).toBe("payment_detected");
+    expect(decision.revertToPending).toBe(false);
+    expect(decision.newNextCheckAt).not.toBeNull();
   });
 });

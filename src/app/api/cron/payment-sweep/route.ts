@@ -102,6 +102,14 @@ export async function GET(request: NextRequest) {
     for (const inv of invoices) {
       try {
         const txs = await fetchAddressTxs(inv.btc_address);
+        if (txs === null) {
+          // mempool.space was unreachable — NOT the same as "no payment yet".
+          // Skip this invoice without touching its schedule, so an outage does
+          // not burn an attempt or stop the watch. (v1.4.22-H / M-MONEY-2)
+          errors += 1;
+          console.warn("[cron/payment-sweep] mempool unreachable, deferring", inv.id);
+          continue;
+        }
 
         let btcPrice: number | null = null;
         try {
@@ -137,16 +145,31 @@ export async function GET(request: NextRequest) {
         if (decision.detectedTxid) {
           update.btc_txid = decision.detectedTxid;
         }
+        if (decision.revertToPending) {
+          // The previously-seen payment vanished. Clear the stale txid and
+          // re-anchor the time-based schedule so the fresh pre-mempool watch
+          // starts from now rather than an old published_at. (M-MONEY-4)
+          update.btc_txid = null;
+          update.published_at = now.toISOString();
+        }
 
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from("invoices")
           .update(update)
           .eq("id", inv.id)
-          .eq("status", inv.status);
+          .eq("status", inv.status)
+          .select("id");
 
         if (updateError) {
           errors += 1;
           console.error("[cron/payment-sweep] update failed", inv.id, updateError);
+          continue;
+        }
+
+        if (!updatedRows || updatedRows.length === 0) {
+          // The optimistic-concurrency filter matched nothing: another writer
+          // (the payer's fast-path route) already moved this row on. Skip the
+          // email side effects so we don't double-send. (v1.4.22-H / M-DB-1)
           continue;
         }
 

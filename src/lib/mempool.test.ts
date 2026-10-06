@@ -50,19 +50,27 @@ describe("fetchAddressTxs", () => {
     );
     await fetchAddressTxs("tb1qtarget");
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("/api/address/tb1qtarget/txs")
+      expect.stringContaining("/api/address/tb1qtarget/txs"),
+      expect.anything() // AbortSignal.timeout
     );
   });
 
-  it("returns empty array on non-ok response", async () => {
+  it("returns null on non-ok response (outage, not an empty address)", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("not found", { status: 404 })
     );
-    expect(await fetchAddressTxs("tb1qtarget")).toEqual([]);
+    expect(await fetchAddressTxs("tb1qtarget")).toBeNull();
   });
 
-  it("returns empty array when fetch throws (network failure)", async () => {
+  it("returns null when fetch throws (network failure)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await fetchAddressTxs("tb1qtarget")).toBeNull();
+  });
+
+  it("returns [] when the API responds OK with no transactions", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    );
     expect(await fetchAddressTxs("tb1qtarget")).toEqual([]);
   });
 });

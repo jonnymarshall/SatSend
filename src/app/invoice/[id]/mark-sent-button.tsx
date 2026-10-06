@@ -151,6 +151,7 @@ function PollingSession({ invoiceId, btcAddress, onTimedOut, onStatusChange }: S
       activeTimeout = setTimeout(async () => {
         const txs = await fetchAddressTxs(btcAddress);
         if (cancelled) return;
+        if (txs === null) { schedule(); return; }
         const hit = txs.find((tx) => txPaysToAddress(tx, btcAddress));
         if (hit) {
           const res = await fetch(`/api/invoices/${invoiceId}/payment-status`, {

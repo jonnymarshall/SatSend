@@ -87,7 +87,10 @@ function makeSelectBuilder(rows: unknown[]) {
   return { builder, calls };
 }
 
-function makeUpdateBuilder(result: { error: unknown } = { error: null }) {
+function makeUpdateBuilder(
+  result: { error: unknown } = { error: null },
+  data: unknown[] = [{ id: "inv-1" }],
+) {
   const calls: Array<{ payload: unknown; filters: Array<{ method: string; args: unknown[] }> }> = [];
   const factory = vi.fn((payload: unknown) => {
     const filters: Array<{ method: string; args: unknown[] }> = [];
@@ -98,9 +101,10 @@ function makeUpdateBuilder(result: { error: unknown } = { error: null }) {
         return chainable;
       });
     chainable.eq = chain("eq");
+    chainable.select = chain("select");
     chainable.then = (onFulfilled: (v: unknown) => unknown) => {
       calls.push({ payload, filters });
-      return Promise.resolve(result).then(onFulfilled);
+      return Promise.resolve({ data, error: result.error }).then(onFulfilled);
     };
     return chainable;
   });
@@ -359,6 +363,33 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     expect(idFilter?.args).toEqual(["id", "inv-1"]);
     expect(statusFilter?.args).toEqual(["status", "pending"]);
   });
+
+  it("does not send an email when the update matches no row (another writer won) (M-DB-1)", async () => {
+    const { builder } = makeSelectBuilder([pending]);
+    const update = makeUpdateBuilder({ error: null }, []);
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+    mockFetchAddressTxs.mockResolvedValue([unconfirmed]);
+    mockGetUserById.mockResolvedValue({ data: { user: { id: "owner-1", email: "owner@example.com" } } });
+
+    const res = await getRequest(authHeaders());
+    const body = await res.json();
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(mockSendDetected).not.toHaveBeenCalled();
+    expect(mockSendConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("skips an invoice without touching its schedule when mempool.space is unreachable (M-MONEY-2)", async () => {
+    const { builder } = makeSelectBuilder([pending]);
+    const update = makeUpdateBuilder();
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+    mockFetchAddressTxs.mockResolvedValue(null);
+
+    const res = await getRequest(authHeaders());
+    const body = await res.json();
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 1, overdueFlips: 0 });
+    expect(update.calls).toHaveLength(0);
+    expect(mockSendDetected).not.toHaveBeenCalled();
+  });
 });
 
 /**
@@ -409,9 +440,10 @@ function makeDualSelectBuilder({
           return chainable;
         });
       chainable.eq = filterChain("eq");
+      chainable.select = filterChain("select");
       chainable.then = (onFulfilled: (v: unknown) => unknown) => {
         updates.push({ payload, filters });
-        return Promise.resolve({ error: null }).then(onFulfilled);
+        return Promise.resolve({ data: [{ id: "matched" }], error: null }).then(onFulfilled);
       };
       return chainable;
     });

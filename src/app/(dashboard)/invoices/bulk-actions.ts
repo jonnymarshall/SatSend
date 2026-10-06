@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 
 export async function bulkArchive(ids: string[]): Promise<{ archived: number; skipped: number }> {
   const supabase = await createClient();
@@ -72,10 +73,23 @@ export async function bulkUnarchive(ids: string[]) {
     return;
   }
 
+  const MONITORABLE = new Set(["pending", "overdue", "payment_detected"]);
   for (const row of rows as { id: string; pre_archive_status: string | null }[]) {
+    const restored = row.pre_archive_status ?? "pending";
+    const patch: Record<string, unknown> = { status: restored, pre_archive_status: null };
+    // Resume monitoring from scratch when restoring to a status the sweep
+    // watches (v1.4.22-H / M-DB-3), so the archived row's stale schedule and
+    // txid don't linger. A restored paid/underpaid row keeps its record.
+    if (MONITORABLE.has(restored)) {
+      patch.published_at = new Date().toISOString();
+      patch.next_check_at = new Date(Date.now() + PRE_MEMPOOL_DELAYS_MS[0]).toISOString();
+      patch.stage_attempt = 0;
+      patch.mempool_seen_at = null;
+      patch.btc_txid = null;
+    }
     const { error } = await supabase
       .from("invoices")
-      .update({ status: row.pre_archive_status ?? "pending", pre_archive_status: null })
+      .update(patch)
       .eq("user_id", user!.id)
       .eq("id", row.id);
     if (error) throw new Error(error.message);

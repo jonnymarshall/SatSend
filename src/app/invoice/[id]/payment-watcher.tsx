@@ -102,6 +102,8 @@ export function PaymentWatcher({
     async function checkRestAndUpdate() {
       const txs = await fetchAddressTxs(btcAddress);
       if (cancelled) return;
+      // mempool.space unreachable — skip this poll; the loop re-arms itself.
+      if (txs === null) return;
 
       const confirmed = txs.find((tx) => tx.status.confirmed && txPaysToAddress(tx, btcAddress));
       const unconfirmed = txs.find((tx) => !tx.status.confirmed && txPaysToAddress(tx, btcAddress));
