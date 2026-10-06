@@ -2,12 +2,9 @@ import { txPaysToAddress, confirmationDepth, type MempoolTx } from "@/lib/mempoo
 
 // Payment polling schedule.
 //
-// v1.4.28-H (S3): the schedule is now TIME-BASED. It used to advance by
-// attempt count (stage_attempt + 1 each tick), which assumed a frequent cron
-// tick. A sparse tick burned the schedule early and long-pending invoices
-// stopped being watched. Now the next check is derived from elapsed wall-clock
-// time against the same delay tables, so a missed or late tick simply lands on
-// the correct boundary instead of consuming a stage.
+// v1.4.28-H (S3): the schedule is TIME-BASED. The next check is derived from
+// elapsed wall-clock time against the delay tables, so a missed or late tick
+// lands on the correct boundary instead of consuming a stage.
 //
 // The anchors:
 //   • pre-mempool  → published_at   (set at publish; see publishStatePatch)
@@ -36,6 +33,12 @@ const POST_MEMPOOL_INTERVALS_MS: readonly number[] = POST_MEMPOOL_STAGES.flatMap
   Array.from({ length: stage.count }, () => stage.intervalMs)
 );
 
+// If a payment was seen but then vanished (replaced via RBF, or evicted from the
+// mempool) and has not reappeared within this window, stop treating the invoice
+// as mid-payment and resume watching for a fresh one. Without this an invoice
+// whose tx disappears sits in `payment_detected` forever. (v1.4.22-H / M-MONEY-4)
+export const REVERT_TO_PENDING_AFTER_MS = 60 * 60_000;
+
 // Coverage is judged in fiat, priced at the moment the payment is confirmed —
 // never at publish time. A price fixed at publish would drift against the
 // invoice's actual fiat total as BTC moves, making "did they pay enough" wrong
@@ -47,7 +50,8 @@ const OVERPAID_COVERAGE = 1.05;
 // is confirmed and which block it landed in — not a live confirmation count,
 // since that's relative to the ever-advancing tip. We require the tip to be
 // at least this many blocks past the tx's block before treating the payment
-// as final, to absorb short reorgs.
+// as final, to absorb short reorgs (a 1-confirmation tx can still be reorged
+// out; two is the pragmatic safety margin).
 export const CONFIRMATION_DEPTH_REQUIRED = 2;
 
 export interface ScheduleInput {
@@ -78,6 +82,10 @@ export interface ScheduleDecision {
   btcPriceAtDetection: number | null;
   amountReceivedFiat: number | null;
   overpaid: boolean;
+  // True when a previously-seen payment has vanished and the invoice should be
+  // put back to a clean `pending` (caller clears btc_txid and re-anchors the
+  // schedule). (v1.4.22-H / M-MONEY-4)
+  revertToPending: boolean;
 }
 
 const NO_VERDICT = {
@@ -85,12 +93,50 @@ const NO_VERDICT = {
   btcPriceAtDetection: null,
   amountReceivedFiat: null,
   overpaid: false,
+  revertToPending: false,
 } as const;
 
 function sumVouts(tx: MempoolTx, address: string): number {
   return tx.vout
     .filter((o) => o.scriptpubkey_address === address)
     .reduce((sum, o) => sum + o.value, 0);
+}
+
+/**
+ * Choose the best paying transaction when several touch the address. mempool.space
+ * returns unconfirmed txs first, so taking the first match can leave an invoice
+ * stuck on a dust payment while a real confirmed one sits behind it. Prefer a
+ * confirmed tx, then the one whose amount is closest to what the invoice asked
+ * for, then the largest. (v1.4.22-H / M-MONEY-3)
+ */
+function pickPayingTx(
+  txs: MempoolTx[],
+  address: string,
+  totalFiat: number,
+  btcPrice: number | null
+): MempoolTx | null {
+  const paying = txs.filter((tx) => txPaysToAddress(tx, address));
+  if (paying.length === 0) return null;
+
+  const expectedSats = btcPrice && btcPrice > 0 ? (totalFiat / btcPrice) * 1e8 : null;
+  const score = (tx: MempoolTx) => {
+    const received = sumVouts(tx, address);
+    return {
+      confirmed: tx.status.confirmed && tx.status.block_height !== undefined,
+      // With no price, fall back to "largest wins" (a smaller delta the larger
+      // the amount). Otherwise the closest to the expected amount wins.
+      amountDelta: expectedSats === null ? -received : Math.abs(received - expectedSats),
+      received,
+    };
+  };
+
+  return paying.slice().sort((a, b) => {
+    const sa = score(a);
+    const sb = score(b);
+    if (sa.confirmed !== sb.confirmed) return sa.confirmed ? -1 : 1;
+    if (sa.amountDelta !== sb.amountDelta) return sa.amountDelta - sb.amountDelta;
+    return sb.received - sa.received;
+  })[0];
 }
 
 /**
@@ -118,7 +164,7 @@ export function decidePaymentSchedule(
   now: Date,
   price: PriceContext
 ): ScheduleDecision {
-  const paying = txs.find((tx) => txPaysToAddress(tx, input.btc_address));
+  const paying = pickPayingTx(txs, input.btc_address, input.total_fiat, price.btcPrice);
 
   if (paying) {
     const depth = confirmationDepth(price.tipHeight, paying.status.block_height);
@@ -142,6 +188,7 @@ export function decidePaymentSchedule(
         btcPriceAtDetection: price.btcPrice,
         amountReceivedFiat: receivedFiat,
         overpaid: coverage > OVERPAID_COVERAGE,
+        revertToPending: false,
       };
     }
 
@@ -207,13 +254,29 @@ export function decidePaymentSchedule(
     };
   }
 
-  // A tx was seen earlier but is absent this poll (dropped/reorged). Keep the
-  // post-mempool cadence running from the original sighting.
+  // A tx was seen earlier but is absent this poll (dropped or reorged).
   const seenAt = new Date(input.mempool_seen_at);
-  const boundary = nextBoundaryAfterMs(
-    POST_MEMPOOL_INTERVALS_MS,
-    now.getTime() - seenAt.getTime()
-  );
+  const elapsed = now.getTime() - seenAt.getTime();
+
+  if (elapsed > REVERT_TO_PENDING_AFTER_MS) {
+    // It has not come back within the bound: the payment is gone. Return the
+    // invoice to a clean pending state and restart the pre-mempool watch. The
+    // caller clears btc_txid and re-anchors published_at. (M-MONEY-4)
+    return {
+      newStatus: "pending",
+      newMempoolSeenAt: null,
+      newStageAttempt: 0,
+      newNextCheckAt: addIso(now, PRE_MEMPOOL_DELAYS_MS[0]),
+      detectedTxid: null,
+      amountReceivedSats: null,
+      btcPriceAtDetection: null,
+      amountReceivedFiat: null,
+      overpaid: false,
+      revertToPending: true,
+    };
+  }
+
+  const boundary = nextBoundaryAfterMs(POST_MEMPOOL_INTERVALS_MS, elapsed);
   return {
     newStatus: "payment_detected",
     newMempoolSeenAt: input.mempool_seen_at,

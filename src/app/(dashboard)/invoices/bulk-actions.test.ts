@@ -184,18 +184,32 @@ describe("bulkUnarchive", () => {
       },
     });
     await bulkUnarchive(["inv-1", "inv-2"]);
-    expect(updatePayloads).toEqual([
-      { status: "paid", pre_archive_status: null },
-      { status: "overdue", pre_archive_status: null },
-    ]);
+    // A restored paid row keeps its record; a restored monitorable row gets a
+    // fresh schedule (v1.4.22-H / M-DB-3).
+    expect(updatePayloads[0]).toEqual({ status: "paid", pre_archive_status: null });
+    expect(updatePayloads[1]).toMatchObject({
+      status: "overdue",
+      pre_archive_status: null,
+      stage_attempt: 0,
+      mempool_seen_at: null,
+      btc_txid: null,
+    });
+    expect(updatePayloads[1].published_at).toEqual(expect.any(String));
+    expect(updatePayloads[1].next_check_at).toEqual(expect.any(String));
   });
 
-  it("falls back to 'pending' when pre_archive_status is null (legacy rows)", async () => {
+  it("falls back to 'pending' when pre_archive_status is null (legacy rows) and resets the schedule", async () => {
     const { updatePayloads } = makeSupabase({
       selectResult: { data: [{ id: "inv-1", pre_archive_status: null }], error: null },
     });
     await bulkUnarchive(["inv-1"]);
-    expect(updatePayloads).toEqual([{ status: "pending", pre_archive_status: null }]);
+    expect(updatePayloads[0]).toMatchObject({
+      status: "pending",
+      pre_archive_status: null,
+      stage_attempt: 0,
+      mempool_seen_at: null,
+      btc_txid: null,
+    });
   });
 
   it("only unarchives rows whose status is currently 'archived'", async () => {

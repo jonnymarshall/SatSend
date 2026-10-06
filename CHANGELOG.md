@@ -54,6 +54,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.22-H — Detection robustness (server side).** Seven ways background
+  payment detection could be fooled, fixed: the sweep now checks that its "only
+  if still status X" update actually matched a row before sending an email (no
+  duplicate detected/confirmed emails when the payer's page moved the invoice
+  first); `fetchAddressTxs` returns `null` on a mempool.space failure (distinct
+  from `[]` = "no payment yet") and has a 10s timeout, so an outage no longer
+  burns an invoice's polling schedule; the scheduler prefers a confirmed payment
+  over an unconfirmed dust one, then the amount-matching tx; `markUnpaid` and
+  `bulkUnarchive` reset the polling fields (and clear the stale txid/amounts) so
+  monitoring resumes; the address-freshness check now **fails closed** when
+  mempool.space is unreachable (was: allowed publish, so an address with prior
+  history could let an old tx flip the new invoice to paid); and a seen payment
+  that vanishes (RBF/eviction) reverts the invoice to pending after an hour
+  instead of sticking in `payment_detected` forever. The browser WebSocket
+  reconnect (the client half) is split into its own branch.
 - **v1.4.19-H (S0) — Green the build.** `actions.test.ts` froze test time
   (`vi.useFakeTimers().setSystemTime`) so the `PUBLISHABLE_INVOICE` fixture's
   `due_date: "2026-07-10"` fixture is future-dated again relative to the test

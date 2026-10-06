@@ -20,8 +20,13 @@ async function assertAddressFreshness(address: string, contextId?: string): Prom
     );
   }
   if (hasHistory === null) {
-    const ref = contextId ? ` for invoice ${contextId}` : "";
-    console.warn(`[publish] mempool.space unreachable, address history check skipped${ref}`);
+    // Fail closed (v1.4.22-H / M-MONEY-5): we could not confirm the address is
+    // unused. An address with prior history would let its old transaction flip
+    // this brand-new invoice straight to paid, so refuse rather than guess.
+    const ref = contextId ? ` (invoice ${contextId})` : "";
+    throw new Error(
+      `btc_address: Couldn't verify this address is unused right now${ref} — the network check failed. Please try again in a moment.`,
+    );
   }
 }
 
@@ -420,7 +425,21 @@ export async function markUnpaid(invoiceId: string) {
 
   const { error } = await supabase
     .from("invoices")
-    .update({ status: "pending" })
+    .update({
+      status: "pending",
+      // Resume monitoring from scratch (v1.4.22-H / M-DB-3): re-anchor the
+      // time-based schedule, clear the stale txid and detection amounts so the
+      // next sweep starts clean instead of reading a vanished payment.
+      published_at: new Date().toISOString(),
+      next_check_at: new Date(Date.now() + PRE_MEMPOOL_DELAYS_MS[0]).toISOString(),
+      stage_attempt: 0,
+      mempool_seen_at: null,
+      btc_txid: null,
+      amount_received_sats: null,
+      btc_price_at_detection: null,
+      amount_received_fiat: null,
+      overpaid: false,
+    })
     .eq("id", invoiceId);
 
   if (error) throw new Error(error.message);

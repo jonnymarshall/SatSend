@@ -1636,19 +1636,16 @@ deletes are rejected, and negative/inconsistent amounts cannot be written. ✅
 
 Each is one branch. Detail for all of these: Appendix A → Phase 1.
 
-- 🔴 **v1.4.22-H — Detection robustness** (`v1.4.22-H/detection-robustness`): cron
-  CAS checks `.select("id")` before sending email (no duplicate emails); `markUnpaid`
-  / `bulkUnarchive` reset the schedule columns + clear `btc_txid`; give the cron
-  a way to tell "mempool.space is down" apart from "no tx yet" so an outage
-  doesn't burn a `stage_attempt`, plus `AbortSignal.timeout` (the client-side half
-  of this — `fetchAddressTxs` crashing `payment-watcher.tsx`'s poll loop — was
-  already fixed 2026-07-27, see Appendix B → M-MONEY-2);
-  scheduler picks the confirmed tx over an unconfirmed dust tx; freshness check
-  fails closed; the mempool.space client WebSocket in `payment-watcher.tsx` never
-  reconnects after a close/error, so the fastest detection path silently dies for
-  the rest of the page load (confirmed 2026-09-28, see Appendix B
-  → M-MONEY-2) — add bounded reconnect/backoff; and the M-MONEY-4 remainder
-  (bounded revert-to-pending when a previously-seen tx disappears via RBF/eviction).
+- ✅ **v1.4.22-H — Detection robustness (server side)** (`v1.4.22-H/detection-robustness`):
+  shipped — cron CAS checks `.select("id")` before sending email (no duplicate
+  emails); `markUnpaid`/`bulkUnarchive` reset the schedule columns + clear
+  `btc_txid`; `fetchAddressTxs` returns `null` on failure (outage ≠ "no tx") with
+  `AbortSignal.timeout`, and the sweep skips without burning an attempt; the
+  scheduler prefers a confirmed / amount-matching tx; the freshness check fails
+  closed; bounded (1h) revert-to-pending when a seen tx vanishes (M-MONEY-4
+  remainder). **Split out:** the `payment-watcher.tsx` mempool.space WebSocket
+  reconnect (the fastest-path client socket) is now its own branch,
+  `v1.4.22-H/ws-reconnect`.
 - 🔴 **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`):
   `pre_archive_status` → enum + CHECK; enumerate the summary view's columns;
   `user_id` index + wrapped `auth.uid()`; webhook dedupe `23505`-only + retention;
@@ -2442,7 +2439,7 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ## Pre-deployment Checklist
 
-Project is not yet linked to Vercel. Before first deployment, run `vercel link` and mirror all `.env` values into Vercel project env vars (Production, Preview, Development):
+The Vercel project `satsendofficial` is linked and deployed. Use this checklist to keep all `.env` values mirrored into Vercel project env vars (Production, Preview, Development) and to verify deploy-time settings stay in sync. Re-check it whenever a new env var is introduced or an existing one changes.
 
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -2454,6 +2451,7 @@ Project is not yet linked to Vercel. Before first deployment, run `vercel link` 
 - [ ] **Sender identity unified (v1.4.4)** — set `EMAIL_FROM="SatSend <team@mail.satsend.me>"` in `.env` and in Vercel project env vars (Production, Preview, Development). Confirm the Supabase custom SMTP "Sender" address (dashboard → Project Settings → Auth → SMTP Settings → Sender) is set to the same `team@mail.satsend.me` so transactional mail and auth mail share a single `From:` identity.
 - [x] **Supabase custom SMTP → Resend** — configured 2026-04-24 in Supabase dashboard (Project Settings → Auth → SMTP Settings) pointing at `smtp.resend.com:465` with the `RESEND_API_KEY` as the password and a sender on the verified `mail.satsend.me` domain. This routes all Supabase auth emails (magic link, signup confirmation, password reset) through Resend and bypasses Supabase's default ~4/hour rate limit. Project-level setting — applies to both local dev and production automatically.
 - [ ] Any other secrets present in `.env` at deploy time
+- [ ] **Vercel env vars flagged `readable-secret` (review when convenient, not urgent)** — as of 2026-10-06 four vars are stored as *encrypted* rather than *sensitive*, so anyone with access to the Vercel project can reveal their values. Vercel surfaces this under "Needs Attention" with reason `readable-secret`. Affected (all on Production + Preview): `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CRON_SECRET`, `RESEND_WEBHOOK_SECRET`. This is a least-privilege cleanup, not a breach indicator. Fix when it suits the build: re-save each as **Sensitive** (CLI: `vercel env update <NAME> --sensitive`), optionally rotating at the source first (Supabase / Resend dashboards; a new random value for `CRON_SECRET`) since the values have been readable. Blast radius if leaked, highest first: `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS, full DB read/write), `RESEND_API_KEY` (send mail as us), `CRON_SECRET` (can trigger the payment sweep), `RESEND_WEBHOOK_SECRET` (forge Resend webhook events). Caveat: Sensitive vars cannot be read back (not in the dashboard, not via `vercel env pull`), so `.env.local` stays the source of truth for local dev.
 
 ---
 
