@@ -168,6 +168,19 @@ describe("saveDraft", () => {
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
+  it("rejects more than 100 line items (v1.4.25-H cap)", async () => {
+    const { insertSingle } = makeSupabase();
+    const items = Array.from({ length: 101 }, (_, i) => ({
+      description: `Item ${i}`,
+      quantity: 1,
+      unit_price: 1,
+    }));
+    await expect(
+      saveDraft({ ...VALID_DRAFT, line_items: items }),
+    ).rejects.toThrow(/line_items.*100/i);
+    expect(insertSingle).not.toHaveBeenCalled();
+  });
+
   it("accepts invoice_number of exactly 30 characters (v1.4.16 boundary)", async () => {
     const { insertSingle } = makeSupabase();
     await saveDraft({ ...VALID_DRAFT, invoice_number: "X".repeat(30) });
@@ -712,5 +725,21 @@ describe("duplicateInvoice", () => {
       fetchData: { ...SOURCE_INVOICE, user_id: "someone-else" },
     });
     await expect(duplicateInvoice("inv-src")).rejects.toThrow(/not found/i);
+  });
+
+  it("refuses to duplicate a source with more than 100 line items (v1.4.25-H cap)", async () => {
+    const { insertChain } = makeSupabase({
+      fetchData: {
+        ...SOURCE_INVOICE,
+        line_items: Array.from({ length: 101 }, (_, i) => ({
+          description: `Item ${i}`,
+          quantity: 1,
+          unit_price: 1,
+        })),
+      },
+      insertData: { id: "inv-new" },
+    });
+    await expect(duplicateInvoice("inv-src")).rejects.toThrow(/line_items.*100/i);
+    expect(insertChain).not.toHaveBeenCalled();
   });
 });

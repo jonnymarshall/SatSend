@@ -85,6 +85,15 @@ export interface InvoicePayload {
 // that bypasses the form (devtools paste, programmatic call, future API).
 const INVOICE_NUMBER_MAX_LENGTH = 30;
 
+// v1.4.25-H: cap the line-item count. PDF rendering is CPU-heavy, so an
+// unbounded array is a cheap DoS; 100 is far beyond any real invoice.
+const MAX_LINE_ITEMS = 100;
+function assertLineItemsLength(items: LineItem[] | undefined): void {
+  if ((items?.length ?? 0) > MAX_LINE_ITEMS) {
+    throw new Error(`line_items: An invoice can have at most ${MAX_LINE_ITEMS} line items.`);
+  }
+}
+
 function assertInvoiceNumberLength(invoiceNumber: string | null | undefined): void {
   if (invoiceNumber && invoiceNumber.length > INVOICE_NUMBER_MAX_LENGTH) {
     throw new Error(
@@ -119,6 +128,7 @@ export async function saveDraft(payload: InvoicePayload) {
   const { data: { user } } = await supabase.auth.getUser();
 
   assertInvoiceNumberLength(payload.invoice_number);
+  assertLineItemsLength(payload.line_items);
 
   // v1.4.14: bitcoin-only — validation is gated on address presence alone.
   if (payload.btc_address) {
@@ -167,6 +177,7 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
   const { data: { user } } = await supabase.auth.getUser();
 
   assertInvoiceNumberLength(payload.invoice_number);
+  assertLineItemsLength(payload.line_items);
 
   const { data: existing } = await supabase
     .from("invoices")
@@ -475,6 +486,11 @@ export async function duplicateInvoice(invoiceId: string) {
     .single();
 
   if (!source || source.user_id !== user!.id) throw new Error("Invoice not found");
+
+  // v1.4.25-H: the duplicate copies the source's line items, so it must run the
+  // same cap (a pre-existing oversized invoice must not be duplicated into a new
+  // oversized one).
+  assertLineItemsLength(source.line_items as LineItem[]);
 
   // Fetch the numbers this user already has so the duplicate gets a free suffix
   // (v1.4.23-H: the old fixed suffix collided when copying a copy).

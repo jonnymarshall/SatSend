@@ -87,6 +87,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.25-H — Public-endpoint hardening.** The public PDF route ignored the
+  access code, so anyone with an invoice link could download the full invoice;
+  it now checks the code and returns 404 when it fails. The access cookie's scope
+  was widened from `/invoice/<id>` to `/`, which also fixes a live bug: the
+  payer's fast-detection route (`/api/invoices/[id]/payment-status`) reads the
+  same cookie and was silently 404ing for access-protected invoices, so their
+  live detection only worked via the cron. The cookie also gains `secure` in
+  production. `btc-price` now rejects any currency other than USD with a 400. The
+  cron secret is compared in constant time, and line items are capped at 100. The
+  public PDF is cached by version (ETag / 304).
 - **v1.4.23-H — RLS & indexes (code half).** Three correctness fixes. The Resend
   webhook now treats only Postgres `23505` as a duplicate — any other dedupe-insert
   error returns 500 instead of a silent 200, so Svix retries and the event is not

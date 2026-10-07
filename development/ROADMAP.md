@@ -1696,10 +1696,12 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   frame-ancestors/object-src/base-uri only). The stricter nonce-based CSP is
   deferred: it forces dynamic rendering, and a wrong `connect-src` would silently
   kill the live mempool/Supabase sockets.
-- 🔴 **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
-  access-code check on the public PDF route; cap `line_items` length + cache PDF;
-  `btc-price` currency allowlist; `timingSafeEqual` for `CRON_SECRET`; `secure`
-  cookie flag.
+- ✅ **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
+  shipped — the public PDF route now enforces the access code (404 on failure);
+  the access cookie's path widened to `/` (which also fixed the payer fast-path
+  silently 404ing on access-protected invoices) and gained `secure` in prod;
+  `btc-price` rejects non-USD with 400; the cron secret is compared in constant
+  time; line items capped at 100; the public PDF is cached by version (ETag/304).
 - 🔴 **v1.4.26-H — Rate limiting & abuse** (`v1.4.26-H/rate-limiting`): Vercel WAF
   rate-limit rules on access-code verify / email send / PDF route; server-side
   `client_email` validation; per-user daily send cap; minimum access-code length +
