@@ -1759,11 +1759,16 @@ Each is one branch. Detail: Appendix A → Phase 2.
   (intrinsic to global uniqueness; rate limiting is the mitigation, v1.4.26.1-H) —
   it makes the pre-check correct and the error timely. **Split out:** the
   integration test harness → v1.4.31.1-H.
-- 🔴 **v1.4.31.1-H — Integration test layer** (`v1.4.31.1-H/supabase-integration`):
-  deferred from v1.4.31-H (M-FE-1, H-FE). Stand up the promised suite against the
-  real (test-only) Supabase, starting with address uniqueness and status
-  transitions. Local-only first (CI wiring needs test-DB secrets + isolation).
-  Never prod; never set `PAYMENT_SWEEP_ENABLED` in test env (one writer per DB).
+- ✅ **v1.4.31.1-H — Integration test layer (first suite)** (`v1.4.31.1-H/supabase-integration`):
+  shipped `test-automation/rls-integration.mjs` (`npm run test:rls`) — local-only,
+  runs against the real test Supabase with real user JWTs, and is guarded (skips
+  without an anon key; aborts on a production URL or `PAYMENT_SWEEP_ENABLED`).
+  Proves what mocks cannot: anon EXECUTE is denied, the RPC returns a bare
+  boolean, the cross-tenant backstop fires, and RLS hides one tenant's invoice
+  from another. **It found a real bug**: Supabase's default privileges re-grant
+  EXECUTE to `anon` on new functions, so 0030's `revoke … from public` had not
+  taken — fixed by 0031 (test and prod). Follow-ups: CI wiring, more suites
+  (status transitions), M-FE-1's shared fake.
 
 ### Roadmap & docs housekeeping (do alongside Phase 0)
 
