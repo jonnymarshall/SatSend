@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.30-H — Realtime unification.** The dashboard and payer-page Realtime
+  hooks were near-duplicates; both are now thin wrappers over one
+  `useInvoiceChannel` (with `auth` and subscription style as explicit parameters),
+  and it reconnects with bounded backoff on channel error/timeout/close instead of
+  staying dead until reload. The colour-source work is split to v1.4.30.1-H: the
+  `brand-colors.ts` hex values and the `globals.css` `.dark` tokens are not in
+  lockstep today.
 - **v1.4.29-H — Zod + typed action results.** Server actions used to throw
   field-validation errors as strings, which Next masks in production, so users
   only ever saw a generic message. Actions now RETURN `{ ok, field, message }`
