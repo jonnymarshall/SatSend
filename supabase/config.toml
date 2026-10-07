@@ -1,4 +1,4 @@
-project_id = "hvkcdezablbqgahvumao"  # Replace with your project ref (e.g. "abcdefghijklmnop") — find it at supabase.com/dashboard → project settings → general
+project_id = "hfqjxuosyxbkkvghanzw"  # SatSend-dev (test). The repo default is the test project; pushing to production requires a deliberate relink, never the default state.
 
 [db]
 port = 5432
