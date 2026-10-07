@@ -25,8 +25,13 @@ export async function verifyAccessCode(
   cookieStore.set(accessCookieName(invoiceId), submitted ?? "", {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 7,
-    path: `/invoice/${invoiceId}`,
+    // Path "/" (not "/invoice/<id>") so the same cookie also reaches the
+    // invoice's API routes (the public PDF and the payer fast-path), which live
+    // under /api/. The cookie name is per-invoice, so unlocking one invoice
+    // cannot unlock another. (v1.4.25-H / H-SEC-1)
+    path: "/",
   });
 
   redirect(`/invoice/${invoiceId}`);

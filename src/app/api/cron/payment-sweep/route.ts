@@ -20,6 +20,7 @@ import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
+import { timingSafeStringEqual } from "@/lib/timing-safe";
 
 // Hobby allows up to 60s for a Node function. The loop below drains the due
 // queue within this budget.
@@ -51,8 +52,9 @@ interface InvoiceRow {
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  const header = request.headers.get("authorization");
-  if (!secret || header !== `Bearer ${secret}`) {
+  const header = request.headers.get("authorization") ?? "";
+  // Constant-time compare (v1.4.25-H): a plain !== leaks length/prefix timing.
+  if (!secret || !timingSafeStringEqual(header, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
