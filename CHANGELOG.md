@@ -57,6 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `(user_id, invoice_number)` unique index — production already has 8 duplicate
   groups, so it would fail the migration; tracked as v1.4.23.1-H with an audit
   listing in `development/invoice-number-duplicates-audit.md`.
+- **v1.4.24-H — Proxy & boundaries.** The auth proxy exported `proxyConfig`, which
+  Next ignores, so its matcher was dead code and it ran on every request including
+  static assets; it now exports `config`. It also validates the session with
+  `getUser` instead of trusting the cookie via `getSession`. Added root `error.tsx`
+  and `not-found.tsx` plus dashboard and invoice `loading.tsx`, and browser safety
+  headers in `next.config.ts` (`X-Frame-Options: DENY`, `X-Content-Type-Options`,
+  `Referrer-Policy`, HSTS, and a minimal CSP). The CSP is deliberately limited to
+  `frame-ancestors`/`object-src`/`base-uri`: a broader policy would have to
+  whitelist the live mempool.space and Supabase Realtime WebSockets, and a wrong
+  `connect-src` would silently stop live payment updates. The stricter CSP is
+  deferred to its own item.
 - Flipped stale `🔄` markers on v1.4.14.1/.2/.3 to `✅` (merged in PRs #31-33).
 - Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
   hardening-train equivalents (v1.4.19-H / v1.4.28-H).

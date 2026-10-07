@@ -34,11 +34,13 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // v1.4.24-H (M-FE-4): getUser() revalidates the token with Supabase instead of
+  // trusting the cookie, so a spoofed cookie can't satisfy the redirect check.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session && isProtected(request.nextUrl.pathname)) {
+  if (!user && isProtected(request.nextUrl.pathname)) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl, 307);
   }
@@ -46,7 +48,10 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-export const proxyConfig = {
+// v1.4.24-H (H-FE-2): Next reads `config`, not `proxyConfig`. The old name was
+// silently ignored, so the matcher never applied and the proxy ran on every
+// request including static assets.
+export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

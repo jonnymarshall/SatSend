@@ -11,6 +11,22 @@
 > below. Open Appendix A when you start a specific hardening item, for its exact
 > steps.
 
+## Product
+
+**SatSend** is Bitcoin-enabled invoicing for freelancers and small businesses.
+
+- **Problem:** freelancers who want to accept Bitcoin have no simple way to make a proper fiat-denominated invoice, and crypto payment tools don't produce real invoices. The client shouldn't need deep crypto knowledge either.
+- **Who it's for:** solo freelancers and small businesses.
+- **The core loop:** create a fiat invoice, share a link and access code, the client pays via a BTC QR code, and the system detects the payment automatically through mempool.space and notifies both sides.
+- **Monetisation:** a free tier and a paid tier (Pro). Invoicing is unlimited on both; Pro is feature-gated, not volume-gated. Full plan in the v2 section.
+- **Principles / non-negotiables:**
+  - Bitcoin-first. No fiat billing rails (the operator is a foreign LLC with no business bank account).
+  - The platform never holds user funds. Invoice addresses are fresh and user-controlled, and the platform never takes a user xpub. Single exception: the platform billing xpub for premium payments.
+  - The core loop (create, pay, get told) stays free forever.
+  - Dark-first brand.
+
+**This roadmap is the single source of truth** for what to build and why, per feature. `README.md` documents the payment-detection architecture. The original MVP PRD is archived at `development/archive/PRD.md`.
+
 ## Status Legend
 
 | Emoji | Meaning |
@@ -1671,9 +1687,15 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   `(user_id, invoice_number) where invoice_number is not null` plus a
   `check (invoice_number <> '')`, and a friendly `23505` message on the create /
   publish path.
-- 🔴 **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`):
-  `proxyConfig` → `config`; add `error.tsx` / `not-found.tsx` / `loading.tsx`;
-  proxy `getSession` → `getUser`; security headers in `next.config.ts`.
+- ✅ **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
+  the proxy now exports `config` (Next reads it, so the matcher finally applies and
+  the proxy stops running on static assets) and validates the token with `getUser`
+  instead of trusting the cookie; added root `error.tsx` + `not-found.tsx` and
+  dashboard/invoice `loading.tsx`; added security headers in `next.config.ts`
+  (`X-Frame-Options: DENY`, nosniff, referrer, HSTS, and a minimal CSP of
+  frame-ancestors/object-src/base-uri only). The stricter nonce-based CSP is
+  deferred: it forces dynamic rendering, and a wrong `connect-src` would silently
+  kill the live mempool/Supabase sockets.
 - 🔴 **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
   access-code check on the public PDF route; cap `line_items` length + cache PDF;
   `btc-price` currency allowlist; `timingSafeEqual` for `CRON_SECRET`; `secure`
@@ -1707,7 +1729,8 @@ Each is one branch. Detail: Appendix A → Phase 2.
 - ⏳ **v1.4.32-H — Roadmap/docs restructure** (`chore/roadmap-restructure`): split
   completed sections into `ROADMAP-ARCHIVE.md`; add `OUTSTANDING-VERIFICATIONS.md`
   + `manual-tests/README.md`; banner `PRD.md` as historical + finish the SatSend
-  rename; add `.env.example`; set `package.json` to `1.4.18` + backfill git tags;
+  rename (done 2026-10-06: PRD renamed, bannered, archived to
+  `development/archive/PRD.md`); add `.env.example`; set `package.json` to `1.4.18` + backfill git tags;
   `git rm --cached` the `.DS_Store` files; delete the stale `master` branch. Detail:
   Appendix A → "Roadmap & docs restructure".
 - ⏳ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): add the
@@ -2629,7 +2652,7 @@ The Vercel project `satsendofficial` is linked and deployed. Use this checklist 
 - [ ] `RESEND_API_KEY` (added v1.4)
 - [ ] `CRON_SECRET` (added v1.4.1) — bearer token the Vercel Cron endpoint validates. Vercel generates this when you configure the cron in the dashboard; mirror it into `.env.local` for local `curl` testing.
 - [ ] `PAYMENT_SWEEP_ENABLED=true` in the environment that owns the payment sweep (production, or the external scheduler). Without it the sweep route no-ops (single-writer guard, v1.4.19.2-H). Do **not** set it in local development.
-- [ ] **Verify a sending domain in the Resend dashboard** and set `EMAIL_FROM` to an address on that domain. Without a verified domain, Resend only delivers to the email address on the Resend account itself — sends to any other recipient (clients, test addresses) return a 422 and the email never arrives. This is a Resend free-tier safety rail, not a Paybitty bug.
+- [ ] **Verify a sending domain in the Resend dashboard** and set `EMAIL_FROM` to an address on that domain. Without a verified domain, Resend only delivers to the email address on the Resend account itself — sends to any other recipient (clients, test addresses) return a 422 and the email never arrives. This is a Resend free-tier safety rail, not a SatSend bug.
 - [ ] **Sender identity unified (v1.4.4)** — set `EMAIL_FROM="SatSend <team@mail.satsend.me>"` in `.env` and in Vercel project env vars (Production, Preview, Development). Confirm the Supabase custom SMTP "Sender" address (dashboard → Project Settings → Auth → SMTP Settings → Sender) is set to the same `team@mail.satsend.me` so transactional mail and auth mail share a single `From:` identity.
 - [x] **Supabase custom SMTP → Resend** — configured 2026-04-24 in Supabase dashboard (Project Settings → Auth → SMTP Settings) pointing at `smtp.resend.com:465` with the `RESEND_API_KEY` as the password and a sender on the verified `mail.satsend.me` domain. This routes all Supabase auth emails (magic link, signup confirmation, password reset) through Resend and bypasses Supabase's default ~4/hour rate limit. Project-level setting — applies to both local dev and production automatically.
 - [ ] Any other secrets present in `.env` at deploy time
@@ -2975,8 +2998,9 @@ Phase 0 above (S2, S3); mark them done there. The v2 growth block stays deferred
    blocker), v1.4.18 TESTS 3/6/7, and the Resend-webhook prod config, each with
    status and blocking-for. Add a `manual-tests/README.md` index.
 4. **Banner PRD.md** (M-PROC-4) as historical/superseded; finish the rename
-   (M-PROC-5) in PRD.md and the one live ROADMAP line, and extend
-   `rename-to-satsend.test.ts` to cover `development/`.
+   (M-PROC-5) in PRD.md and the one live ROADMAP line. _(PRD part done
+   2026-10-06: renamed, bannered, archived to `development/archive/PRD.md`.)_
+   Still to do: extend `rename-to-satsend.test.ts` to cover `development/`.
 5. **Add `.env.example`** at root (and `!.env.example` to `.gitignore`) with every
    var one-line-commented: `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
@@ -3389,14 +3413,16 @@ until the due queue drains. This is roadmap item v1.4.28 — promote it.
   (PRs #31-33); several ✅ sections have unchecked test boxes. A weak model can't
   tell "done but not ticked" from "not done".
 
-- **M-PROC-4 — PRD.md is dead documentation.** Still titled "Paybitty", still
-  describes auto-generated codes, `tax_fiat`, the login sweep, and lists PDF
-  download as out of scope (all superseded). Any session reading it as ground
-  truth is misled. Banner it as historical.
+- **M-PROC-4 — PRD.md was dead documentation.** Renamed to SatSend, bannered as
+  historical, and moved to `development/archive/PRD.md` (2026-10-06). It still
+  describes superseded behaviour (auto-generated codes, `tax_fiat`, the login
+  sweep); the banner covers that. `development/ROADMAP.md` is the source of truth.
 
-- **M-PROC-5 — Rename to SatSend is incomplete.** PRD.md, one live ROADMAP line,
-  and the Supabase project name still say Paybitty. The
-  `rename-to-satsend.test.ts` guard deliberately doesn't cover PRD.md.
+- **M-PROC-5 — Rename to SatSend is incomplete.** The PRD (now
+  `development/archive/PRD.md`) and the one live ROADMAP line are fixed
+  (2026-10-06); the **Supabase project name** still says Paybitty (dashboard
+  rename outstanding). Consider extending `rename-to-satsend.test.ts` to cover
+  `development/archive/`.
 
 ### LOW (do in passing)
 
