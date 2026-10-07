@@ -32,9 +32,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OpenCode project config** (`.opencode/opencode.json`): project MCP servers
   (Playwright, Supabase, Vercel) and instruction files, for the move from Claude
   Code to OpenCode.
+- **Testnet4 detection end-to-end harness** (`test-automation/detection-e2e.mjs`)
+  and its verification record (`manual-tests/v1.4.22-H-testnet-detection-e2e.md`).
+  It drives a real testnet4 payment through the real sweep and asserts the real
+  database, instead of mocks. The hard gate `pending → payment_detected` passed
+  (real tx, correct 10-minute post-mempool boundary, email row written); the
+  best-effort `→ paid` (2 confirmations, miner-dependent) is recorded separately.
+  This retires the roadmap's "single highest-risk unverified path" — live
+  background detection had never succeeded end-to-end.
 
 ### Changed
 
+- **AGENTS.md environment rule reworded** to be explicitly per-database: the
+  payment sweep may be enabled in exactly one environment per database (its
+  owner), and a local session may enable it temporarily only against the
+  local/test database, never one shared with production.
 - Flipped stale `🔄` markers on v1.4.14.1/.2/.3 to `✅` (merged in PRs #31-33).
 - Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
   hardening-train equivalents (v1.4.19-H / v1.4.28-H).

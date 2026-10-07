@@ -1610,8 +1610,11 @@ placeholder). The schedule is now time-based — anchored on `published_at`
 lands on the correct boundary instead of burning a stage. The sweep orders by
 `next_check_at`, includes `overdue` (M-DB-2), drains the due queue past one batch,
 and sets `maxDuration = 60`. New column `published_at` (migration `0028`).
-**Verified:** unit + route tests; live end-to-end confirmation is post-merge (the
-workflow only exists on `main`, and needs the `CRON_SECRET` Actions secret).
+**Verified:** unit + route tests; the production workflow returned a green run
+(2026-10-06); and a real testnet4 payment was detected end-to-end against the
+local test database (`manual-tests/v1.4.22-H-testnet-detection-e2e.md`) — the
+`pending → payment_detected` hard gate passed. Still unrun as one combination: a
+real payment detected by the external scheduler against production.
 
 #### ✅ v1.4.21-H (S4) — DB defends money state
 **Branch:** `fix/db-money-invariants` · Detail: Appendix A → S4
@@ -1629,8 +1632,10 @@ deletes are rejected, and negative/inconsistent amounts cannot be written. ✅
 > test (S2.3)** runs earlier, right after S2.2, on a deliberately tiny amount — so
 > real mainnet exposure is validated while S3/S4 continue. Full mainnet readiness
 > still requires all of Phase 0. The phase-end check is the same flow repeated
-> through the external cron once S3 lands; that mainnet path has never succeeded
-> and remains the top unverified risk.
+> through the external cron once S3 lands; the detection logic behind that path is
+> now verified end-to-end on testnet4
+> (`manual-tests/v1.4.22-H-testnet-detection-e2e.md`), so the remaining gap is only
+> the mainnet-plus-scheduler combination itself.
 
 ### Phase 1 — Correctness & hygiene (before real volume)
 
