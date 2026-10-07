@@ -45,6 +45,7 @@ function makeSupabase({
   updateError = null as object | null,
   deleteError = null as object | null,
   userId = "user-1",
+  takenInvoiceNumbers = [] as { invoice_number: string }[],
 } = {}) {
   // insert chain: .insert().select().single()
   const insertSingle = vi.fn().mockResolvedValue({ data: insertData, error: insertError });
@@ -73,10 +74,17 @@ function makeSupabase({
   const fetchSingle = vi.fn().mockResolvedValue({ data: fetchData, error: null });
   const fetchIdEq = vi.fn().mockReturnValue({ single: fetchSingle });
 
+  // duplicateInvoice fetches the user's existing invoice numbers to pick a free
+  // suffix: .select("invoice_number").eq("user_id").not("invoice_number","is",null)
+  const takenNot = vi.fn().mockResolvedValue({ data: takenInvoiceNumbers, error: null });
+  const takenEq = vi.fn().mockReturnValue({ not: takenNot });
+
   const selectChain = vi.fn((cols: string) =>
     cols === "id, invoice_number"
       ? { eq: uniqAddressEq }
-      : { eq: fetchIdEq }
+      : cols === "invoice_number"
+        ? { eq: takenEq }
+        : { eq: fetchIdEq }
   );
 
   vi.mocked(createClient).mockResolvedValue({
@@ -91,7 +99,7 @@ function makeSupabase({
     })),
   } as unknown as AnySupabase);
 
-  return { insertSingle, insertChain, updateChain, updateEq, deleteEq, maybeSingle };
+  return { insertSingle, insertChain, updateChain, updateEq, deleteEq, maybeSingle, takenEq, takenNot };
 }
 
 beforeEach(() => {
@@ -622,16 +630,16 @@ describe("duplicateInvoice", () => {
     expect(insertSingle).toHaveBeenCalled();
   });
 
-  // v1.4.16: suffix is "... (copy)" (10 chars). The "..." is a visual signal
-  // that the duplicate's number is derived from a source. Source is trimmed
-  // from the end only when the result would exceed the 30-char DB cap.
-  it('appends "... (copy)" to a short invoice_number without trimming (v1.4.16)', async () => {
+  // v1.4.23-H: the suffix is now " (copy)", " (copy 2)", ... chosen so it does
+  // not collide with a number the user already has. Source is trimmed from the
+  // end only when the result would exceed the 30-char cap.
+  it('appends " (copy)" to a short invoice_number without trimming', async () => {
     const { insertChain } = makeSupabase({
       fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
       insertData: { id: "inv-new" },
     });
     await duplicateInvoice("inv-src");
-    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001... (copy)");
+    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy)");
   });
 
   it("leaves invoice_number null when source has no number", async () => {
@@ -643,31 +651,42 @@ describe("duplicateInvoice", () => {
     expect(insertChain.mock.calls[0][0].invoice_number).toBeNull();
   });
 
-  it("does not trim when source is exactly 20 chars — full source + suffix totals 30 (v1.4.16 boundary)", async () => {
-    const source20 = "A".repeat(20);
+  it('skips to " (copy 2)" when " (copy)" is already taken (v1.4.23-H fix)', async () => {
     const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: source20 },
+      fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
+      insertData: { id: "inv-new" },
+      takenInvoiceNumbers: [{ invoice_number: "INV-001 (copy)" }],
+    });
+    await duplicateInvoice("inv-src");
+    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy 2)");
+  });
+
+  it('skips to " (copy 3)" when both earlier copies are taken (v1.4.23-H fix)', async () => {
+    const { insertChain } = makeSupabase({
+      fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
+      insertData: { id: "inv-new" },
+      takenInvoiceNumbers: [
+        { invoice_number: "INV-001 (copy)" },
+        { invoice_number: "INV-001 (copy 2)" },
+      ],
+    });
+    await duplicateInvoice("inv-src");
+    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy 3)");
+  });
+
+  it("does not trim when source is 23 chars — full source + ' (copy)' totals 30 (boundary)", async () => {
+    const source23 = "A".repeat(23);
+    const { insertChain } = makeSupabase({
+      fetchData: { ...SOURCE_INVOICE, invoice_number: source23 },
       insertData: { id: "inv-new" },
     });
     await duplicateInvoice("inv-src");
     const result = insertChain.mock.calls[0][0].invoice_number;
-    expect(result).toBe(`${source20}... (copy)`);
+    expect(result).toBe(`${source23} (copy)`);
     expect(result.length).toBe(30);
   });
 
-  it("trims source from the end when source is 21 chars — result still totals 30 (v1.4.16)", async () => {
-    const source21 = "A".repeat(21);
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: source21 },
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    const result = insertChain.mock.calls[0][0].invoice_number;
-    expect(result).toBe(`${"A".repeat(20)}... (copy)`);
-    expect(result.length).toBe(30);
-  });
-
-  it("trims a 30-char source down to 20 chars + suffix (v1.4.16 worst case)", async () => {
+  it("trims a 30-char source to 23 chars + ' (copy)' (worst case)", async () => {
     const source30 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ-123";
     const { insertChain } = makeSupabase({
       fetchData: { ...SOURCE_INVOICE, invoice_number: source30 },
@@ -675,7 +694,7 @@ describe("duplicateInvoice", () => {
     });
     await duplicateInvoice("inv-src");
     const result = insertChain.mock.calls[0][0].invoice_number;
-    expect(result).toBe("ABCDEFGHIJKLMNOPQRST... (copy)");
+    expect(result).toBe(`${source30.slice(0, 23)} (copy)`);
     expect(result.length).toBe(30);
   });
 

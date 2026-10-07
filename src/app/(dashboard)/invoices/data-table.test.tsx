@@ -19,7 +19,7 @@ vi.mock("./bulk-actions", () => ({
   bulkArchive: vi.fn().mockResolvedValue({ archived: 1, skipped: 0 }),
   bulkDelete: vi.fn().mockResolvedValue(undefined),
   bulkMarkPaid: vi.fn().mockResolvedValue(undefined),
-  bulkUnarchive: vi.fn().mockResolvedValue(undefined),
+  bulkUnarchive: vi.fn().mockResolvedValue({ unarchived: 1, skipped: 0 }),
 }));
 vi.mock("./actions", () => ({
   publishInvoice: vi.fn().mockResolvedValue(undefined),
@@ -361,6 +361,16 @@ describe("InvoiceDataTable — per-row actions", () => {
     fireEvent.click(openMenuButtons[3]); // inv-4 archived
     fireEvent.click(await screen.findByRole("menuitem", { name: /^unarchive$/i }));
     await waitFor(() => expect(bulkUnarchive).toHaveBeenCalledWith(["inv-4"]));
+  });
+
+  it("warns when a row can't be unarchived because its prior status wasn't recorded", async () => {
+    vi.mocked(bulkUnarchive).mockResolvedValueOnce({ unarchived: 0, skipped: 1 });
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    fireEvent.click(screen.getByRole("button", { name: /show archived/i }));
+    const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
+    fireEvent.click(openMenuButtons[3]); // inv-4 archived
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^unarchive$/i }));
+    expect(await screen.findByText(/previous status wasn't recorded/i)).toBeInTheDocument();
   });
 
   it("shows 'Download PDF' on non-draft rows wired to the PDF endpoint", async () => {

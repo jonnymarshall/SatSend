@@ -18,7 +18,7 @@ vi.mock("../actions", () => ({
 }));
 vi.mock("../bulk-actions", () => ({
   bulkArchive: vi.fn().mockResolvedValue(undefined),
-  bulkUnarchive: vi.fn().mockResolvedValue(undefined),
+  bulkUnarchive: vi.fn().mockResolvedValue({ unarchived: 1, skipped: 0 }),
   bulkDelete: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -295,6 +295,13 @@ describe("InvoiceActions — archived status", () => {
     render(<InvoiceActions invoice={archived} />);
     fireEvent.click(screen.getByRole("button", { name: /unarchive/i }));
     await waitFor(() => expect(bulkUnarchive).toHaveBeenCalledWith(["inv-a"]));
+  });
+
+  it("shows an error when Unarchive can't restore (prior status wasn't recorded)", async () => {
+    vi.mocked(bulkUnarchive).mockResolvedValueOnce({ unarchived: 0, skipped: 1 });
+    render(<InvoiceActions invoice={archived} />);
+    fireEvent.click(screen.getByRole("button", { name: /unarchive/i }));
+    expect(await screen.findByText(/previous status wasn't recorded/i)).toBeInTheDocument();
   });
 
   it("still renders View public invoice, Duplicate, Delete for archived", () => {

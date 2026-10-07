@@ -183,7 +183,7 @@ describe("bulkUnarchive", () => {
         error: null,
       },
     });
-    await bulkUnarchive(["inv-1", "inv-2"]);
+    const result = await bulkUnarchive(["inv-1", "inv-2"]);
     // A restored paid row keeps its record; a restored monitorable row gets a
     // fresh schedule (v1.4.22-H / M-DB-3).
     expect(updatePayloads[0]).toEqual({ status: "paid", pre_archive_status: null });
@@ -196,20 +196,34 @@ describe("bulkUnarchive", () => {
     });
     expect(updatePayloads[1].published_at).toEqual(expect.any(String));
     expect(updatePayloads[1].next_check_at).toEqual(expect.any(String));
+    expect(result).toEqual({ unarchived: 2, skipped: 0 });
   });
 
-  it("falls back to 'pending' when pre_archive_status is null (legacy rows) and resets the schedule", async () => {
+  it("skips a row whose pre_archive_status is null (legacy) instead of guessing 'pending' (v1.4.23-H / M-DB-4)", async () => {
     const { updatePayloads } = makeSupabase({
       selectResult: { data: [{ id: "inv-1", pre_archive_status: null }], error: null },
     });
-    await bulkUnarchive(["inv-1"]);
-    expect(updatePayloads[0]).toMatchObject({
-      status: "pending",
-      pre_archive_status: null,
-      stage_attempt: 0,
-      mempool_seen_at: null,
-      btc_txid: null,
+    const result = await bulkUnarchive(["inv-1"]);
+    // Guessing 'pending' could silently downgrade a previously-paid invoice, so
+    // the row is left archived and reported instead.
+    expect(updatePayloads).toEqual([]);
+    expect(result).toEqual({ unarchived: 0, skipped: 1 });
+  });
+
+  it("restores recorded-status rows and skips legacy NULL rows in one call", async () => {
+    const { updatePayloads } = makeSupabase({
+      selectResult: {
+        data: [
+          { id: "inv-1", pre_archive_status: "paid" },
+          { id: "inv-2", pre_archive_status: null },
+        ],
+        error: null,
+      },
     });
+    const result = await bulkUnarchive(["inv-1", "inv-2", "inv-3"]);
+    expect(updatePayloads).toHaveLength(1);
+    expect(updatePayloads[0]).toMatchObject({ status: "paid", pre_archive_status: null });
+    expect(result).toEqual({ unarchived: 1, skipped: 2 });
   });
 
   it("only unarchives rows whose status is currently 'archived'", async () => {

@@ -31,6 +31,20 @@ const OVERWRITABLE_BY: Record<"delivered" | "bounced" | "complained", string[]> 
   complained: ["queued", "sent", "delivered", "bounced"],
 };
 
+// Keep the dedupe table small. Svix retries for at most hours, so 30 days is
+// generous. This must never fail the webhook: a sweep error is logged and
+// swallowed. No index on received_at: at this table size it is wasted.
+// (v1.4.23-H / M-DB-7)
+const DEDUPE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+async function sweepOldDeliveries(admin: ReturnType<typeof createAdminClient>): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - DEDUPE_RETENTION_MS).toISOString();
+    await admin.from("webhook_deliveries").delete().lt("received_at", cutoff);
+  } catch (err) {
+    console.error("[resend-webhook] retention sweep failed", err);
+  }
+}
+
 interface ResendEvent {
   type?: string;
   data?: {
@@ -80,12 +94,35 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
+  // Claim the svix-id. Insert first: the primary key is the atomic claim that
+  // stops two concurrent copies of the same delivery both proceeding.
   const dedupe = await admin
     .from("webhook_deliveries")
     .insert({ svix_id: svixId, event_type: eventType });
   if (dedupe.error) {
-    return NextResponse.json({ ok: true, dedupe: "duplicate" }, { status: 200 });
+    if (dedupe.error.code === "23505") {
+      // A genuine duplicate (Svix retry). Already handled.
+      return NextResponse.json({ ok: true, dedupe: "duplicate" }, { status: 200 });
+    }
+    // Any other insert error is a real failure. Do NOT report success, or Svix
+    // will never retry and the event is silently lost. (v1.4.23-H / M-DB-7)
+    console.error("[resend-webhook] dedupe insert failed", dedupe.error);
+    return NextResponse.json({ error: "Dedupe insert failed" }, { status: 500 });
   }
+
+  // Retention sweep, best-effort. Never allowed to fail the webhook.
+  await sweepOldDeliveries(admin);
+
+  // From here on, any *unexpected* failure must release the claim so Svix's retry
+  // can run again; otherwise the dedupe row blocks it forever. Re-applying the
+  // event is harmless because the lifecycle-overwrite guard below is idempotent.
+  const releaseClaim = async () => {
+    try {
+      await admin.from("webhook_deliveries").delete().eq("svix_id", svixId);
+    } catch (err) {
+      console.error("[resend-webhook] failed to release dedupe claim", err);
+    }
+  };
 
   if (!targetStatus) {
     return NextResponse.json({ ok: true, ignored: eventType || "unknown" }, { status: 200 });
@@ -105,6 +142,12 @@ export async function POST(request: NextRequest) {
     .limit(1)
     .maybeSingle();
 
+  if (lookup.error) {
+    await releaseClaim();
+    console.error("[resend-webhook] email_events lookup failed", lookup.error);
+    return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
+  }
+
   const row = lookup.data as { id: string; status: string } | null;
   if (!row) {
     return NextResponse.json({ ok: true, ignored: "no-matching-row" }, { status: 200 });
@@ -114,10 +157,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ignored: "lifecycle-noop" }, { status: 200 });
   }
 
-  const update: Record<string, unknown> = {
-    status: targetStatus,
-    updated_at: new Date().toISOString(),
-  };
+  // updated_at is owned by the DB trigger (migration 0029), so it is not set here.
+  const update: Record<string, unknown> = { status: targetStatus };
   if (targetStatus === "bounced") {
     const raw = event.data?.bounce?.message ?? "bounced";
     // Resend bounce messages are often multi-sentence with SMTP detail. Surface
@@ -126,7 +167,12 @@ export async function POST(request: NextRequest) {
     update.error_message = (firstSentence || raw).slice(0, 200);
   }
 
-  await admin.from("email_events").update(update).eq("id", row.id);
+  const { error: updateError } = await admin.from("email_events").update(update).eq("id", row.id);
+  if (updateError) {
+    await releaseClaim();
+    console.error("[resend-webhook] email_events update failed", updateError);
+    return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, status: targetStatus }, { status: 200 });
 }

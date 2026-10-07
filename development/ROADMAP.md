@@ -1407,7 +1407,7 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
   longer shares the production database, which completes the environment half of
   S2.2 and stops the stale production deployment from corrupting test results.
 - **Dev-only automation API** — deferred. Not needed for testing (the harness
-  writes directly with the service role); fold it into the v2.1 agent API instead.
+  writes directly with the service role); fold it into the v2.8 agent API instead.
 
 **Leftover — final action before retiring the test wallet.** The wallet's
 spendable balance sits at high address indices that the wallet UI does not display
@@ -1651,10 +1651,26 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   remainder). **Split out:** the `payment-watcher.tsx` mempool.space WebSocket
   reconnect (the fastest-path client socket) is now its own branch,
   `v1.4.22-H/ws-reconnect`.
-- 🔴 **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`):
-  `pre_archive_status` → enum + CHECK; enumerate the summary view's columns;
-  `user_id` index + wrapped `auth.uid()`; webhook dedupe `23505`-only + retention;
-  `email_events.updated_at` trigger; `(user_id, invoice_number)` uniqueness.
+- ✅ **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`): shipped —
+  `pre_archive_status` → `invoice_status` enum + CHECK (legacy values nulled);
+  the summary view recreated with enumerated columns (`security_invoker` + the
+  anon revoke re-asserted); `invoices (user_id, created_at desc)` index +
+  `auth.uid()` wrapped in all three policies; webhook dedupe now treats only
+  `23505` as a duplicate, releases the claim on failure so Svix can retry, and
+  sweeps 30-day-old rows; `email_events.updated_at` owned by a trigger. Un-archive
+  reports a legacy row it cannot restore instead of guessing.
+  **Split out:** `(user_id, invoice_number)` uniqueness — prod already has 8
+  duplicate groups (`development/invoice-number-duplicates-audit.md`), so the
+  constraint would fail the migration. The generator bug that created them
+  (`buildDuplicateInvoiceNumber` used a fixed suffix) **is fixed here**.
+- 🔴 **v1.4.23.1-H — Invoice-number uniqueness** (`v1.4.23.1-H/invoice-number-uniqueness`):
+  the split-out follow-up. Start from the audit listing in
+  `development/invoice-number-duplicates-audit.md`; decide per group (delete /
+  archive your test rows, rename the later copy for real users, never the
+  original); then add the partial unique index
+  `(user_id, invoice_number) where invoice_number is not null` plus a
+  `check (invoice_number <> '')`, and a friendly `23505` message on the create /
+  publish path.
 - 🔴 **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`):
   `proxyConfig` → `config`; add `error.tsx` / `not-found.tsx` / `loading.tsx`;
   proxy `getSession` → `getUser`; security headers in `next.config.ts`.
@@ -1774,7 +1790,7 @@ No backfill — existing invoices keep their current `paid` status with NULLs in
 - `invoice_payments` table — the unifying multi-rail architecture sketched during v1.4.10 planning. Stays deferred until multi-payment or programmatic fiat reconciliation is needed.
 - Programmatic fiat reconciliation (auto-detecting Stripe / bank-transfer payments). For now, the owner manually flips underpaid → paid via the Mark As menu when fiat tops up the balance off-platform — covered by v1.4.10's existing menu.
 - Refund flows for overpaid invoices (out-of-band; the surface only flags it).
-- Multi-currency support beyond the per-invoice `currency` field (v2.4 territory).
+- Multi-currency support beyond the per-invoice `currency` field (v2.12 territory).
 
 **Done when:** A BTC payment of any size resolves to one of `paid` / `paid+overpaid` / `underpaid` based on a 5% tolerance band against the invoice's fiat total at detection time; the actual amount received and the BTC price used for conversion are persisted on the invoice row; the UI surfaces both states clearly; the price-oracle failure mode does not corrupt status.
 
@@ -2202,7 +2218,7 @@ status-colour mapping is exactly as locked above, and an accessibility pass is c
 
 **Branch:** `v1.7/address-fields`
 
-> **Note:** This branch changes the address data model. Should land before v2.3 (saved client/sender details) since those features depend on the address structure.
+> **Note:** This branch changes the address data model. Should land before v2.2 (saved clients) since those features depend on the address structure.
 
 - [ ] Replace single freeform `your_address` / `client_address` text fields with structured fields: Line 1, Line 2, City, State/Province, Post Code, Country — following the UN/OASIS xNAL address standard ordering
 - [ ] Schema migration: add individual address sub-columns (nullable); keep old `*_address` column for migration only, then drop after backfill
@@ -2214,73 +2230,254 @@ status-colour mapping is exactly as locked above, and an accessibility pass is c
 
 ---
 
-## v2 — Growth (Billing + Ecosystem)
+## v2 — Growth (Monetisation + Ecosystem)
 
-> Goal: Monetise the product and expand the creator experience.
+> Goal: Launch a free tier and a paid (Pro) tier, then expand the creator experience.
+
+> **This is the launch monetisation plan.** It replaces the earlier "premium, feature-gated later" sketch. The free/paid split, the email rules, and the build order below are agreed. The `v2.x` numbers are IDs; the **Phase** labels are the build order.
+
+### Monetisation plan (free vs Pro)
+
+**Philosophy**
+- Invoicing is **unlimited on both tiers**. Volume caps are a losing game (throwaway emails defeat them) and the per-invoice cost is near zero: an unpaid invoice is polled roughly 7 times over ~48 min, then hibernates. Monetise **features**, not volume.
+- Keep the core loop free forever: create an invoice, the payer pays, both sides are told. Sell polish, automation, and integration.
+- Gate on what costs real money per use (client email to arbitrary recipients, API resources) and on what a freelancer will happily pay for (looking professional, chasing late payers).
+
+**Free**
+- Unlimited invoices, BTC payment detection, share link, PDF, dashboard.
+- Owner-facing "payment detected" and "payment confirmed" emails (the "you got paid" pair). This is the heartbeat of the product and stays free.
+- No client-facing email. No pretty links, client pages, branding, reminders, reports, or API.
+
+**Pro**
+- Pretty links (`satsend.me/theircompanyname`) and client pages (`satsend.me/theircompanyname/<client>`).
+- Saved clients + reusable line items.
+- Custom branding (logo, colours) across the invoice page, PDF, client page, and emails.
+- Client-facing email with a display-name sender (see email rules).
+- Payment reminders.
+- Financial reports + export.
+- API access.
+
+**Email rules (locked)**
+- **All client-facing email is Pro-only.**
+- **Owner-facing payment notifications stay free.** Rule of thumb: if the system is *telling the owner something happened*, free; if it is *doing work for them* (sending to clients, chasing, digests), Pro.
+- **Custom sender = display name only**, e.g. `Acme Studio <team@mail.satsend.me>`, with reply-to set to the owner's email so replies reach them. **Never** the owner's own domain: that needs the user to configure DNS, and misconfiguration sends their mail to spam and creates support load. Out of scope permanently unless demand appears.
+- **Do not gate payer-page live updates.** That is the *payer's* experience and the payer will never be the customer. Gating it punishes the wrong person.
+
+**Entitlement model (locked)**
+- Store one column: `premium_until timestamptz`. `isPremium = premium_until > now()`. No separate `tier` column and **no downgrade cron**; expiry is automatic. Use `infinity` for lifetime / grandfathered accounts.
+- One central helper, `getEntitlements(userId)`, returns the flags. Every gated surface calls it and nothing else, so changing the paid feature list later is a one-file change.
+
+**Billing (locked)**
+- **Bitcoin-only** at launch (hard rule). Reason: the operator is a foreign LLC owner with no business bank account, so fiat rails are not viable.
+- **Self-serve from day one** (no manual flag-flipping).
+- **Model an upgrade as a special invoice.** Reuse the existing address-watch / sweep / detection / dedup machinery. An "upgrade attempt" has an address, an amount, a status, and a schedule, exactly like an invoice; the only new pieces are (a) derive the address from a platform billing key instead of asking the user, and (b) on confirmation, extend `premium_until` instead of marking an invoice paid.
+- Keep reconciliation dumb: one attempt, one fresh address, flip on confirm.
+- Price in fiat, convert to BTC at attempt time, lock for ~15 min.
+- Use a **dedicated billing seed**, separate from any personal wallet, so a leak exposes billing addresses only.
+
+**Access codes for client pages (locked)**
+- The client page has a top-level access code. Entering it satisfies the access codes of the invoices listed under that client, so the client never types a code twice.
+- Standalone invoice links still use the invoice's own code. Invoices with no client attached always use their own code.
+
+**Build order**
+- **Phase 1 (launch Pro):** v2.0 -> v2.1 -> v2.2 -> v2.3 -> v2.4 -> v2.5 -> v2.6
+- **Phase 2:** v2.7
+- **Phase 3:** v2.8
+- **Later:** v2.9, v2.10, v2.11, v2.12
+
+> If you want to open the doors sooner, the natural cut line is to launch with **v2.0-v2.3** (billing, pretty links, saved clients, client pages) and add v2.4-v2.6 (branding, client email, reminders) in the weeks right after, at the same price. Early Pro buyers keep everything.
 
 ---
 
-### 🚫 v2.0 — Premium / Paid Accounts (Bitcoin)
+### 🚫 v2.0: Premium accounts: entitlement + Bitcoin billing (foundation)
 
 **Branch:** `v2.0/premium-bitcoin`
 
-**Context:** Monetise SatSend with a premium tier. Users click an "Upgrade" or "Go Premium" affordance, choose a duration (1 month / 6 months / 12 months), and pay in bitcoin. Premium grants access to gated features (initial candidates: full email functionality, public API access). Bitcoin-only at launch — fiat billing rails are explicitly deferred.
-
-**xpub exception.** The standing policy "no xpub on the platform" (see Notes below) carves out one deliberate exception for this branch: the platform holds a *billing* xpub used solely to derive a fresh receive address per upgrade attempt, indexed by user. Reasoning: per-user attribution of inbound subscription payments is non-negotiable; manually provisioning addresses per signup is not viable at any scale. The trade-off — that a leaked billing xpub would expose subscription revenue addresses — is judged acceptable because (a) it controls only inbound subscription flows, not invoice payments, and (b) the alternative (third-party billing) carries its own custody and KYC trade-offs the project wants to avoid for v2.
+**Context:** Everything else in v2 sits on this. Until the entitlement layer and a way to take money exist, nothing can be "Pro." Bitcoin-only, self-serve from day one.
 
 **Scope**
+- [ ] Entitlement model per the plan above: single `premium_until` column, `isPremium` computed, no downgrade cron, and one `getEntitlements(userId)` helper that every gate calls.
+- [ ] Bitcoin billing built on the existing invoice machinery (address watch + sweep + detection + dedup), not a parallel system. An "upgrade attempt" reuses the invoice shape; confirmation extends `premium_until`.
+- [ ] Tier picker: 1 month / 6 months / 12 months. Fiat price converted to BTC at attempt time, locked ~15 min.
+- [ ] Address derivation from a dedicated `BILLING_XPUB` (BIP84 `m/84'/0'/0'/0/n`), per-user index, never reuse an address, audit log of every derived address.
+- [ ] "Upgrade" / "Go Premium" CTA in settings + a free-tier nav banner.
+- [ ] Premium-gated surfaces show a "Pro" badge with an upgrade CTA.
+- [ ] Server-side gate helper rejects free-tier requests on every gated route/action.
+- [ ] Renewal adds months to `max(now(), premium_until)`.
 
-Tier model
-- [ ] `users.tier text not null default 'free' check (tier in ('free', 'premium'))`.
-- [ ] `users.premium_until timestamptz` — when premium expires.
-- [ ] Cron job downgrades expired users back to `free`.
-- [ ] Decide what happens to premium-only state when a user downgrades (e.g. existing API keys: revoke or grace?).
-
-Upgrade flow
-- [ ] "Upgrade" / "Go Premium" CTA placed in settings + a free-tier-only nav banner.
-- [ ] Tier picker: 1 month / 6 months / 12 months with bitcoin price for each (price in BTC computed at initiation time, locked for a short window — say 15 minutes — to avoid mid-flow drift).
-- [ ] On selection, derive the next address from the billing xpub (per-user index in `users.billing_address_index`), store it on the upgrade attempt, render QR + address + amount.
-- [ ] Background watcher polls the address (re-use the existing `payment-watcher` and `payment-sweep` infrastructure) and flips the user's tier + extends `premium_until` when the payment lands.
-- [ ] Payment-locked-window expiry: if the price window expires before payment, the upgrade attempt is voided and a fresh address + price are issued on retry.
-
-Billing xpub mechanics
-- [ ] `BILLING_XPUB` env var. Documented as the only platform-controlled xpub on the system.
-- [ ] Derivation: BIP84 (`m/84'/0'/0'/0/n`) by default; document the choice in the migration.
-- [ ] Gap-limit handling: skip used indices, never reuse an address even if a previous attempt was abandoned.
-- [ ] `users.billing_address_index integer not null default 0` to track the per-user counter.
-- [ ] Audit log: every derived address with `(user_id, index, address, derived_at, used_for_attempt_id)` so manual reconciliation is possible.
-
-Premium feature gating
-- [ ] Server-side gate helper: `requirePremium(userId)` for premium-only routes / actions.
-- [ ] **Initial premium-gated features (locked in for v2.0 — confirm during a grilling session):**
-  - Sending invoices via email (recipient + owner notifications). Free tier: publish-and-share-link only.
-  - Live payment updates on the public payer page without the payer being logged in (the existing realtime channel — moved behind premium for the *owner's* invoices).
-- [ ] Visual indicator on premium-gated UI surfaces ("Premium feature" badge, with upgrade CTA).
-- [ ] Test that every gated path returns a clear 403/redirect on free-tier requests.
-
-**Decisions to lock in before implementation (grilling session)**
-- Exact pricing for each tier (1m / 6m / 12m).
-- Definitive premium feature list. Email gating for *existing* free users is a behaviour change — confirm acceptance and decide whether existing users at launch get grandfathered.
-- Whether to allow an "extend by N months" flow before current expiry vs. only post-expiry renewal.
-- Refund / dispute policy (likely: none; bitcoin payments are final).
-- Receipt / invoice-for-the-billing-itself behaviour (do users get a receipt for their premium payment?).
-- Behaviour when `BILLING_XPUB` rotates (mid-flight upgrade attempts using the old xpub need a defined fate).
+**Decisions to lock before implementation**
+- Exact pricing for 1m / 6m / 12m.
+- Whether to offer "extend by N months" before expiry, or only post-expiry renewal.
+- Refund policy (likely none; bitcoin is final).
+- Do users get a receipt for their own premium payment?
+- What happens to Pro-only state on downgrade (e.g. API keys: revoke or grace?).
 
 **Out of scope (deferred)**
-- Fiat billing rails (Lemon Squeezy, Stripe, etc.). Bitcoin-only at v2.0; revisit only if real demand surfaces.
-- Per-feature à la carte purchases. One tier with one price ladder.
-- Refunds and chargebacks (out-of-band; see decisions list).
-- Free-tier invoice quotas. Premium is feature-gated, not volume-gated, at v2.0.
+- Fiat billing rails (Lemon Squeezy, Stripe). Bitcoin-only; revisit only on real demand.
+- Free-tier invoice quotas. Feature-gated, not volume-gated.
+- Per-feature à la carte purchases. One paid tier, one price ladder.
 
-**Done when:** A free-tier user can click Upgrade, scan a QR code, pay in bitcoin to a fresh per-user address derived from `BILLING_XPUB`, and have their tier flipped to `premium` automatically when the payment confirms; premium-gated features (email + live updates initially) reject free-tier requests; the cron expiry path downgrades users when `premium_until` lapses; the audit log captures every derived billing address with its user / attempt mapping.
+**Done when:** A free user can click Upgrade, pay in bitcoin to a fresh derived address, and have `premium_until` extended automatically on confirmation; every gated surface rejects free requests; expiry needs no cron; the audit log maps every billing address to its user and attempt.
 
 ---
 
-### 🚫 v2.1 — Public API + AI Agent Access (premium-gated)
+### 🚫 v2.1: Pretty links (owner slug)
 
-**Branch:** `v2.1/public-api`
+**Branch:** `v2.1/pretty-links`
 
-> **Depends on:** v2.0 (premium tier + entitlement system).
+**Context:** Give every Pro user a readable URL for their business, `satsend.me/theircompanyname`, so shared links look professional instead of exposing an opaque invoice ID.
+
+**Scope**
+- [ ] Unique `slug` per user (on the user/profile record). Reserved-word list so nobody takes `dashboard`, `api`, `invoice`, `invoices`, `login`, `settings`, `admin`, `help`, etc.
+- [ ] `satsend.me/<slug>` renders a Pro front page. **Keep existing invoice URLs unchanged**; the pretty link points at them. Do not rewrite the invoice routing or the access-code flow.
+- [ ] Slug is editable in settings; handle collisions with a clear error.
+- [ ] Pro-only: free users see the feature with an upgrade CTA.
+
+**Decisions to confirm**
+- Redirect old slugs on change, or free them?
+- Whether the front page is a simple landing card or a lightweight public index.
+
+**Done when:** A Pro user can claim a slug, and `satsend.me/<slug>` resolves to their front page without clashing with any real app route.
+
+---
+
+### 🚫 v2.2: Saved clients + reusable line items
+
+**Branch:** `v2.2/saved-clients`
+
+> **Depends on:** v1.7 (structured addresses).
+
+**Context:** Today a "client" is just text typed on each invoice; there is no client record. This entry introduces the client entity, which is the prerequisite for client pages (v2.3). Building it also delivers the saved-clients convenience.
+
+**Scope**
+- [ ] `clients` table: `(id, user_id, name, email, company, structured address, tax_id, slug, created_at)`. Invoices link to a client (nullable; free-form invoices still allowed).
+- [ ] Client slug: readable, scoped to the owner (so no cross-owner collision), deduped with a suffix. DB key stays the client ID. Recommended URL form `<name>_<shortid>` (readable and collision-proof); confirm at build time.
+- [ ] Client picker on the invoice form pre-fills client fields, plus a "save this client" affordance.
+- [ ] Manage clients (add / edit / delete) from a clients page or settings.
+- [ ] Saved sender (own) details: one set, pre-filled on the form.
+- [ ] Reusable line-item templates.
+- [ ] Confirm whether saved clients themselves are free or Pro (client pages in v2.3 are Pro).
+
+**Out of scope**
+- Multi-tier client grouping / tags.
+- Address lookup / auto-fill.
+
+**Done when:** An owner can save a client and reuse it on new invoices, and every invoice can be tied to a client record.
+
+---
+
+### 🚫 v2.3: Client pages
+
+**Branch:** `v2.3/client-pages`
+
+> **Depends on:** v2.1 (owner slug), v2.2 (client entity).
+
+**Context:** A Pro page per client at `satsend.me/theircompanyname/<client>` listing the invoices between the owner and that client, so the client can see what they owe without the owner re-sending links.
+
+**Scope**
+- [ ] Route `/<owner-slug>/<client-slug>` rendering that client's invoices.
+- [ ] Show **published invoices only** (never drafts). Default view: **open invoices** (pending, payment detected, overdue). Confirm whether to add a collapsed paid-history section (a running statement reads more professional).
+- [ ] Top-level access code on the client page (per the locked access-code rule above): entering it satisfies the codes of the invoices listed, so the client is not asked twice. Standalone invoice links still use the invoice's own code.
+- [ ] Links from the page open the existing invoice URLs.
+- [ ] Pro-only.
+
+**Decisions to confirm**
+- Open invoices only, or open plus a paid-history section?
+- Cookie scope for the "client code already entered" grant (signed, includes the client ID).
+
+**Done when:** A client can open their page with one code, see their open invoices, and open any of them without a second code; drafts never appear.
+
+---
+
+### 🚫 v2.4: Custom branding
+
+**Branch:** `v2.4/custom-branding`
+
+**Context:** The most visible "looks professional" upgrade: the owner's logo and colours on everything the client sees.
+
+**Scope**
+- [ ] Logo upload + brand colours on the user/profile record.
+- [ ] Applied consistently across the invoice page, the PDF, the client page, and the email templates.
+- [ ] Build **after** the client page and client email exist so branding is applied in one pass rather than sprinkled into each feature.
+- [ ] Pro-only.
+
+**Out of scope**
+- Full theme / layout customisation beyond logo + colours.
+- Custom email templates beyond branding.
+
+**Done when:** A Pro user's logo and colours appear on every client-facing surface.
+
+---
+
+### 🚫 v2.5: Client-facing email + display-name sender
+
+**Branch:** `v2.5/client-email`
+
+**Context:** Today email goes out from `SatSend <team@mail.satsend.me>` to both owner and payer. This entry makes client-facing email a Pro feature and makes it look like it came from the owner.
+
+**Scope**
+- [ ] Gate **all client-facing email** behind Pro. Keep owner-facing payment notifications free.
+- [ ] **Display-name sender**: send as `<owner company> <team@mail.satsend.me>`, with reply-to set to the owner's email. Built branding-aware (v2.4).
+- [ ] Free users: no client-facing email; share-link delivery only.
+- [ ] Owner notification emails stay free and unchanged.
+
+**Out of scope (permanently)**
+- Sending from the owner's own domain. It requires the user to configure DNS; misconfiguration routes their mail to spam and creates support load. Revisit only on real demand.
+
+**Done when:** A Pro user's client email arrives from the owner's display name with replies going to the owner; a free user's client-facing sends are refused and the UI offers an upgrade.
+
+---
+
+### 🚫 v2.6: Payment reminders
+
+**Branch:** `v2.6/reminders`
+
+> **Depends on:** v2.5 (client-facing email).
+
+**Context:** Chasing late payers is the top admin pain for freelancers, and the app already detects overdue invoices. Reminders are automation layered on infrastructure that exists.
+
+**Scope**
+- [ ] Scheduled reminder emails to the client for overdue (and optionally upcoming-due) invoices.
+- [ ] Reuse the existing overdue sweep and email pipeline.
+- [ ] Owner controls: on/off, cadence, message. A sensible default schedule.
+- [ ] Pro-only.
+
+**Decisions to confirm**
+- Default cadence (e.g. on due date, +3 days, +7 days).
+- Whether the owner can preview / edit copy.
+
+**Done when:** A Pro owner's overdue invoice automatically emails the client on schedule, and the owner can turn it off.
+
+---
+
+### 🚫 v2.7: Financial reports + export
+
+**Branch:** `v2.7/reports`
+
+**Phase 2.**
+
+**Context:** The small-business end of the market wants income, outstanding, and overdue at a glance, and wants to get the numbers out.
+
+**Scope**
+- [ ] Reports page: income over time, outstanding, overdue, per-client totals, BTC received.
+- [ ] CSV export (and optionally PDF).
+- [ ] Pro-only.
+- [ ] Confirm the money fields are trustworthy before building (this area has moved recently).
+
+**Out of scope**
+- Accounting-software sync (that is API / ecosystem territory).
+
+**Done when:** A Pro user can view their figures and export them.
+
+---
+
+### 🚫 v2.8: Public API + AI Agent Access (premium-gated)
+
+**Branch:** `v2.8/public-api`
+
+**Phase 3.**
+
+> **Depends on:** v2.0 (entitlement system).
 
 **Context:** Let premium users interact with SatSend programmatically. Primary use case: AI agents creating invoices, checking payment status, and sending emails on the user's behalf without a browser session. Secondary use case: third-party integrations (accounting tools, custom dashboards). Gated to premium so the API surface is a value-add of the paid tier rather than a free-tier abuse vector.
 
@@ -2312,31 +2509,33 @@ Documentation + DX
 
 Security + observability
 - [ ] All API responses tagged with the key id in logs (not the raw key).
-- [ ] Webhook signing if/when webhooks are added (out of scope for v2.1; placeholder).
+- [ ] Webhook signing if/when webhooks are added (out of scope for v2.8; placeholder).
 - [ ] Audit log per key: every request line with timestamp, route, status, latency.
 - [ ] Tests: revoked-key path returns 401; expired-premium path returns 403; rate-limit path returns 429.
 
 **Decisions to lock in (grilling session)**
 - Versioning policy: `/api/v1/*` permanent, breaking changes only via `/api/v2/*`?
-- Webhook support — in v2.1 or later? (Real-time payment notifications via webhook is the natural agent integration.)
+- Webhook support — in v2.8 or later? (Real-time payment notifications via webhook is the natural agent integration.)
 - Read-only vs read-write keys, or single permission level?
 - Per-key vs per-user rate limits.
 
 **Out of scope (deferred)**
-- Third-party OAuth applications (programmatic access on behalf of *other* users). Single-user keys only at v2.1.
+- Third-party OAuth applications (programmatic access on behalf of *other* users). Single-user keys only at v2.8.
 - Webhooks (deferred follow-on; would land as v2.X once the API surface is stable).
 - GraphQL. REST + JSON only.
-- SDKs. Curl + the OpenAPI spec is enough at v2.1; community / first-party SDKs can follow.
+- SDKs. Curl + the OpenAPI spec is enough at v2.8; community / first-party SDKs can follow.
 
 **Done when:** A premium user can generate an API key from settings, use it to perform the full invoice lifecycle (create / publish / send / check-status / mark-state) via curl, hit a documented rate limit, and revoke the key cleanly; an AI agent given a key can drive the same flows; non-premium users receive 403 on every API route; the OpenAPI spec is the source of truth and is served from the deployment.
 
 ---
 
-### 🚫 v2.2 — Referral Codes
+### 🚫 v2.9: Referral codes
 
-**Branch:** `v2.2/referral-codes`
+**Branch:** `v2.9/referral-codes`
 
-> **Depends on:** v2.0 (premium tier — the payout target is premium signups).
+**Later.**
+
+> **Depends on:** v2.0 (entitlement system — the payout target is Pro signups).
 
 **Context:** Every account gets a referral code at signup. New users can sign up with someone's code. Referrers earn a cut of premium signups they bring in. Mechanism designed to grow word-of-mouth without paid ads.
 
@@ -2371,16 +2570,16 @@ The user has flagged this entry as needing a thorough grilling before any code i
 **Out of scope (deferred)**
 - Multi-tier (referrer of a referrer) attribution. Single-hop only.
 - Custom-vanity codes (paid feature for marketing partners). Auto-generated only.
-- Affiliate-style dashboards with conversion analytics. Settings-page summary only at v2.2.
+- Affiliate-style dashboards with conversion analytics. Settings-page summary only at v2.9.
 - Coupon-style codes that grant a discount to the referee. Referee gets the standard signup; only the referrer earns.
 
 **Done when:** Every account has a referral code; a new user signing up via `?ref=CODE` or the form field has the relationship recorded; a premium upgrade by a referred user produces a payout event whose mechanics are exactly as decided in the grilling session above; the referrer can see their referrals and payout state from settings.
 
 ---
 
-### 🚫 v2.3 — OAuth
+### 🚫 v2.10: OAuth
 
-**Branch:** `v2.3/oauth`
+**Branch:** `v2.10/oauth`
 
 - [ ] Google OAuth
 - [ ] GitHub OAuth
@@ -2388,39 +2587,17 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ---
 
-### 🚫 v2.4 — Custom Subdomains + Branding
+### 🚫 v2.11: Custom subdomains
 
-**Branch:** `v2.4/custom-subdomains`
+**Branch:** `v2.11/custom-subdomains`
 
-- [ ] Wildcard subdomain routing (`yourcompany.satsend.me`)
-- [ ] Logo/branding upload (paid tier only)
-
----
-
-### 🚫 v2.5 — Address Book + Reusable Items
-
-**Branch:** `v2.5/address-book`
-
-> **Depends on:** v1.7 (address format standardisation) — saved addresses use the structured multi-field format.
-
-**Saved client details**
-- [ ] User can save up to 5 client profiles (name, email, company, structured address, tax ID)
-- [ ] Client selector on invoice creation form — choosing a saved client pre-fills all client fields
-- [ ] Manage saved clients: add, edit, delete from a settings or clients page
-
-**Saved sender (own) details**
-- [ ] User can save one set of their own invoicing details (name, email, company, structured address, tax ID)
-- [ ] "Your details" section on invoice creation pre-fills from saved profile if one exists
-- [ ] User can update their saved details from settings
-
-**Reusable items**
-- [ ] Reusable service/line item templates
+- [ ] Wildcard subdomain routing (`yourcompany.satsend.me`) as an alternative to the path-based pretty links (v2.1)
 
 ---
 
-### 🚫 v2.6 — Multi-Currency Support
+### 🚫 v2.12: Multi-currency support
 
-**Branch:** `v2.6/multi-currency`
+**Branch:** `v2.12/multi-currency`
 
 - [ ] Currency selector on invoice creation (USD, EUR, GBP, AUD, CAD, etc.)
 - [ ] BTC price fetched in the selected fiat currency
@@ -2430,7 +2607,7 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ## Notes
 
-- Billing (v2.0+) is fully deferred until v1 is stable and in use.
+- Billing (v2.0+) is part of the launch plan (free + Pro), sequenced after the security hardening train. The free/paid split and build order live in the v2 section above.
 - **Future: publish under a different GitHub identity.** The project currently lives
   under the `jonnymarshall` GitHub account. Jonny wants it moved to a separate,
   anonymous identity before public launch (a concern about anonymity, not
@@ -2682,7 +2859,7 @@ Findings H-DB-1, H-DB-2. One migration.
 
 Steps (new migration, add constraints `NOT VALID` then validate):
 1. `amounts_non_negative` (subtotal/tax/total ≥ 0); `tax_percent_range` (0-100);
-   `currency_whitelist` (start `('USD')`, widen when v2.6 lands);
+   `currency_whitelist` (start `('USD')`, widen when v2.12 lands);
    `totals_consistent` (`total_fiat = round(subtotal_fiat + tax_fiat, 2)`).
 2. `line_items` shape: an `immutable` helper function `line_items_valid(jsonb)`
    asserting array-of-objects with numeric `quantity`/`unit_price`, wired into a

@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payment sweep may be enabled in exactly one environment per database (its
   owner), and a local session may enable it temporarily only against the
   local/test database, never one shared with production.
+- **v1.4.23-H — migration `0029` (schema half).** `pre_archive_status` is now the
+  `invoice_status` enum (+ a CHECK), so un-archive cannot write a stale value; the
+  `invoice_email_summary` view is recreated with its columns enumerated (no
+  `select i.*`) and its `security_invoker` + anon revoke re-asserted; an
+  `invoices (user_id, created_at desc)` index is added and `auth.uid()` is wrapped
+  as `(select auth.uid())` in all three RLS policies; and `email_events.updated_at`
+  is maintained by a trigger instead of the application. **Split out:** the
+  `(user_id, invoice_number)` unique index — production already has 8 duplicate
+  groups, so it would fail the migration; tracked as v1.4.23.1-H with an audit
+  listing in `development/invoice-number-duplicates-audit.md`.
 - Flipped stale `🔄` markers on v1.4.14.1/.2/.3 to `✅` (merged in PRs #31-33).
 - Old `⏳ v1.4.19` and `⏳ v1.4.28` sections marked SUPERSEDED by their `-H`
   hardening-train equivalents (v1.4.19-H / v1.4.28-H).
@@ -66,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.23-H — RLS & indexes (code half).** Three correctness fixes. The Resend
+  webhook now treats only Postgres `23505` as a duplicate — any other dedupe-insert
+  error returns 500 instead of a silent 200, so Svix retries and the event is not
+  lost; if a later step fails, the dedupe claim is released so the retry can run;
+  and deliveries older than 30 days are swept (best-effort, never fails the
+  webhook). Un-archiving a row whose previous status was never recorded now leaves
+  it archived and reports it, instead of silently downgrading a paid invoice to
+  pending. And `buildDuplicateInvoiceNumber` now produces a genuinely unique
+  number (` (copy)`, ` (copy 2)`, …) — the fixed suffix it used before meant
+  duplicating a copy created duplicate invoice numbers in production.
 - **v1.4.22-H — Detection robustness (server side).** Seven ways background
   payment detection could be fooled, fixed: the sweep now checks that its "only
   if still status X" update actually matched a row before sending an email (no
