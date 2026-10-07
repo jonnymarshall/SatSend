@@ -1702,10 +1702,20 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   silently 404ing on access-protected invoices) and gained `secure` in prod;
   `btc-price` rejects non-USD with 400; the cron secret is compared in constant
   time; line items capped at 100; the public PDF is cached by version (ETag/304).
-- 🔴 **v1.4.26-H — Rate limiting & abuse** (`v1.4.26-H/rate-limiting`): Vercel WAF
-  rate-limit rules on access-code verify / email send / PDF route; server-side
-  `client_email` validation; per-user daily send cap; minimum access-code length +
-  hashed storage.
+- ✅ **v1.4.26-H — Abuse controls (code side)** (`v1.4.26-H/rate-limiting`): shipped —
+  server-side `client_email` validation (empty OK, malformed rejected on save and
+  at send, where a bad payer address skips quietly); minimum access-code length of
+  6; and a per-user daily send cap of 200 enforced in the shared send helper. At
+  the cap, automated sends (detected/confirmed) are skipped without throwing so the
+  sweep/fast-path cannot crash, while owner-initiated sends surface an error.
+  **Split out:** rate limiting and hashed access codes → v1.4.26.1-H.
+- 🔴 **v1.4.26.1-H — Rate limiting & hashed access codes** (`v1.4.26.1-H/rate-limiting-and-hashing`):
+  deferred from v1.4.26-H. Vercel WAF rate-limit rules on access-code verify /
+  email send / PDF route — a Pro+ feature, and the project is on Hobby, so this
+  waits for an upgrade (or an app-level limiter if ever needed). Hashed
+  access-code storage: needs a migration plus two decisions first — owners
+  currently see their code in the dashboard (hashing makes it reset-only), and the
+  check is case-insensitive (hashing needs a normalisation rule).
 
 ### Phase 2 — Structural single-sources-of-truth
 

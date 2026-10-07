@@ -28,10 +28,28 @@ interface ResendSendResult {
   error?: { name?: string; message?: string } | null;
 }
 
-export type EmailOutcomeStatus = "sent" | "failed" | "skipped_no_api_key";
+export type EmailOutcomeStatus = "sent" | "failed" | "skipped_no_api_key" | "skipped_daily_cap";
 export interface EmailOutcome {
   status: EmailOutcomeStatus;
   errorMessage?: string;
+}
+
+// v1.4.26-H: per-user daily send cap. Counts email_events rows over a rolling
+// 24h. 200 is generous: a busy day (30 invoices published, 20 detected, 20
+// confirmed, each emailing owner and payer) can pass 100 without any abuse.
+const DAILY_SEND_CAP = 200;
+
+async function isOverDailySendCap(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await admin
+    .from("email_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", since);
+  return (count ?? 0) >= DAILY_SEND_CAP;
 }
 
 async function safeSend(
@@ -39,6 +57,22 @@ async function safeSend(
   send: () => Promise<ResendSendResult>,
 ): Promise<EmailOutcome> {
   const admin = createAdminClient();
+
+  // At the cap, skip WITHOUT inserting a row (so the count cannot inflate
+  // itself) and never throw — automated callers (the sweep, the fast-path) must
+  // keep running, or a capped send would crash detection mid-flight. Callers
+  // decide how to surface it.
+  try {
+    if (await isOverDailySendCap(admin, ctx.userId)) {
+      console.warn(
+        `[email] skipping ${ctx.type} — daily send cap (${DAILY_SEND_CAP}) reached for user ${ctx.userId}`,
+      );
+      return { status: "skipped_daily_cap" };
+    }
+  } catch (err) {
+    // A counting failure must never block mail.
+    console.error("[email] daily send cap check failed", err);
+  }
 
   const { data: row, error: insertError } = await admin
     .from("email_events")
