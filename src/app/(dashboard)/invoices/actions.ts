@@ -84,7 +84,6 @@ export interface InvoicePayload {
 // `<Input maxLength={30}>` on the form. Server-side guard catches any path
 // that bypasses the form (devtools paste, programmatic call, future API).
 const INVOICE_NUMBER_MAX_LENGTH = 30;
-const DUPLICATE_SUFFIX = "... (copy)";
 
 function assertInvoiceNumberLength(invoiceNumber: string | null | undefined): void {
   if (invoiceNumber && invoiceNumber.length > INVOICE_NUMBER_MAX_LENGTH) {
@@ -94,14 +93,25 @@ function assertInvoiceNumberLength(invoiceNumber: string | null | undefined): vo
   }
 }
 
-// v1.4.16: appends "... (copy)" and trims the source from the end only when
-// needed to fit the 30-char cap. Returns null when source is null/empty so
-// duplicates of unnumbered invoices stay unnumbered.
-function buildDuplicateInvoiceNumber(source: string | null | undefined): string | null {
+// v1.4.23-H: pick a genuinely unique number. The old version appended a fixed
+// "... (copy)", so duplicating an invoice that was already a copy produced the
+// same string again and manufactured duplicate numbers (a live prod bug). Walk
+// " (copy)", " (copy 2)", ... until one is not already taken, trimming the source
+// to fit the 30-char cap. Returns null when source is null/empty so duplicates of
+// unnumbered invoices stay unnumbered.
+function buildDuplicateInvoiceNumber(
+  source: string | null | undefined,
+  taken: Set<string>,
+): string | null {
   if (!source) return null;
-  const room = INVOICE_NUMBER_MAX_LENGTH - DUPLICATE_SUFFIX.length;
-  const base = source.length > room ? source.slice(0, room) : source;
-  return `${base}${DUPLICATE_SUFFIX}`;
+  for (let n = 1; n <= 999; n++) {
+    const suffix = n === 1 ? " (copy)" : ` (copy ${n})`;
+    const room = INVOICE_NUMBER_MAX_LENGTH - suffix.length;
+    const base = source.length > room ? source.slice(0, room) : source;
+    const candidate = `${base}${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return null;
 }
 
 export async function saveDraft(payload: InvoicePayload) {
@@ -466,11 +476,20 @@ export async function duplicateInvoice(invoiceId: string) {
 
   if (!source || source.user_id !== user!.id) throw new Error("Invoice not found");
 
+  // Fetch the numbers this user already has so the duplicate gets a free suffix
+  // (v1.4.23-H: the old fixed suffix collided when copying a copy).
+  const { data: takenRows } = await supabase
+    .from("invoices")
+    .select("invoice_number")
+    .eq("user_id", user!.id)
+    .not("invoice_number", "is", null);
+  const taken = new Set((takenRows ?? []).map((r) => r.invoice_number as string));
+
   const { data: created, error } = await supabase
     .from("invoices")
     .insert({
       user_id: source.user_id,
-      invoice_number: buildDuplicateInvoiceNumber(source.invoice_number),
+      invoice_number: buildDuplicateInvoiceNumber(source.invoice_number, taken),
       your_name: source.your_name,
       your_email: source.your_email ?? "",
       your_company: source.your_company,

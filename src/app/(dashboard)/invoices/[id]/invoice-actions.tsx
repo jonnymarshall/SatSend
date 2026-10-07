@@ -186,7 +186,16 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
           <Button
             id="invoice-actions--unarchive-button"
             variant="outline"
-            onClick={() => run(() => bulkUnarchive([invoice.id]))}
+            onClick={() =>
+              run(async () => {
+                const { unarchived } = await bulkUnarchive([invoice.id]);
+                if (unarchived === 0) {
+                  setError(
+                    "This invoice can't be unarchived automatically because its previous status wasn't recorded. Use the Mark as menu to set its status."
+                  );
+                }
+              })
+            }
             disabled={busy}
           >
             Unarchive

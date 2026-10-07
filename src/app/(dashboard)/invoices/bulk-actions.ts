@@ -56,7 +56,7 @@ export async function bulkDelete(ids: string[]) {
   revalidatePath("/invoices");
 }
 
-export async function bulkUnarchive(ids: string[]) {
+export async function bulkUnarchive(ids: string[]): Promise<{ unarchived: number; skipped: number }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -68,14 +68,17 @@ export async function bulkUnarchive(ids: string[]) {
     .eq("status", "archived");
 
   if (fetchError) throw new Error(fetchError.message);
-  if (!rows || rows.length === 0) {
-    revalidatePath("/invoices");
-    return;
-  }
+
+  const archived = (rows ?? []) as { id: string; pre_archive_status: string | null }[];
+  // A row with no recorded prior status (a legacy NULL) is left archived rather
+  // than guessed at: defaulting it to 'pending' could silently downgrade a
+  // previously-paid invoice, the worst outcome in a payments app. Report it so
+  // the caller can ask the user to set the status manually. (v1.4.23-H / M-DB-4)
+  const restorable = archived.filter((row) => row.pre_archive_status !== null);
 
   const MONITORABLE = new Set(["pending", "overdue", "payment_detected"]);
-  for (const row of rows as { id: string; pre_archive_status: string | null }[]) {
-    const restored = row.pre_archive_status ?? "pending";
+  for (const row of restorable) {
+    const restored = row.pre_archive_status as string;
     const patch: Record<string, unknown> = { status: restored, pre_archive_status: null };
     // Resume monitoring from scratch when restoring to a status the sweep
     // watches (v1.4.22-H / M-DB-3), so the archived row's stale schedule and
@@ -96,6 +99,7 @@ export async function bulkUnarchive(ids: string[]) {
   }
 
   revalidatePath("/invoices");
+  return { unarchived: restorable.length, skipped: ids.length - restorable.length };
 }
 
 export async function bulkMarkPaid(ids: string[]) {

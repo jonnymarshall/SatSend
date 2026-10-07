@@ -156,7 +156,15 @@ export function InvoiceDataTable({ data, userId }: Props) {
         onMarkOverdue: (id) => runRowAction(() => markOverdue(id)),
         onMarkPending: (id) => runRowAction(() => markUnpaid(id)),
         onArchive: (id) => runRowAction(() => bulkArchive([id])),
-        onUnarchive: (id) => runRowAction(() => bulkUnarchive([id])),
+        onUnarchive: (id) =>
+          runRowAction(async () => {
+            const { unarchived } = await bulkUnarchive([id]);
+            setArchiveFeedback(
+              unarchived === 0
+                ? "This invoice can't be unarchived automatically because its previous status wasn't recorded. Set its status from the row menu."
+                : null
+            );
+          }),
         onDelete: (id) => setDeleteTarget([id]),
         onCopyPublicLink: copyPublicLink,
         onDuplicate: (id) => runRowAction(() => duplicateInvoice(id)),

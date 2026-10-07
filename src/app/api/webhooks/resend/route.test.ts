@@ -47,13 +47,29 @@ interface FromMockState {
   dedupeInsert: { error: unknown };
   emailEventsRow: Record<string, unknown> | null;
   updates: UpdateCall[];
+  lookupError?: unknown;
+  updateError?: unknown;
+  releasedClaims?: string[];
+  retentionSweeps?: number;
 }
 
 function installFromMock(state: FromMockState) {
+  state.releasedClaims ??= [];
+  state.retentionSweeps ??= 0;
   mockFrom.mockImplementation((table: string) => {
     if (table === "webhook_deliveries") {
       return {
         insert: vi.fn().mockResolvedValue(state.dedupeInsert),
+        delete: vi.fn(() => ({
+          eq: vi.fn((col: string, val: string) => {
+            if (col === "svix_id") state.releasedClaims!.push(val);
+            return Promise.resolve({ error: null });
+          }),
+          lt: vi.fn((col: string) => {
+            if (col === "received_at") state.retentionSweeps = (state.retentionSweeps ?? 0) + 1;
+            return Promise.resolve({ error: null });
+          }),
+        })),
       };
     }
     if (table === "email_events") {
@@ -62,7 +78,9 @@ function installFromMock(state: FromMockState) {
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
               limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({ data: state.emailEventsRow, error: null }),
+                maybeSingle: vi
+                  .fn()
+                  .mockResolvedValue({ data: state.emailEventsRow, error: state.lookupError ?? null }),
               }),
             }),
           }),
@@ -70,7 +88,7 @@ function installFromMock(state: FromMockState) {
         update: vi.fn((payload: Record<string, unknown>) => ({
           eq: vi.fn((col: string, val: string) => {
             if (col === "id") state.updates.push({ payload, rowId: val });
-            return Promise.resolve({ error: null });
+            return Promise.resolve({ error: state.updateError ?? null });
           }),
         })),
       };
@@ -251,5 +269,71 @@ describe("POST /api/webhooks/resend", () => {
     });
     expect(res.status).toBe(200);
     expect(state.updates[0].payload.status).toBe("complained");
+  });
+
+  it("returns 500 (not a silent success) when the dedupe insert fails for a non-duplicate reason (v1.4.23-H / M-DB-7)", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: { code: "08006", message: "connection failure" } },
+      emailEventsRow: { id: "row-db", status: "sent" },
+      updates: [],
+    };
+    installFromMock(state);
+    const { res } = await postEvent({
+      body: { type: "email.delivered", data: { email_id: "re_abc" } },
+    });
+    expect(res.status).toBe(500);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("releases the dedupe claim and returns 500 when the email_events update fails, so Svix can retry (v1.4.23-H / M-DB-7)", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: null },
+      emailEventsRow: { id: "row-upd", status: "sent" },
+      updates: [],
+      updateError: { message: "deadlock detected" },
+    };
+    installFromMock(state);
+    const { res, svixId } = await postEvent({
+      body: { type: "email.delivered", data: { email_id: "re_abc" } },
+    });
+    expect(res.status).toBe(500);
+    expect(state.releasedClaims).toContain(svixId);
+  });
+
+  it("releases the dedupe claim and returns 500 when the email_events lookup fails (v1.4.23-H / M-DB-7)", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: null },
+      emailEventsRow: null,
+      updates: [],
+      lookupError: { message: "boom" },
+    };
+    installFromMock(state);
+    const { res, svixId } = await postEvent({
+      body: { type: "email.delivered", data: { email_id: "re_abc" } },
+    });
+    expect(res.status).toBe(500);
+    expect(state.releasedClaims).toContain(svixId);
+  });
+
+  it("sweeps old dedupe rows once per delivery (retention, v1.4.23-H / M-DB-7)", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: null },
+      emailEventsRow: { id: "row-sweep", status: "sent" },
+      updates: [],
+    };
+    installFromMock(state);
+    await postEvent({ body: { type: "email.delivered", data: { email_id: "re_abc" } } });
+    expect(state.retentionSweeps).toBe(1);
+  });
+
+  it("does not write updated_at in the payload (the DB trigger owns it, v1.4.23-H)", async () => {
+    const state: FromMockState = {
+      dedupeInsert: { error: null },
+      emailEventsRow: { id: "row-ts", status: "sent" },
+      updates: [],
+    };
+    installFromMock(state);
+    await postEvent({ body: { type: "email.delivered", data: { email_id: "re_abc" } } });
+    expect(state.updates[0].payload).not.toHaveProperty("updated_at");
   });
 });
