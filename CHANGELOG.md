@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.4.31.2-H — Integration harness, second suite (DB invariants).**
+  `test-automation/db-invariants.mjs` (`npm run test:db`) proves migration 0027
+  against real Postgres: impossible money is rejected by the CHECK constraints,
+  non-draft invoices cannot be deleted, a paid invoice's money is frozen while its
+  status stays writable, and a draft can be deleted. Same DB-only blind-spot class
+  as the anon hole.
 - **v1.4.31.1-H — Integration test layer (first suite).** `test-automation/rls-integration.mjs`
   (`npm run test:rls`) runs against the real test Supabase with genuine user
   sessions. Local-only and guarded: it skips without an anon key, and aborts on a
