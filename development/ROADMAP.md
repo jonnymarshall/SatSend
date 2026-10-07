@@ -1769,6 +1769,12 @@ Each is one branch. Detail: Appendix A → Phase 2.
   EXECUTE to `anon` on new functions, so 0030's `revoke … from public` had not
   taken — fixed by 0031 (test and prod). Follow-ups: CI wiring, more suites
   (status transitions), M-FE-1's shared fake.
+- ✅ **v1.4.31.2-H — Integration harness, second suite: DB invariants** (`v1.4.31.2-H/db-invariants`):
+  `test-automation/db-invariants.mjs` (`npm run test:db`) proves migration 0027
+  against real Postgres: impossible money (inconsistent totals, negative, non-USD,
+  out-of-range tax, malformed line items) is rejected; non-draft invoices cannot be
+  deleted; a paid invoice's money is frozen while its status stays writable; a
+  draft can be deleted. Same DB-only blind-spot class as the anon hole.
 
 ### Roadmap & docs housekeeping (do alongside Phase 0)
 
