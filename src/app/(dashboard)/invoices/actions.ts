@@ -72,6 +72,22 @@ async function addressUniquenessError(
       message: `This bitcoin address has already been used on ${ref}. Please provide a unique address.`,
     };
   }
+
+  // v1.4.31-H (H-DB-3): the lookup above is RLS-scoped, so it cannot see another
+  // user's invoice, while the unique index is global. Ask a security-definer RPC
+  // so the collision is caught at validation time, not after a failed insert.
+  // The message is generic — naming the other tenant's invoice would leak more.
+  const { data: registeredElsewhere } = await supabase.rpc("is_address_registered", {
+    addr: address,
+  });
+  if (registeredElsewhere) {
+    return {
+      ok: false,
+      field: "btc_address",
+      message:
+        "This bitcoin address has already been used on another invoice. Please provide a unique address.",
+    };
+  }
   return null;
 }
 

@@ -1750,10 +1750,20 @@ Each is one branch. Detail: Appendix A → Phase 2.
   are NOT in lockstep today (see `manual-tests/v1.4.30-H-realtime-unification.md`);
   decide which is canonical, sync them, then add the drift-guard test (with a
   tolerance for OKLCH→hex rounding). Do the styling half with v1.5.
-- ⏳ **v1.4.31-H — Integration test layer** (`test/supabase-integration`): the
-  PRD-promised suite against a real Supabase instance, starting with
-  address-uniqueness (fix the cross-tenant oracle here via a `security definer`
-  boolean RPC) and status transitions.
+- ✅ **v1.4.31-H — Address uniqueness across tenants (H-DB-3)** (`v1.4.31-H/address-uniqueness`):
+  shipped — a `security definer` RPC (`is_address_registered`, search_path pinned,
+  execute limited to authenticated) lets the pre-check see across tenants, so a
+  cross-tenant collision is caught at validation time instead of after a failed
+  insert. Layered: own-row lookup (names your invoice) → RPC (generic) → 23505
+  (race). **Honest scope:** this does NOT close the address-registered oracle
+  (intrinsic to global uniqueness; rate limiting is the mitigation, v1.4.26.1-H) —
+  it makes the pre-check correct and the error timely. **Split out:** the
+  integration test harness → v1.4.31.1-H.
+- 🔴 **v1.4.31.1-H — Integration test layer** (`v1.4.31.1-H/supabase-integration`):
+  deferred from v1.4.31-H (M-FE-1, H-FE). Stand up the promised suite against the
+  real (test-only) Supabase, starting with address uniqueness and status
+  transitions. Local-only first (CI wiring needs test-DB secrets + isolation).
+  Never prod; never set `PAYMENT_SWEEP_ENABLED` in test env (one writer per DB).
 
 ### Roadmap & docs housekeeping (do alongside Phase 0)
 
@@ -3257,11 +3267,9 @@ until the due queue drains. This is roadmap item v1.4.28 — promote it.
   `security definer` RPC returning a boolean, and catch `23505` for a friendly
   message.
 
-- **H-FE-1 — Test suite is RED on main.** 5 tests in `actions.test.ts` fail
-  because a fixture `due_date = "2026-07-10"` is now in the past, so publish flips
-  to `overdue` and the assertions expect `pending`. They started failing silently
-  on 2026-07-10 with no code change. A red suite masks all future regressions.
-  Use `vi.setSystemTime()` (as `payment-schedule.test.ts` already does correctly).
+- **H-FE-1 — Test suite is RED on main. [RESOLVED]** Fixed by the v1.4.19-H (S0)
+  time-freeze; re-verified at v1.4.31-H: `npm run test:run` is 578/578 green on
+  main. Kept for the record.
 
 - **H-FE-2 — Proxy route matcher is silently ignored.** `src/proxy.ts:49`
   exports `proxyConfig`; Next 16 recognizes `export const config`. So the matcher

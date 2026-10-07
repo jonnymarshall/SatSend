@@ -333,6 +333,7 @@ export type Database = {
       }
     }
     Functions: {
+      is_address_registered: { Args: { addr: string }; Returns: boolean }
       line_items_valid: { Args: { items: Json }; Returns: boolean }
     }
     Enums: {

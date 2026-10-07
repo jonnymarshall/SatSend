@@ -46,6 +46,7 @@ function makeSupabase({
   deleteError = null as object | null,
   userId = "user-1",
   takenInvoiceNumbers = [] as { invoice_number: string }[],
+  rpcResult = null as boolean | null,
 } = {}) {
   // insert chain: .insert().select().single()
   const insertSingle = vi.fn().mockResolvedValue({ data: insertData, error: insertError });
@@ -97,6 +98,7 @@ function makeSupabase({
       update: updateChain,
       delete: deleteChain,
     })),
+    rpc: vi.fn().mockResolvedValue({ data: rpcResult, error: null }),
   } as unknown as AnySupabase);
 
   return { insertSingle, insertChain, updateChain, updateEq, deleteEq, maybeSingle, takenEq, takenNot };
@@ -170,6 +172,13 @@ describe("saveDraft", () => {
     const res = await saveDraft(VALID_DRAFT);
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
     expect(insertSingle).toHaveBeenCalled();
+  });
+
+  it("returns a btc_address field error when the address is registered on another tenant (RPC backstop) (v1.4.31-H)", async () => {
+    const { insertSingle } = makeSupabase({ rpcResult: true });
+    const res = await saveDraft(VALID_DRAFT);
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    expect(insertSingle).not.toHaveBeenCalled();
   });
 
   // v1.4.16: invoice_number is capped at 30 chars (DB CHECK, invoiceSchema, form maxLength).
