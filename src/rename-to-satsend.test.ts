@@ -9,11 +9,11 @@ const ROOT = path.resolve(__dirname, "..");
 const FORBIDDEN = ["pay", "bitty"].join("");
 const FORBIDDEN_RE = new RegExp(FORBIDDEN, "i");
 
-function grepCount(targets: string[]): { count: number; files: string[] } {
+function grepCount(targets: string[], extra = ""): { count: number; files: string[] } {
   const existing = targets.filter((t) => existsSync(path.join(ROOT, t)));
   if (existing.length === 0) return { count: 0, files: [] };
   try {
-    const out = execSync(`grep -RIil "${FORBIDDEN}" ${existing.join(" ")}`, {
+    const out = execSync(`grep -RIil "${FORBIDDEN}" ${extra} ${existing.join(" ")}`, {
       cwd: ROOT,
       encoding: "utf8",
     });
@@ -45,6 +45,14 @@ describe(`v1.4.15 rename guard — living copy reads SatSend, not the old name`,
       "package.json",
       "package-lock.json",
     ]);
+    expect(files).toEqual([]);
+  });
+
+  it(`development/ living docs contain zero forbidden references (archive excluded)`, () => {
+    const { files } = grepCount(
+      ["development"],
+      "--exclude=ROADMAP-ARCHIVE.md --exclude-dir=archive",
+    );
     expect(files).toEqual([]);
   });
 

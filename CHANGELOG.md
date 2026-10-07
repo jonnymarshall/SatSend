@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.32-H — Roadmap/docs restructure.** Split the completed v1.0–v1.4.18 build
+  into `development/ROADMAP-ARCHIVE.md`; the live `ROADMAP.md` is now ~2225 lines
+  (the old "< 500" target predated the hardening train — restated honestly). Added
+  `development/OUTSTANDING-VERIFICATIONS.md`, `manual-tests/README.md`, and a root
+  `.env.example` (with `!.env.example` un-ignored). `package.json` set to `1.4.32`
+  (plain SemVer). The rename guard now covers living docs under `development/`
+  (archived history and `ROADMAP-ARCHIVE.md` excluded). The `roadmap-progress` skill
+  now counts ✅ across both files (edited outside the repo). **`master` is
+  deliberately not deleted** — it is an unrelated history, not a stale branch.
 - **v1.4.30-H — Realtime unification.** The dashboard and payer-page Realtime
   hooks were near-duplicates; both are now thin wrappers over one
   `useInvoiceChannel` (with `auth` and subscription style as explicit parameters),
