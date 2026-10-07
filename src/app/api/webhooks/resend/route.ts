@@ -12,6 +12,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Webhook, WebhookVerificationError } from "svix";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/database.types";
 
 // Map Resend event type → target email_events.status value. Unrecognised
 // types fall through to a no-op 200 (Resend retries on 5xx; we don't want
@@ -158,7 +159,7 @@ export async function POST(request: NextRequest) {
   }
 
   // updated_at is owned by the DB trigger (migration 0029), so it is not set here.
-  const update: Record<string, unknown> = { status: targetStatus };
+  const update: Database["public"]["Tables"]["email_events"]["Update"] = { status: targetStatus };
   if (targetStatus === "bounced") {
     const raw = event.data?.bounce?.message ?? "bounced";
     // Resend bounce messages are often multi-sentence with SMTP detail. Surface

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceDataTable } from "./data-table";
+import type { InvoiceRow } from "./columns";
 
 export default async function InvoicesPage() {
   const supabase = await createClient();
@@ -39,7 +40,7 @@ export default async function InvoicesPage() {
         </div>
       ) : (
         <Suspense fallback={null}>
-          <InvoiceDataTable data={invoices} userId={user?.id ?? ""} />
+          <InvoiceDataTable data={(invoices ?? []) as unknown as InvoiceRow[]} userId={user?.id ?? ""} />
         </Suspense>
       )}
     </div>

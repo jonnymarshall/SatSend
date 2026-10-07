@@ -8,11 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
+import { canMarkAsOverdue, canMarkAsPending, type InvoiceForOverdueActions } from "@/lib/invoices/overdue-actions";
 
 export interface MarkAsMenuProps {
   invoiceId: string;
-  status: string;
+  status: InvoiceForOverdueActions["status"];
   dueDate: string | null;
   onMarkPaid: (id: string) => void;
   onMarkUnpaid: (id: string) => void;

@@ -1721,9 +1721,13 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
 
 Each is one branch. Detail: Appendix A → Phase 2.
 
-- ⏳ **v1.4.27-H — Generate Supabase types** (`chore/supabase-types`): generate
-  `database.types.ts`, thread `Database` through the three client factories, delete
-  the four hand-declared row shapes.
+- ✅ **v1.4.27-H — Generate Supabase types** (`chore/supabase-types`): shipped —
+  `src/lib/database.types.ts` generated (`npm run gen:types`) and committed;
+  `Database` threaded through the three client factories; the hand-declared row
+  shapes replaced by types derived from the generated ones (one `Invoice` + `Pick`
+  subsets); one home for the JSONB cast. `npm run typecheck` added as the gate.
+  Surfaced real drift (nullable `btc_address`, `send_method` as text, untyped
+  update payloads).
 - ⏳ **v1.4.29-H — Zod + typed action results** (`refactor/zod-validation`): one
   shared `invoiceSchema` for form + actions; convert thrown-string validation
   errors to `{ ok, field, message }` return values; collapse the form's three

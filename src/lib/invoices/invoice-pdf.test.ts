@@ -33,6 +33,18 @@ const baseInvoice: Invoice = {
   due_date: "2026-05-15",
   created_at: "2026-04-15T10:00:00Z",
   updated_at: "2026-04-15T10:00:00Z",
+  amount_received_fiat: null,
+  amount_received_sats: null,
+  btc_price_at_detection: null,
+  email_attempted_at: null,
+  mempool_seen_at: null,
+  next_check_at: null,
+  overpaid: false,
+  pre_archive_status: null,
+  published_at: null,
+  send_method: null,
+  sent_at: null,
+  stage_attempt: 0,
 };
 
 async function textFromPdf(invoice: Invoice, appUrl = "https://satsend.test"): Promise<string> {

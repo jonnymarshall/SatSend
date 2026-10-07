@@ -9,6 +9,7 @@ import { InvoiceActions } from "./invoice-actions";
 import { InvoiceActivityCard } from "./invoice-activity-card";
 import { BackToInvoices } from "./back-to-invoices";
 import type { LineItem } from "@/lib/invoices";
+import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 
 export default async function InvoiceDetailPage({
@@ -29,7 +30,7 @@ export default async function InvoiceDetailPage({
 
   if (!invoice) notFound();
 
-  const items: LineItem[] = invoice.line_items ?? [];
+  const items: LineItem[] = toInvoice(invoice).line_items;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const shareLink = `${appUrl}/invoice/${invoice.id}`;
 

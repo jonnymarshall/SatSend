@@ -19,14 +19,15 @@ import {
 } from "../actions";
 import { bulkArchive, bulkDelete, bulkUnarchive } from "../bulk-actions";
 import { parseServerError } from "@/lib/invoices";
+import type { Database } from "@/lib/database.types";
 
 interface Invoice {
   id: string;
-  status: string;
+  status: Database["public"]["Enums"]["invoice_status"];
   due_date?: string | null;
   client_email?: string | null;
   sent_at?: string | null;
-  send_method?: "email" | "manual" | null;
+  send_method?: string | null;
   email_attempted_at?: string | null;
 }
 

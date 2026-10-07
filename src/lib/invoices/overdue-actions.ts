@@ -7,10 +7,10 @@
 // Used by both the row dropdown and the invoice detail page so visibility
 // stays consistent across surfaces.
 
-export interface InvoiceForOverdueActions {
-  status: string;
-  due_date: string | null;
-}
+import type { Invoice } from "@/lib/invoice-public";
+
+// Derived from the generated types (v1.4.27-H); only these two fields matter here.
+export type InvoiceForOverdueActions = Pick<Invoice, "status" | "due_date">;
 
 const UNPAID_STATES = new Set(["pending", "payment_detected", "underpaid"]);
 

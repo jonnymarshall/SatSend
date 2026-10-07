@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MarkAsMenu } from "./mark-as-menu";
+import type { InvoiceForOverdueActions } from "@/lib/invoices/overdue-actions";
 
 const onMarkPaid = vi.fn();
 const onMarkUnpaid = vi.fn();
@@ -12,7 +13,7 @@ function open() {
   fireEvent.click(screen.getByRole("button", { name: /mark as/i }));
 }
 
-function renderMenu(props: { status: string; dueDate?: string | null; invoiceId?: string }) {
+function renderMenu(props: { status: InvoiceForOverdueActions["status"]; dueDate?: string | null; invoiceId?: string }) {
   render(
     <MarkAsMenu
       invoiceId={props.invoiceId ?? "inv-1"}

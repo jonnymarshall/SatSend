@@ -15,7 +15,7 @@ export interface PublishMenuProps {
   emailAttemptedAt: string | null;
   clientEmail: string | null;
   sentAt?: string | null;
-  sendMethod?: "email" | "manual" | null;
+  sendMethod?: string | null;
   onSendEmail: (id: string) => void;
   onMarkSent: (id: string) => void;
   onDownloadAndMarkSent: (id: string) => void;
