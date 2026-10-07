@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { computeInvoiceTotals, LineItem, isValidEmail, lineItemsToJson, MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
+import { computeInvoiceTotals, LineItem, isValidEmail, lineItemsToJson } from "@/lib/invoices";
+import {
+  invoiceSchema,
+  firstFieldError,
+  dbErrorToFieldError,
+  type ActionResult,
+  type FieldError,
+} from "@/lib/invoices/schema";
 import { toInvoice, type Invoice } from "@/lib/invoice-public";
 import { canPublishInvoice } from "@/lib/invoices/can-publish";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
@@ -13,33 +20,36 @@ import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 import { addressHasHistory } from "@/lib/mempool";
 
-async function assertAddressFreshness(address: string, contextId?: string): Promise<void> {
+async function addressFreshnessError(address: string, contextId?: string): Promise<FieldError | null> {
   const hasHistory = await addressHasHistory(address);
   if (hasHistory === true) {
-    throw new Error(
-      "btc_address: This address has already received transactions — use a fresh address for each invoice.",
-    );
+    return {
+      ok: false,
+      field: "btc_address",
+      message: "This address has already received transactions — use a fresh address for each invoice.",
+    };
   }
   if (hasHistory === null) {
     // Fail closed (v1.4.22-H / M-MONEY-5): we could not confirm the address is
     // unused. An address with prior history would let its old transaction flip
     // this brand-new invoice straight to paid, so refuse rather than guess.
     const ref = contextId ? ` (invoice ${contextId})` : "";
-    throw new Error(
-      `btc_address: Couldn't verify this address is unused right now${ref} — the network check failed. Please try again in a moment.`,
-    );
+    return {
+      ok: false,
+      field: "btc_address",
+      message: `Couldn't verify this address is unused right now${ref} — the network check failed. Please try again in a moment.`,
+    };
   }
+  return null;
 }
 
-// v1.4.13.6: extracted from loadAndAuthorise so saveDraft and updateDraft can
-// run the same uniqueness check at form-submit time. Previously only publish
-// ran it, so a draft with a duplicate address would save fine and only fail
-// at publish time — confusing fail-late UX.
-async function assertAddressUniqueness(
+// v1.4.13.6: extracted so saveDraft and updateDraft run the same uniqueness
+// check at form-submit time, not only at publish.
+async function addressUniquenessError(
   supabase: Awaited<ReturnType<typeof createClient>>,
   address: string,
   excludeInvoiceId?: string,
-): Promise<void> {
+): Promise<FieldError | null> {
   let query = supabase
     .from("invoices")
     .select("id, invoice_number")
@@ -56,10 +66,13 @@ async function assertAddressUniqueness(
     const ref = conflict.invoice_number
       ? `invoice ${conflict.invoice_number}`
       : `invoice …${conflict.id.slice(-8)}`;
-    throw new Error(
-      `btc_address: This bitcoin address has already been used on ${ref}. Please provide a unique address.`,
-    );
+    return {
+      ok: false,
+      field: "btc_address",
+      message: `This bitcoin address has already been used on ${ref}. Please provide a unique address.`,
+    };
   }
+  return null;
 }
 
 export interface InvoicePayload {
@@ -81,44 +94,10 @@ export interface InvoicePayload {
   access_code?: string;
 }
 
-// v1.4.16: cap matches the DB CHECK constraint added in 0020 and the
-// `<Input maxLength={30}>` on the form. Server-side guard catches any path
-// that bypasses the form (devtools paste, programmatic call, future API).
+// v1.4.16: cap matches the DB CHECK constraint (migration 0020) and the form's
+// maxLength. Used by buildDuplicateInvoiceNumber; the input itself is validated
+// by invoiceSchema (max 30).
 const INVOICE_NUMBER_MAX_LENGTH = 30;
-
-// v1.4.25-H: cap the line-item count. PDF rendering is CPU-heavy, so an
-// unbounded array is a cheap DoS; 100 is far beyond any real invoice.
-const MAX_LINE_ITEMS = 100;
-function assertLineItemsLength(items: LineItem[] | undefined): void {
-  if ((items?.length ?? 0) > MAX_LINE_ITEMS) {
-    throw new Error(`line_items: An invoice can have at most ${MAX_LINE_ITEMS} line items.`);
-  }
-}
-
-// v1.4.26-H: empty is fine, malformed is rejected. Applied on save and again at
-// send time (old drafts may carry bad addresses).
-function assertClientEmail(email: string | undefined): void {
-  if (email && !isValidEmail(email)) {
-    throw new Error("client_email: Enter a valid email address, or leave it blank.");
-  }
-}
-
-// v1.4.26-H: stop an owner setting a one-character code.
-function assertAccessCodeLength(code: string | undefined): void {
-  if (code && code.length < MIN_ACCESS_CODE_LENGTH) {
-    throw new Error(
-      `access_code: Access code must be at least ${MIN_ACCESS_CODE_LENGTH} characters.`,
-    );
-  }
-}
-
-function assertInvoiceNumberLength(invoiceNumber: string | null | undefined): void {
-  if (invoiceNumber && invoiceNumber.length > INVOICE_NUMBER_MAX_LENGTH) {
-    throw new Error(
-      `invoice_number: Invoice number must be ${INVOICE_NUMBER_MAX_LENGTH} characters or fewer.`,
-    );
-  }
-}
 
 // v1.4.23-H: pick a genuinely unique number. The old version appended a fixed
 // "... (copy)", so duplicating an invoice that was already a copy produced the
@@ -141,19 +120,19 @@ function buildDuplicateInvoiceNumber(
   return null;
 }
 
-export async function saveDraft(payload: InvoicePayload) {
+export async function saveDraft(payload: InvoicePayload): Promise<ActionResult<Invoice>> {
+  const parsed = invoiceSchema.safeParse(payload);
+  if (!parsed.success) return firstFieldError(parsed.error);
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  assertInvoiceNumberLength(payload.invoice_number);
-  assertLineItemsLength(payload.line_items);
-  assertClientEmail(payload.client_email);
-  assertAccessCodeLength(payload.access_code);
-
   // v1.4.14: bitcoin-only — validation is gated on address presence alone.
   if (payload.btc_address) {
-    await assertAddressUniqueness(supabase, payload.btc_address);
-    await assertAddressFreshness(payload.btc_address);
+    const uniq = await addressUniquenessError(supabase, payload.btc_address);
+    if (uniq) return uniq;
+    const fresh = await addressFreshnessError(payload.btc_address);
+    if (fresh) return fresh;
   }
 
   const { subtotal, taxFiat, total } = computeInvoiceTotals(payload.line_items, payload.tax_percent);
@@ -187,19 +166,24 @@ export async function saveDraft(payload: InvoicePayload) {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    const fieldError = dbErrorToFieldError(error);
+    if (fieldError) return fieldError;
+    throw new Error(error.message);
+  }
   revalidatePath("/dashboard");
-  return data;
+  return { ok: true, data: toInvoice(data) };
 }
 
-export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
+export async function updateDraft(
+  invoiceId: string,
+  payload: InvoicePayload,
+): Promise<ActionResult<Invoice>> {
+  const parsed = invoiceSchema.safeParse(payload);
+  if (!parsed.success) return firstFieldError(parsed.error);
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
-  assertInvoiceNumberLength(payload.invoice_number);
-  assertLineItemsLength(payload.line_items);
-  assertClientEmail(payload.client_email);
-  assertAccessCodeLength(payload.access_code);
 
   const { data: existing } = await supabase
     .from("invoices")
@@ -211,8 +195,10 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
   if (existing.status !== "draft") throw new Error("Only draft invoices can be edited");
 
   if (payload.btc_address) {
-    await assertAddressUniqueness(supabase, payload.btc_address, invoiceId);
-    await assertAddressFreshness(payload.btc_address, invoiceId);
+    const uniq = await addressUniquenessError(supabase, payload.btc_address, invoiceId);
+    if (uniq) return uniq;
+    const fresh = await addressFreshnessError(payload.btc_address, invoiceId);
+    if (fresh) return fresh;
   }
 
   const { subtotal, taxFiat, total } = computeInvoiceTotals(payload.line_items, payload.tax_percent);
@@ -244,10 +230,14 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    const fieldError = dbErrorToFieldError(error);
+    if (fieldError) return fieldError;
+    throw new Error(error.message);
+  }
   revalidatePath("/dashboard");
   revalidatePath(`/invoices/${invoiceId}`);
-  return data;
+  return { ok: true, data: toInvoice(data) };
 }
 
 async function loadAndAuthorise(invoiceId: string): Promise<{
@@ -266,21 +256,33 @@ async function loadAndAuthorise(invoiceId: string): Promise<{
   if (fetchError || !invoice) throw new Error("Invoice not found");
   if (invoice.user_id !== user!.id) throw new Error("Forbidden");
 
-  // v1.4.14: every publish requires a valid btc_address (bitcoin-only).
+  return { supabase, invoice: toInvoice(invoice) };
+}
+
+// v1.4.29-H: publish-time field checks, RETURNED (not thrown) so they survive
+// production. v1.4.14: every publish requires a valid btc_address.
+async function publishFieldError(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  invoice: Invoice,
+  invoiceId: string,
+): Promise<FieldError | null> {
   const check = canPublishInvoice({ btc_address: invoice.btc_address });
   if (!check.ok) {
-    if (check.error === "btc_address_required") {
-      throw new Error("btc_address: A bitcoin address is required to publish");
-    }
-    throw new Error("btc_address: Invalid BTC address");
+    return {
+      ok: false,
+      field: "btc_address",
+      message:
+        check.error === "btc_address_required"
+          ? "A bitcoin address is required to publish"
+          : "Invalid BTC address",
+    };
   }
-
-  // canPublishInvoice above guarantees a valid, non-null address.
   const btcAddress = invoice.btc_address!;
-  await assertAddressUniqueness(supabase, btcAddress, invoiceId);
-  await assertAddressFreshness(btcAddress, invoice.id);
-
-  return { supabase, invoice: toInvoice(invoice) };
+  const uniq = await addressUniquenessError(supabase, btcAddress, invoiceId);
+  if (uniq) return uniq;
+  const fresh = await addressFreshnessError(btcAddress, invoice.id);
+  if (fresh) return fresh;
+  return null;
 }
 
 const publishStatePatch = () => ({
@@ -328,23 +330,30 @@ async function applyPublishUpdate(
   revalidatePath(`/invoices/${invoice.id}`);
 }
 
-export async function publishInvoice(invoiceId: string) {
+export async function publishInvoice(invoiceId: string): Promise<ActionResult<undefined>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
+  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
+  if (fieldError) return fieldError;
   await applyPublishUpdate(supabase, invoice, {});
+  return { ok: true, data: undefined };
 }
 
 export async function publishAndSendEmail(
   invoiceId: string,
-): Promise<{
-  emailStatus: "sent" | "failed" | "skipped_no_api_key" | "skipped_daily_cap" | "no_recipient";
-}> {
+): Promise<
+  ActionResult<{
+    emailStatus: "sent" | "failed" | "skipped_no_api_key" | "skipped_daily_cap" | "no_recipient";
+  }>
+> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
+  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
+  if (fieldError) return fieldError;
 
   // v1.4.26-H: skip quietly for a missing OR malformed address (old drafts may
   // carry bad ones) — publish-only, no send attempt.
   if (!invoice.client_email || !isValidEmail(invoice.client_email)) {
     await applyPublishUpdate(supabase, invoice, {});
-    return { emailStatus: "no_recipient" };
+    return { ok: true, data: { emailStatus: "no_recipient" } };
   }
 
   const attemptAt = new Date().toISOString();
@@ -370,14 +379,16 @@ export async function publishAndSendEmail(
     email_attempted_at: attemptAt,
   });
 
-  return { emailStatus: outcome.status };
+  return { ok: true, data: { emailStatus: outcome.status } };
 }
 
 export async function publishAndMarkSent(
   invoiceId: string,
   opts: { withDownload?: boolean } = {},
-): Promise<{ downloadUrl: string } | undefined> {
+): Promise<ActionResult<{ downloadUrl?: string }>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
+  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
+  if (fieldError) return fieldError;
 
   await applyPublishUpdate(supabase, invoice, {
     sent_at: new Date().toISOString(),
@@ -390,9 +401,10 @@ export async function publishAndMarkSent(
     eventType: "marked_as_sent",
   });
 
-  if (opts.withDownload) {
-    return { downloadUrl: `/api/invoices/${invoiceId}/pdf` };
-  }
+  return {
+    ok: true,
+    data: opts.withDownload ? { downloadUrl: `/api/invoices/${invoiceId}/pdf` } : {},
+  };
 }
 
 export async function markPaid(invoiceId: string) {
@@ -485,7 +497,7 @@ export async function markUnpaid(invoiceId: string) {
   revalidatePath(`/invoices/${invoiceId}`);
 }
 
-export async function duplicateInvoice(invoiceId: string) {
+export async function duplicateInvoice(invoiceId: string): Promise<ActionResult<undefined>> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -500,7 +512,9 @@ export async function duplicateInvoice(invoiceId: string) {
   // v1.4.25-H: the duplicate copies the source's line items, so it must run the
   // same cap (a pre-existing oversized invoice must not be duplicated into a new
   // oversized one).
-  assertLineItemsLength(toInvoice(source).line_items);
+  if (toInvoice(source).line_items.length > 100) {
+    return { ok: false, field: "line_items", message: "An invoice can have at most 100 line items." };
+  }
 
   // Fetch the numbers this user already has so the duplicate gets a free suffix
   // (v1.4.23-H: the old fixed suffix collided when copying a copy).

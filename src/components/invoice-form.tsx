@@ -13,7 +13,8 @@ import {
   InvoicePayload,
 } from "@/app/(dashboard)/invoices/actions";
 import { PublishMenu } from "@/components/publish-menu";
-import { computeInvoiceTotals, isValidEmail, isValidBtcAddress, parseServerError, LineItem } from "@/lib/invoices";
+import { computeInvoiceTotals, isValidEmail, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
   DndContext,
   DragEndEvent,
@@ -220,13 +221,12 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     };
   }
 
-  function handleServerError(e: unknown) {
-    const { field, message } = parseServerError((e as Error).message);
-    if (field && field in errorFieldIds) {
-      setErrors({ [field]: message });
-      document.getElementById(errorFieldIds[field])?.scrollIntoView({ behavior: "smooth", block: "center" });
+  function handleFieldError(err: FieldError) {
+    if (err.field && err.field in errorFieldIds) {
+      setErrors({ [err.field]: err.message });
+      document.getElementById(errorFieldIds[err.field])?.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
-      setErrors({ _form: message });
+      setErrors({ _form: err.message });
     }
   }
 
@@ -236,14 +236,16 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     try {
       const payload = buildPayload();
       if (invoiceId) {
-        await updateDraft(invoiceId, payload);
+        const res = await updateDraft(invoiceId, payload);
+        if (!res.ok) return handleFieldError(res);
         router.push(`/invoices/${invoiceId}`);
       } else {
-        const invoice = await saveDraft(payload);
-        router.push(`/invoices/${invoice.id}`);
+        const res = await saveDraft(payload);
+        if (!res.ok) return handleFieldError(res);
+        router.push(`/invoices/${res.data.id}`);
       }
-    } catch (e) {
-      handleServerError(e);
+    } catch {
+      setErrors({ _form: "Something went wrong. Please try again." });
     } finally {
       setSaving(false);
     }
@@ -251,23 +253,29 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
 
   // Shared flow for all four publish/send options. Saves/updates the draft to obtain
   // an id, then runs the chosen publish action against that id, then navigates.
-  async function runPublishFlow<T>(action: (id: string) => Promise<T>, postNavigate?: (result: T) => void) {
+  async function runPublishFlow<T>(
+    action: (id: string) => Promise<ActionResult<T>>,
+    postNavigate?: (data: T) => void,
+  ) {
     if (!validate(true)) return;
     setSaving(true);
     try {
       const payload = buildPayload();
       let id = invoiceId;
       if (id) {
-        await updateDraft(id, payload);
+        const res = await updateDraft(id, payload);
+        if (!res.ok) return handleFieldError(res);
       } else {
-        const invoice = await saveDraft(payload);
-        id = invoice.id;
+        const res = await saveDraft(payload);
+        if (!res.ok) return handleFieldError(res);
+        id = res.data.id;
       }
       const result = await action(id!);
+      if (!result.ok) return handleFieldError(result);
       router.push(`/invoices/${id}`);
-      postNavigate?.(result);
-    } catch (e) {
-      handleServerError(e);
+      postNavigate?.(result.data);
+    } catch {
+      setErrors({ _form: "Something went wrong. Please try again." });
     } finally {
       setSaving(false);
     }
@@ -279,9 +287,9 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   const handleDownloadAndMarkSent = () =>
     runPublishFlow(
       (id) => publishAndMarkSent(id, { withDownload: true }),
-      (result) => {
-        if (result?.downloadUrl && typeof window !== "undefined") {
-          window.location.href = result.downloadUrl;
+      (data) => {
+        if (data?.downloadUrl && typeof window !== "undefined") {
+          window.location.href = data.downloadUrl;
         }
       }
     );

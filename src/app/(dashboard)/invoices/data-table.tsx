@@ -130,7 +130,14 @@ export function InvoiceDataTable({ data, userId }: Props) {
     async (fn: () => Promise<unknown>) => {
       setPending(true);
       try {
-        await fn();
+        const result = await fn();
+        // Field-validation failures are RETURNED (not thrown) so they survive
+        // production; surface them in the feedback banner.
+        const maybe = result as { ok?: boolean; message?: string } | null;
+        if (maybe && typeof maybe === "object" && maybe.ok === false) {
+          setArchiveFeedback(maybe.message ?? "Something went wrong. Please try again.");
+          return;
+        }
         router.refresh();
       } finally {
         setPending(false);
@@ -148,9 +155,10 @@ export function InvoiceDataTable({ data, userId }: Props) {
         onDownloadAndMarkSent: (id) =>
           runRowAction(async () => {
             const result = await publishAndMarkSent(id, { withDownload: true });
-            if (result?.downloadUrl && typeof window !== "undefined") {
-              window.location.href = result.downloadUrl;
+            if (result.ok && result.data.downloadUrl && typeof window !== "undefined") {
+              window.location.href = result.data.downloadUrl;
             }
+            return result;
           }),
         onMarkPaid: (id) => runRowAction(() => bulkMarkPaid([id])),
         onMarkOverdue: (id) => runRowAction(() => markOverdue(id)),
