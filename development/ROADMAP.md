@@ -1687,9 +1687,15 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   `(user_id, invoice_number) where invoice_number is not null` plus a
   `check (invoice_number <> '')`, and a friendly `23505` message on the create /
   publish path.
-- 🔴 **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`):
-  `proxyConfig` → `config`; add `error.tsx` / `not-found.tsx` / `loading.tsx`;
-  proxy `getSession` → `getUser`; security headers in `next.config.ts`.
+- ✅ **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
+  the proxy now exports `config` (Next reads it, so the matcher finally applies and
+  the proxy stops running on static assets) and validates the token with `getUser`
+  instead of trusting the cookie; added root `error.tsx` + `not-found.tsx` and
+  dashboard/invoice `loading.tsx`; added security headers in `next.config.ts`
+  (`X-Frame-Options: DENY`, nosniff, referrer, HSTS, and a minimal CSP of
+  frame-ancestors/object-src/base-uri only). The stricter nonce-based CSP is
+  deferred: it forces dynamic rendering, and a wrong `connect-src` would silently
+  kill the live mempool/Supabase sockets.
 - 🔴 **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
   access-code check on the public PDF route; cap `line_items` length + cache PDF;
   `btc-price` currency allowlist; `timingSafeEqual` for `CRON_SECRET`; `secure`
