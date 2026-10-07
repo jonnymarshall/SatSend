@@ -24,3 +24,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
   Production once drifted two releases behind because this was left as a manual
   step.
 <!-- END:environment-rules -->
+
+<!-- BEGIN:project-brief -->
+# Project brief (how to work here)
+
+- **Never commit to `main`.** Work on a branch named for the roadmap item.
+- **Before any commit:** `npm run test:run`, `npm run typecheck`, and
+  `npm run lint` must be green. CI enforces this on the PR; the local hooks are
+  fast feedback only.
+- **Before opening a PR:** run the `pre-merge-verification` skill. Bump the version
+  **on the branch** (`package.json` = branch version); tag **on merge**.
+- **Migrations:** apply to the **test** database before the PR (`npx supabase db
+  push`); apply to **production at merge** (Supabase MCP `apply_migration`). Never
+  defer (see the environment rules above).
+- **Versions** come from `development/ROADMAP.md`. Never re-implement an item
+  marked SUPERSEDED.
+- **Skills:** `next-feature` (plan the next item, then stop for approval),
+  `git-workflow` (branching/SemVer), `migration-safety`, `deploy-checklist`,
+  `pre-merge-verification`.
+<!-- END:project-brief -->

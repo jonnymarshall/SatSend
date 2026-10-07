@@ -446,10 +446,15 @@ Each is one branch. Detail: Appendix A → Phase 2.
   merge `v1.4.32`, prune merged branches. **`master` is NOT deleted** — unrelated
   history (~383 commits, no merge-base with `main`); optionally renamed
   `archive/pre-restart`. Detail: Appendix A → "Roadmap & docs restructure".
-- ⏳ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): add the
-  test-must-pass commit gate, typecheck-on-Stop, version-sync-on-PR, and roadmap-size
-  hooks; add the pre-merge-verification, migration-safety, and deploy-checklist
-  skills. Detail: Appendix A → "Claude Code workflow".
+- ✅ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): shipped —
+  CI workflow (`.github/workflows/ci.yml`: typecheck + unit tests + lint on PR; the
+  real, tool-blind gate — unit-only, since the integration suites are local-only);
+  four warn-only hook scripts in `.claude/hooks/` wired via `settings.json` (commit
+  gate, typecheck-on-Stop, version-sync, roadmap-size); three skills, mirrored in
+  both `.claude/skills/` and `.agents/skills/` (pre-merge-verification,
+  migration-safety, deploy-checklist); `write-a-prd` now invokes `grill-me`; a
+  project brief added to `AGENTS.md`; `git-workflow` amended to "bump on branch, tag
+  on merge". Preserved branches recorded in Notes.
 
 ### Phase 3 — Redesign, then the feature queue resumes
 
@@ -1343,6 +1348,12 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ## Notes
 
+- **Preserved branches (v1.4.32-H cleanup, 2026-10-07).** Four branches are kept on
+  purpose and must NOT be deleted: `master` (an unrelated history, ~383 commits, no
+  merge-base with `main`), `v1.0/foundation` (its own initial commit),
+  `v1.4.14/fiat-payment-and-manual-confirmation` (local + `origin`; abandoned fiat
+  work, marked as such). Merged feature branches were pruned; tags `v1.4.18` and
+  `v1.4.32` added.
 - Billing (v2.0+) is part of the launch plan (free + Pro), sequenced after the security hardening train. The free/paid split and build order live in the v2 section above.
 - **Future: publish under a different GitHub identity.** The project currently lives
   under the `jonnymarshall` GitHub account. Jonny wants it moved to a separate,
@@ -1747,8 +1758,9 @@ enforced."
    a session never ends green-looking with a broken build.
 3. **version-sync on `gh pr create`** — verify `CHANGELOG.md` has the branch's
    version and `package.json` matches. Closes H-PROC-1 permanently.
-4. **roadmap-size tripwire** — warn when `ROADMAP.md` exceeds ~40KB, so the archive
-   discipline self-enforces.
+4. **roadmap-size tripwire** — warn when `ROADMAP.md` exceeds ~160KB (not the
+   original 40KB, which — like the "< 500 lines" target — predated the hardening
+   train; the live file is ~152KB), so the archive discipline self-enforces.
 
 **Skills**:
 5. **pre-merge-verification** — run the full gate (tests, typecheck, lint, the

@@ -1,0 +1,30 @@
+name: CI
+
+# The real quality gate: tool-blind, can't be bypassed by any agent or tired
+# human. Runs on every PR. Local .claude hooks are fast feedback only.
+#
+# NOTE: this runs UNIT tests + typecheck + lint. The integration suites
+# (npm run test:rls, npm run test:db) are LOCAL-ONLY by decision — they need the
+# test Supabase project and real sessions — so they are not covered here; run
+# them locally when a PR touches migrations, RLS, or grants.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:run
+      - name: Lint
+        run: npm run lint

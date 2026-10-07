@@ -6,8 +6,53 @@
         "hooks": [
           {
             "type": "command",
+            "command": ".claude/hooks/state.sh edited",
+            "statusMessage": "Marking edits unverified..."
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/roadmap-size.sh"
+          },
+          {
+            "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath // \"\"' | { read -r f; echo \"$f\" | grep -q 'supabase/migrations' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"New Supabase migration file written: %s — run the supabase-migrate skill now to apply it with npx supabase db push.\"}}' \"$f\" || true; }",
             "statusMessage": "Checking for new migrations..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/state.sh verified"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/state.sh commit-gate",
+            "statusMessage": "Checking for unverified edits..."
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/version-sync.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/typecheck-on-stop.sh",
+            "statusMessage": "Typechecking..."
           }
         ]
       }
