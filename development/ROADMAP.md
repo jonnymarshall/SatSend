@@ -1728,10 +1728,16 @@ Each is one branch. Detail: Appendix A → Phase 2.
   subsets); one home for the JSONB cast. `npm run typecheck` added as the gate.
   Surfaced real drift (nullable `btc_address`, `send_method` as text, untyped
   update payloads).
-- ⏳ **v1.4.29-H — Zod + typed action results** (`refactor/zod-validation`): one
-  shared `invoiceSchema` for form + actions; convert thrown-string validation
-  errors to `{ ok, field, message }` return values; collapse the form's three
-  parallel arrays into one.
+- ✅ **v1.4.29-H — Zod + typed action results** (`refactor/zod-validation`): shipped —
+  one shared `invoiceSchema`; server actions now RETURN `{ ok, field, message }` for
+  field-validation failures (thrown messages are masked in production), including
+  translated DB constraint violations (the address unique index → a btc_address
+  field error). Structural errors still throw; `parseServerError` deleted.
+  **Split out:** the form's three parallel arrays → v1.4.29.1-H.
+- 🔴 **v1.4.29.1-H — Collapse the form's parallel arrays** (`v1.4.29.1-H/form-line-item-state`):
+  deferred from v1.4.29-H (M-FE-2). Replace the form's three index-synced arrays
+  (`line_items`, `rawAmounts`, `itemKeys`) with one `LineItemState[]`, and have the
+  form import the shared `invoiceSchema` for client-side validation.
 - ⏳ **v1.4.30-H — Realtime & styling unification** (`refactor/realtime-and-styling`):
   one `useInvoiceChannel` hook with bounded resubscribe; document the 1-conf reorg
   risk; pick one color source of truth (do the styling half during v1.5).

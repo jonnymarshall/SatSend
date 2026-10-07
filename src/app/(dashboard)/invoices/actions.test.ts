@@ -119,24 +119,27 @@ describe("saveDraft", () => {
   it("inserts an invoice with status draft and returns it", async () => {
     const { insertSingle } = makeSupabase();
     const result = await saveDraft(VALID_DRAFT);
-    expect(result.id).toBe("inv-1");
-    expect(result.status).toBe("draft");
+    if (!result.ok) throw new Error("expected saveDraft to succeed");
+    expect(result.data.id).toBe("inv-1");
+    expect(result.data.status).toBe("draft");
     expect(insertSingle).toHaveBeenCalled();
   });
 
-  it("rejects when the BTC address already has on-chain or mempool history (v1.4.12 hotfix)", async () => {
+  it("returns a btc_address field error when the address already has on-chain or mempool history (v1.4.12 hotfix)", async () => {
     const { insertSingle } = makeSupabase();
     vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
-    await expect(saveDraft(VALID_DRAFT)).rejects.toThrow(
-      /btc_address: This address has already received transactions/i,
-    );
+    const res = await saveDraft(VALID_DRAFT);
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/already received transactions/i);
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
-  it("refuses when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
+  it("returns a field error when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
     const { insertSingle } = makeSupabase();
     vi.mocked(addressHasHistory).mockResolvedValueOnce(null);
-    await expect(saveDraft(VALID_DRAFT)).rejects.toThrow(/couldn't verify this address is unused/i);
+    const res = await saveDraft(VALID_DRAFT);
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/couldn't verify this address is unused/i);
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
@@ -147,45 +150,52 @@ describe("saveDraft", () => {
     expect(insertSingle).toHaveBeenCalled();
   });
 
-  it("rejects when the BTC address is already used on another non-draft invoice in the user's account (v1.4.13.6)", async () => {
+  it("returns a btc_address field error when the address is already used on another non-draft invoice (v1.4.13.6)", async () => {
     const { insertSingle } = makeSupabase({
       btcConflict: { id: "inv-prev", invoice_number: "INV-007" },
     });
-    await expect(saveDraft(VALID_DRAFT)).rejects.toThrow(
-      /btc_address: This bitcoin address has already been used on invoice INV-007/i,
-    );
+    const res = await saveDraft(VALID_DRAFT);
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/already been used on invoice INV-007/i);
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
-  // v1.4.16: invoice_number is capped at 30 chars at three layers (DB CHECK,
-  // server actions, form maxLength). The server-action guard is the safety net
-  // for any path that bypasses the form (devtools paste, programmatic call).
-  it("rejects when invoice_number is longer than 30 characters (v1.4.16)", async () => {
+  it("translates a DB unique-violation on the address index into a btc_address field error (v1.4.29-H)", async () => {
+    const { insertSingle } = makeSupabase({
+      insertError: {
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "invoices_btc_address_active_idx"',
+      },
+    });
+    const res = await saveDraft(VALID_DRAFT);
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    expect(insertSingle).toHaveBeenCalled();
+  });
+
+  // v1.4.16: invoice_number is capped at 30 chars (DB CHECK, invoiceSchema, form maxLength).
+  it("returns an invoice_number field error longer than 30 characters (v1.4.16)", async () => {
     const { insertSingle } = makeSupabase();
-    await expect(
-      saveDraft({ ...VALID_DRAFT, invoice_number: "X".repeat(31) }),
-    ).rejects.toThrow(/invoice_number.*30/i);
+    const res = await saveDraft({ ...VALID_DRAFT, invoice_number: "X".repeat(31) });
+    expect(res).toMatchObject({ ok: false, field: "invoice_number" });
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
-  it("rejects more than 100 line items (v1.4.25-H cap)", async () => {
+  it("returns a line_items field error for more than 100 line items (v1.4.25-H cap)", async () => {
     const { insertSingle } = makeSupabase();
     const items = Array.from({ length: 101 }, (_, i) => ({
       description: `Item ${i}`,
       quantity: 1,
       unit_price: 1,
     }));
-    await expect(
-      saveDraft({ ...VALID_DRAFT, line_items: items }),
-    ).rejects.toThrow(/line_items.*100/i);
+    const res = await saveDraft({ ...VALID_DRAFT, line_items: items });
+    expect(res).toMatchObject({ ok: false, field: "line_items" });
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
-  it("rejects a malformed client_email (v1.4.26-H)", async () => {
+  it("returns a client_email field error for a malformed email (v1.4.26-H)", async () => {
     const { insertSingle } = makeSupabase();
-    await expect(
-      saveDraft({ ...VALID_DRAFT, client_email: "not-an-email" }),
-    ).rejects.toThrow(/client_email/i);
+    const res = await saveDraft({ ...VALID_DRAFT, client_email: "not-an-email" });
+    expect(res).toMatchObject({ ok: false, field: "client_email" });
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
@@ -195,11 +205,10 @@ describe("saveDraft", () => {
     expect(insertSingle).toHaveBeenCalled();
   });
 
-  it("rejects an access code shorter than 6 characters (v1.4.26-H)", async () => {
+  it("returns an access_code field error shorter than 6 characters (v1.4.26-H)", async () => {
     const { insertSingle } = makeSupabase();
-    await expect(
-      saveDraft({ ...VALID_DRAFT, access_code: "abc" }),
-    ).rejects.toThrow(/access_code/i);
+    const res = await saveDraft({ ...VALID_DRAFT, access_code: "abc" });
+    expect(res).toMatchObject({ ok: false, field: "access_code" });
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
@@ -223,38 +232,32 @@ describe("saveDraft", () => {
 });
 
 describe("updateDraft", () => {
-  // updateDraft does a status pre-fetch (single) then an update().eq().select().single().
-  // The default makeSupabase select chain returns BASE_INVOICE; we need a draft fixture.
   const draftFixture = { id: "inv-1", user_id: "user-1", status: "draft" };
 
-  it("rejects when updating with a BTC address that has prior history (v1.4.12 hotfix)", async () => {
+  it("returns a btc_address field error when the new address has prior history (v1.4.12 hotfix)", async () => {
     makeSupabase({ fetchData: draftFixture });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
     const { updateDraft } = await import("./actions");
-    await expect(
-      updateDraft("inv-1", { ...VALID_DRAFT, btc_address: "bc1qpoisoned" }),
-    ).rejects.toThrow(/btc_address: This address has already received transactions/i);
+    const res = await updateDraft("inv-1", { ...VALID_DRAFT, btc_address: "bc1qpoisoned" });
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
-  it("rejects when updating with a BTC address already used on another non-draft invoice (v1.4.13.6)", async () => {
+  it("returns a btc_address field error when the address is already used on another non-draft invoice (v1.4.13.6)", async () => {
     makeSupabase({
       fetchData: draftFixture,
       btcConflict: { id: "inv-prev", invoice_number: "INV-042" },
     });
     const { updateDraft } = await import("./actions");
-    await expect(
-      updateDraft("inv-1", { ...VALID_DRAFT, btc_address: "bc1qreused" }),
-    ).rejects.toThrow(
-      /btc_address: This bitcoin address has already been used on invoice INV-042/i,
-    );
+    const res = await updateDraft("inv-1", { ...VALID_DRAFT, btc_address: "bc1qreused" });
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/already been used on invoice INV-042/i);
   });
 
-  it("rejects when invoice_number is longer than 30 characters (v1.4.16)", async () => {
+  it("returns an invoice_number field error longer than 30 characters (v1.4.16)", async () => {
     makeSupabase({ fetchData: draftFixture });
     const { updateDraft } = await import("./actions");
-    await expect(
-      updateDraft("inv-1", { ...VALID_DRAFT, invoice_number: "X".repeat(31) }),
-    ).rejects.toThrow(/invoice_number.*30/i);
+    const res = await updateDraft("inv-1", { ...VALID_DRAFT, invoice_number: "X".repeat(31) });
+    expect(res).toMatchObject({ ok: false, field: "invoice_number" });
   });
 });
 
@@ -339,12 +342,11 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
 });
 
 describe("publishInvoice — btc_address publish-gate (v1.4.14)", () => {
-  it("rejects when the invoice has no btc_address", async () => {
+  it("returns a btc_address field error when the invoice has no btc_address", async () => {
     const noAddress = { ...PUBLISHABLE_INVOICE, btc_address: null };
     const { updateChain } = makeSupabase({ fetchData: noAddress });
-    await expect(publishInvoice("inv-1")).rejects.toThrow(
-      /btc_address.*required/i,
-    );
+    const res = await publishInvoice("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
     expect(updateChain).not.toHaveBeenCalled();
   });
 });
@@ -369,20 +371,20 @@ describe("publishInvoice (publish-only, no email)", () => {
     expect(payload).not.toHaveProperty("email_attempted_at");
   });
 
-  it("throws if the BTC address is already used on an active invoice", async () => {
+  it("returns a btc_address field error if the BTC address is already used on an active invoice", async () => {
     makeSupabase({
       fetchData: PUBLISHABLE_INVOICE,
       btcConflict: { id: "inv-other", status: "pending" },
     });
-    await expect(publishInvoice("inv-1")).rejects.toThrow(/btc_address: This bitcoin address/i);
+    const res = await publishInvoice("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
-  it("rejects when the BTC address already has on-chain or mempool history (v1.4.12)", async () => {
+  it("returns a btc_address field error when the address has on-chain or mempool history (v1.4.12)", async () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
-    await expect(publishInvoice("inv-1")).rejects.toThrow(
-      /btc_address: This address has already received transactions/i,
-    );
+    const res = await publishInvoice("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
   it("proceeds when the BTC address has no prior history (v1.4.12)", async () => {
@@ -392,10 +394,11 @@ describe("publishInvoice (publish-only, no email)", () => {
     expect(updateChain).toHaveBeenCalled();
   });
 
-  it("refuses when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
+  it("returns a field error when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(null);
-    await expect(publishInvoice("inv-1")).rejects.toThrow(/couldn't verify this address is unused/i);
+    const res = await publishInvoice("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
     expect(updateChain).not.toHaveBeenCalled();
   });
 
@@ -474,19 +477,20 @@ describe("publishAndSendEmail", () => {
     }));
   });
 
-  it("throws if the BTC address is already used on an active invoice", async () => {
+  it("returns a btc_address field error if the BTC address is already used on an active invoice", async () => {
     makeSupabase({
       fetchData: PUBLISHABLE_INVOICE,
       btcConflict: { id: "inv-other", status: "pending" },
     });
-    await expect(publishAndSendEmail("inv-1")).rejects.toThrow(/btc_address: This bitcoin address/i);
+    const res = await publishAndSendEmail("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
   it("returns the email outcome to the caller", async () => {
     vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "failed" });
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const result = await publishAndSendEmail("inv-1");
-    expect(result).toEqual({ emailStatus: "failed" });
+    expect(result).toEqual({ ok: true, data: { emailStatus: "failed" } });
   });
 
   it("skips quietly (no send) for a malformed client_email, but still publishes (v1.4.26-H)", async () => {
@@ -494,7 +498,7 @@ describe("publishAndSendEmail", () => {
       fetchData: { ...PUBLISHABLE_INVOICE, client_email: "not-an-email" },
     });
     const result = await publishAndSendEmail("inv-1");
-    expect(result).toEqual({ emailStatus: "no_recipient" });
+    expect(result).toEqual({ ok: true, data: { emailStatus: "no_recipient" } });
     expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
     expect(updateChain).toHaveBeenCalled();
   });
@@ -503,7 +507,7 @@ describe("publishAndSendEmail", () => {
     vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "skipped_daily_cap" });
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const result = await publishAndSendEmail("inv-1");
-    expect(result).toEqual({ emailStatus: "skipped_daily_cap" });
+    expect(result).toEqual({ ok: true, data: { emailStatus: "skipped_daily_cap" } });
   });
 });
 
@@ -539,21 +543,22 @@ describe("publishAndMarkSent", () => {
   it("with { withDownload: true }, response includes the PDF download URL", async () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const result = await publishAndMarkSent("inv-1", { withDownload: true });
-    expect(result).toEqual({ downloadUrl: "/api/invoices/inv-1/pdf" });
+    expect(result).toEqual({ ok: true, data: { downloadUrl: "/api/invoices/inv-1/pdf" } });
   });
 
   it("with { withDownload: false } (default), returns no download URL", async () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const result = await publishAndMarkSent("inv-1");
-    expect(result).toBeUndefined();
+    expect(result).toEqual({ ok: true, data: {} });
   });
 
-  it("throws if the BTC address is already used on an active invoice", async () => {
+  it("returns a btc_address field error if the BTC address is already used on an active invoice", async () => {
     makeSupabase({
       fetchData: PUBLISHABLE_INVOICE,
       btcConflict: { id: "inv-other", status: "pending" },
     });
-    await expect(publishAndMarkSent("inv-1")).rejects.toThrow(/btc_address: This bitcoin address/i);
+    const res = await publishAndMarkSent("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 });
 
@@ -784,7 +789,8 @@ describe("duplicateInvoice", () => {
       },
       insertData: { id: "inv-new" },
     });
-    await expect(duplicateInvoice("inv-src")).rejects.toThrow(/line_items.*100/i);
+    const res = await duplicateInvoice("inv-src");
+    expect(res).toMatchObject({ ok: false, field: "line_items" });
     expect(insertChain).not.toHaveBeenCalled();
   });
 });

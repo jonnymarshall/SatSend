@@ -18,7 +18,6 @@ import {
   publishAndMarkSent,
 } from "../actions";
 import { bulkArchive, bulkDelete, bulkUnarchive } from "../bulk-actions";
-import { parseServerError } from "@/lib/invoices";
 import type { Database } from "@/lib/database.types";
 
 interface Invoice {
@@ -53,8 +52,8 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
     try {
       await fn();
       router.refresh();
-    } catch (e) {
-      setError(parseServerError((e as Error).message).message);
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -137,41 +136,60 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
             onSendEmail={(id) =>
               run(async () => {
                 const result = await publishAndSendEmail(id);
-                if (result.emailStatus === "sent") {
+                if (!result.ok) {
+                  setError(result.message);
+                  return;
+                }
+                const { emailStatus } = result.data;
+                if (emailStatus === "sent") {
                   setNotice(
                     invoice.client_email
                       ? `Email queued for delivery to ${invoice.client_email}. See the Email Activity log for the delivery status.`
                       : "Email queued for delivery. See the Email Activity log for the delivery status."
                   );
-                } else if (result.emailStatus === "failed") {
+                } else if (emailStatus === "failed") {
                   setError(
                     "Email delivery failed at the provider. The invoice has been published; see the Email Activity log for the error message."
                   );
-                } else if (result.emailStatus === "skipped_no_api_key") {
+                } else if (emailStatus === "skipped_no_api_key") {
                   setError(
                     "Email skipped: the email provider isn't configured (RESEND_API_KEY is missing). The invoice has been published — use 'Mark as sent' to record manual delivery."
                   );
-                } else if (result.emailStatus === "no_recipient") {
+                } else if (emailStatus === "no_recipient") {
                   setError(
                     "Email skipped: no client email is set on this invoice. The invoice has been published — use 'Mark as sent' to record manual delivery."
                   );
-                } else if (result.emailStatus === "skipped_daily_cap") {
+                } else if (emailStatus === "skipped_daily_cap") {
                   setError(
                     "Daily email limit reached for your account (200 emails in 24 hours). The invoice has been published — try again later, or use 'Mark as sent' to record manual delivery."
                   );
                 }
               })
             }
-            onMarkSent={(id) => run(() => publishAndMarkSent(id))}
+            onMarkSent={(id) =>
+              run(async () => {
+                const res = await publishAndMarkSent(id);
+                if (!res.ok) setError(res.message);
+              })
+            }
             onDownloadAndMarkSent={(id) =>
               run(async () => {
                 const result = await publishAndMarkSent(id, { withDownload: true });
-                if (result?.downloadUrl && typeof window !== "undefined") {
-                  window.location.href = result.downloadUrl;
+                if (!result.ok) {
+                  setError(result.message);
+                  return;
+                }
+                if (result.data.downloadUrl && typeof window !== "undefined") {
+                  window.location.href = result.data.downloadUrl;
                 }
               })
             }
-            onPublishOnly={(id) => run(() => publishInvoice(id))}
+            onPublishOnly={(id) =>
+              run(async () => {
+                const res = await publishInvoice(id);
+                if (!res.ok) setError(res.message);
+              })
+            }
           />
         )}
 

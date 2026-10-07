@@ -18,11 +18,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/app/(dashboard)/invoices/actions", () => ({
-  saveDraft: vi.fn().mockResolvedValue({ id: "test-id" }),
-  updateDraft: vi.fn().mockResolvedValue({}),
-  publishInvoice: vi.fn().mockResolvedValue({}),
-  publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
-  publishAndMarkSent: vi.fn().mockResolvedValue(undefined),
+  saveDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id" } }),
+  updateDraft: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+  publishInvoice: vi.fn().mockResolvedValue({ ok: true, data: undefined }),
+  publishAndSendEmail: vi.fn().mockResolvedValue({ ok: true, data: { emailStatus: "sent" } }),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
 }));
 
 describe("InvoiceForm your_email field", () => {
@@ -327,9 +327,11 @@ describe("InvoiceForm — server-error field placement and scroll on save-draft 
   it("attaches a 'btc_address:' server error to the BTC address field (not the form-level banner)", async () => {
     const user = userEvent.setup();
     vi.mocked(saveDraft).mockClear();
-    vi.mocked(saveDraft).mockRejectedValueOnce(
-      new Error("btc_address: This address has already received transactions — use a fresh address for each invoice."),
-    );
+    vi.mocked(saveDraft).mockResolvedValueOnce({
+      ok: false,
+      field: "btc_address",
+      message: "This address has already received transactions — use a fresh address for each invoice.",
+    });
 
     render(<InvoiceForm sessionEmail="owner@example.com" />);
 
@@ -352,9 +354,11 @@ describe("InvoiceForm — server-error field placement and scroll on save-draft 
   it("scrolls the BTC address field into view when save-draft fails with a btc_address error", async () => {
     const user = userEvent.setup();
     vi.mocked(saveDraft).mockClear();
-    vi.mocked(saveDraft).mockRejectedValueOnce(
-      new Error("btc_address: This address has already received transactions — use a fresh address for each invoice."),
-    );
+    vi.mocked(saveDraft).mockResolvedValueOnce({
+      ok: false,
+      field: "btc_address",
+      message: "This address has already received transactions — use a fresh address for each invoice.",
+    });
 
     render(<InvoiceForm sessionEmail="owner@example.com" />);
 

@@ -160,7 +160,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   });
 
   it("shows a failed-email alert banner when publishAndSendEmail returns emailStatus='failed'", async () => {
-    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ emailStatus: "failed" });
+    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
     const invoice = { id: "inv-fail", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /publish/i }));
@@ -170,7 +170,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   });
 
   it("shows a queued-for-delivery notice when publishAndSendEmail returns emailStatus='sent'", async () => {
-    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ emailStatus: "sent" });
+    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "sent" } });
     const invoice = { id: "inv-ok", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /publish/i }));

@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.29-H — Zod + typed action results.** Server actions used to throw
+  field-validation errors as strings, which Next masks in production, so users
+  only ever saw a generic message. Actions now RETURN `{ ok, field, message }`
+  (typed, via one shared Zod `invoiceSchema`), and DB constraint violations are
+  translated too (the address unique index becomes a `btc_address` field error).
+  Structural errors still throw. `parseServerError` is deleted. The form's
+  three-array refactor is split to v1.4.29.1-H.
 - **v1.4.27-H — Generated Supabase types.** `src/lib/database.types.ts` is now
   generated from the database (`npm run gen:types`) and committed, and `Database`
   is threaded through the three client factories, so every query is typed. The
