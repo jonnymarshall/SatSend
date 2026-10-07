@@ -1,4 +1,6 @@
-# PRD: Paybitty MVP — Bitcoin-Enabled Invoicing
+> **Historical document.** This is the original MVP PRD, written before the product rename (Paybitty to SatSend) and before the paid tier existed. Some details are superseded; `development/ROADMAP.md` is the single source of truth. Kept for provenance.
+
+# PRD: SatSend MVP (Bitcoin-Enabled Invoicing)
 
 ## Problem Statement
 
@@ -6,7 +8,7 @@ Freelancers and small businesses who want to accept Bitcoin payments have no sim
 
 ## Solution
 
-Paybitty is a web app where users create fiat-denominated invoices, share a link and access code with their client, and the client pays via a BTC QR code. The system tracks payment status automatically using mempool.space, notifying the invoice creator when payment is detected and confirmed.
+SatSend is a web app where users create fiat-denominated invoices, share a link and access code with their client, and the client pays via a BTC QR code. The system tracks payment status automatically using mempool.space, notifying the invoice creator when payment is detected and confirmed.
 
 ## User Stories
 
@@ -101,16 +103,27 @@ A good test verifies externally observable behavior, not implementation details.
 - **Invoice CRUD** — integration tests against a real Supabase test instance; verify address uniqueness enforcement, access code generation, and status transitions
 - **Client Payment View** — end-to-end: enter valid/invalid access code, verify BTC amount displayed, simulate payment detected event
 
-## Out of Scope
+## Monetisation (Free + Pro)
 
-- Paid tier / subscription billing (Lemon Squeezy, BTC one-time payments)
+SatSend launches with a free tier and a paid tier (Pro). Invoicing is unlimited on both tiers; the paid tier is feature-gated, not volume-gated.
+
+- **Free:** unlimited invoices, BTC payment detection, share link, PDF, dashboard, and owner-facing payment notifications ("you got paid").
+- **Pro:** pretty links (`satsend.me/yourcompany`), client pages, saved clients, custom branding, client-facing email (sent from your display name), payment reminders, financial reports + export, and API access.
+
+All client-facing email is Pro-only. Owner-facing payment notifications stay free. Billing is Bitcoin-only and self-serve from day one.
+
+The full split, the entitlement model, and the build order live in `development/ROADMAP.md` (section v2, "Monetisation plan").
+
+## Out of Scope (MVP)
+
+Not part of the MVP. Several of these are planned for the paid tier in v2 (paid accounts, branding, saved clients, custom subdomains); see `development/ROADMAP.md`.
+
 - OAuth (Google, GitHub, LinkedIn)
 - Custom subdomains (yourcompany.satsend.me)
 - Branding/logo upload
 - xpub / HD wallet support
 - Saved contacts / address book
 - Reusable services/line items list
-- PDF invoice download
 - Mobile apps
 - Multi-currency support beyond fiat/BTC pair
 
