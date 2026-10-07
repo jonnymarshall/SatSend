@@ -18,4 +18,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
   `.env.local` at the production database.
 - **Never deploy a preview or branch environment that shares the production
   database** — its cron could write to live data.
+- **Migrations are applied by the agent, not deferred.** After a migration merges,
+  apply it to the owning database in the same session: test via
+  `npx supabase db push`, production via the Supabase MCP `apply_migration` tool.
+  Production once drifted two releases behind because this was left as a manual
+  step.
 <!-- END:environment-rules -->

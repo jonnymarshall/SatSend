@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.4.31.1-H — Integration test layer (first suite).** `test-automation/rls-integration.mjs`
+  (`npm run test:rls`) runs against the real test Supabase with genuine user
+  sessions. Local-only and guarded: it skips without an anon key, and aborts on a
+  production URL or `PAYMENT_SWEEP_ENABLED`. Proves the address-uniqueness RPC
+  against real RLS (anon cannot execute it, it returns a bare boolean, the
+  cross-tenant backstop fires, and RLS hides one tenant's invoice from another),
+  which the mocked suites cannot.
 - **Master architecture audit** — five-dimension senior review (payment
   correctness, DB/RLS, security, frontend, process). Its findings are now folded
   into `development/ROADMAP.md` as **Appendix B (findings reference)** and its
@@ -109,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.31.1-H — `is_address_registered` was executable by anon.** Supabase's
+  default privileges re-grant EXECUTE on new public functions to `anon`, so
+  0030's `revoke … from public` + `grant … to authenticated` left anon able to
+  call it. 0031 revokes it explicitly (applied to test and production). Found by
+  the new integration harness, which the mocked tests could not see.
 - **v1.4.31-H — Address uniqueness across tenants (H-DB-3).** The address
   uniqueness pre-check ran on the RLS-scoped client, so it only saw the caller's
   own invoices while the `btc_address` unique index is global: reusing another
