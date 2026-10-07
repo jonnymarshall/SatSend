@@ -3,6 +3,9 @@ import bs58check from "bs58check";
 
 const ACCESS_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+// v1.4.26-H: minimum length for a user-set access code.
+export const MIN_ACCESS_CODE_LENGTH = 6;
+
 export function generateAccessCode(): string {
   return Array.from(
     { length: 8 },

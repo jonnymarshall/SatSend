@@ -181,6 +181,34 @@ describe("saveDraft", () => {
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
+  it("rejects a malformed client_email (v1.4.26-H)", async () => {
+    const { insertSingle } = makeSupabase();
+    await expect(
+      saveDraft({ ...VALID_DRAFT, client_email: "not-an-email" }),
+    ).rejects.toThrow(/client_email/i);
+    expect(insertSingle).not.toHaveBeenCalled();
+  });
+
+  it("allows a blank client_email (optional) (v1.4.26-H)", async () => {
+    const { insertSingle } = makeSupabase();
+    await saveDraft({ ...VALID_DRAFT, client_email: "" });
+    expect(insertSingle).toHaveBeenCalled();
+  });
+
+  it("rejects an access code shorter than 6 characters (v1.4.26-H)", async () => {
+    const { insertSingle } = makeSupabase();
+    await expect(
+      saveDraft({ ...VALID_DRAFT, access_code: "abc" }),
+    ).rejects.toThrow(/access_code/i);
+    expect(insertSingle).not.toHaveBeenCalled();
+  });
+
+  it("allows a 6-character access code (v1.4.26-H)", async () => {
+    const { insertSingle } = makeSupabase();
+    await saveDraft({ ...VALID_DRAFT, access_code: "abcdef" });
+    expect(insertSingle).toHaveBeenCalled();
+  });
+
   it("accepts invoice_number of exactly 30 characters (v1.4.16 boundary)", async () => {
     const { insertSingle } = makeSupabase();
     await saveDraft({ ...VALID_DRAFT, invoice_number: "X".repeat(30) });
@@ -459,6 +487,23 @@ describe("publishAndSendEmail", () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const result = await publishAndSendEmail("inv-1");
     expect(result).toEqual({ emailStatus: "failed" });
+  });
+
+  it("skips quietly (no send) for a malformed client_email, but still publishes (v1.4.26-H)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHABLE_INVOICE, client_email: "not-an-email" },
+    });
+    const result = await publishAndSendEmail("inv-1");
+    expect(result).toEqual({ emailStatus: "no_recipient" });
+    expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
+    expect(updateChain).toHaveBeenCalled();
+  });
+
+  it("surfaces the daily send cap to the caller (v1.4.26-H)", async () => {
+    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "skipped_daily_cap" });
+    makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
+    const result = await publishAndSendEmail("inv-1");
+    expect(result).toEqual({ emailStatus: "skipped_daily_cap" });
   });
 });
 

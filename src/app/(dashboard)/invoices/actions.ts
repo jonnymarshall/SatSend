@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { computeInvoiceTotals, LineItem } from "@/lib/invoices";
+import { computeInvoiceTotals, LineItem, isValidEmail, MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
 import { canPublishInvoice } from "@/lib/invoices/can-publish";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
@@ -94,6 +94,23 @@ function assertLineItemsLength(items: LineItem[] | undefined): void {
   }
 }
 
+// v1.4.26-H: empty is fine, malformed is rejected. Applied on save and again at
+// send time (old drafts may carry bad addresses).
+function assertClientEmail(email: string | undefined): void {
+  if (email && !isValidEmail(email)) {
+    throw new Error("client_email: Enter a valid email address, or leave it blank.");
+  }
+}
+
+// v1.4.26-H: stop an owner setting a one-character code.
+function assertAccessCodeLength(code: string | undefined): void {
+  if (code && code.length < MIN_ACCESS_CODE_LENGTH) {
+    throw new Error(
+      `access_code: Access code must be at least ${MIN_ACCESS_CODE_LENGTH} characters.`,
+    );
+  }
+}
+
 function assertInvoiceNumberLength(invoiceNumber: string | null | undefined): void {
   if (invoiceNumber && invoiceNumber.length > INVOICE_NUMBER_MAX_LENGTH) {
     throw new Error(
@@ -129,6 +146,8 @@ export async function saveDraft(payload: InvoicePayload) {
 
   assertInvoiceNumberLength(payload.invoice_number);
   assertLineItemsLength(payload.line_items);
+  assertClientEmail(payload.client_email);
+  assertAccessCodeLength(payload.access_code);
 
   // v1.4.14: bitcoin-only — validation is gated on address presence alone.
   if (payload.btc_address) {
@@ -178,6 +197,8 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
 
   assertInvoiceNumberLength(payload.invoice_number);
   assertLineItemsLength(payload.line_items);
+  assertClientEmail(payload.client_email);
+  assertAccessCodeLength(payload.access_code);
 
   const { data: existing } = await supabase
     .from("invoices")
@@ -328,11 +349,14 @@ export async function publishInvoice(invoiceId: string) {
 
 export async function publishAndSendEmail(
   invoiceId: string,
-): Promise<{ emailStatus: "sent" | "failed" | "skipped_no_api_key" | "no_recipient" }> {
+): Promise<{
+  emailStatus: "sent" | "failed" | "skipped_no_api_key" | "skipped_daily_cap" | "no_recipient";
+}> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
 
-  if (!invoice.client_email) {
-    // Nothing to send to — fall back to publish-only semantics.
+  // v1.4.26-H: skip quietly for a missing OR malformed address (old drafts may
+  // carry bad ones) — publish-only, no send attempt.
+  if (!invoice.client_email || !isValidEmail(invoice.client_email)) {
     await applyPublishUpdate(supabase, invoice, {});
     return { emailStatus: "no_recipient" };
   }

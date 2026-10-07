@@ -154,6 +154,10 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
                   setError(
                     "Email skipped: no client email is set on this invoice. The invoice has been published — use 'Mark as sent' to record manual delivery."
                   );
+                } else if (result.emailStatus === "skipped_daily_cap") {
+                  setError(
+                    "Daily email limit reached for your account (200 emails in 24 hours). The invoice has been published — try again later, or use 'Mark as sent' to record manual delivery."
+                  );
                 }
               })
             }

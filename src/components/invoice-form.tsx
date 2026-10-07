@@ -499,7 +499,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             className={`${inputCls} max-w-[200px] font-mono tracking-widest`}
             placeholder="e.g. mycode01"
           />
-          <p id="hint-access-code" className="text-xs text-muted-foreground">Leave blank for no access code — anyone with the link can view.</p>
+          <p id="hint-access-code" className="text-xs text-muted-foreground">Leave blank for no access code — anyone with the link can view. Otherwise use at least 6 characters.</p>
         </Field>
       </section>
 

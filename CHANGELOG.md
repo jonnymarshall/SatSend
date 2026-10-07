@@ -87,6 +87,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.26-H — Abuse controls.** Server-side client-email validation (empty is
+  fine, malformed is rejected on save and again at send, where a malformed payer
+  address skips quietly); a 6-character minimum for access codes; and a per-user
+  daily send cap of 200 in the shared send helper. At the cap, automated
+  detected/confirmed sends are skipped without throwing (so the sweep and the
+  payer fast-path cannot crash mid-flight), while owner-initiated sends show an
+  error. Rate limiting and hashed access codes are split to v1.4.26.1-H (custom WAF
+  rules are a Vercel Pro+ feature; the project is on Hobby).
 - **v1.4.25-H — Public-endpoint hardening.** The public PDF route ignored the
   access code, so anyone with an invoice link could download the full invoice;
   it now checks the code and returns 404 when it fails. The access cookie's scope

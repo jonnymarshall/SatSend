@@ -11,11 +11,14 @@ vi.mock("./client", () => ({
 
 const mockInsert = vi.fn();
 const mockUpdate = vi.fn();
+const mockCount = vi.fn();
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => ({
       insert: (row: unknown) => mockInsert(table, row),
       update: (row: unknown) => mockUpdate(table, row),
+      // Daily-cap count query: .select("id",{count,head}).eq(...).gte(...)
+      select: () => ({ eq: () => ({ gte: () => mockCount(table) }) }),
     }),
   }),
 }));
@@ -41,6 +44,9 @@ const baseArgs = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Default: under the daily send cap.
+  mockCount.mockResolvedValue({ count: 0, error: null });
 
   // Default insert chain: returns { data: { id: "evt-1" } }
   mockInsert.mockReturnValue({
@@ -143,6 +149,21 @@ describe("safeSend (via sendInvoicePublishedEmail)", () => {
     mockGetResend.mockReturnValueOnce(null);
     const outcome = await sendInvoicePublishedEmail(baseArgs);
     expect(outcome).toEqual({ status: "skipped_no_api_key" });
+  });
+
+  it("skips (skipped_daily_cap) and inserts no row when the daily send cap is reached (v1.4.26-H)", async () => {
+    mockCount.mockResolvedValueOnce({ count: 200, error: null });
+    const outcome = await sendInvoicePublishedEmail(baseArgs);
+    expect(outcome).toEqual({ status: "skipped_daily_cap" });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockResendSend).not.toHaveBeenCalled();
+  });
+
+  it("does not block mail when the cap check itself errors (v1.4.26-H)", async () => {
+    mockCount.mockRejectedValueOnce(new Error("db down"));
+    const outcome = await sendInvoicePublishedEmail(baseArgs);
+    expect(outcome.status).toBe("sent");
+    expect(mockResendSend).toHaveBeenCalledTimes(1);
   });
 });
 
