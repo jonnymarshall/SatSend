@@ -71,7 +71,7 @@ export async function POST(
   // Fetch the REAL transaction from mempool.space — never trust the client's
   // claimed `status`. It's treated purely as a "check now" hint below.
   const tx = await fetchTx(txid);
-  if (!tx || !txPaysToAddress(tx, invoice.btc_address)) {
+  if (!tx || !txPaysToAddress(tx, invoice.btc_address!)) {
     return NextResponse.json({ error: "Transaction does not pay to invoice address" }, { status: 400 });
   }
 
@@ -86,7 +86,7 @@ export async function POST(
   const decision = decidePaymentSchedule(
     {
       status: invoice.status as "pending" | "payment_detected" | "overdue",
-      btc_address: invoice.btc_address,
+      btc_address: invoice.btc_address!,
       mempool_seen_at: invoice.mempool_seen_at,
       published_at: invoice.published_at,
       stage_attempt: invoice.stage_attempt,

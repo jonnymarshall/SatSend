@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceForm } from "@/components/invoice-form";
-import type { LineItem } from "@/lib/invoices";
+import { toInvoice } from "@/lib/invoice-public";
 
 export default async function EditInvoicePage({
   params,
@@ -40,7 +40,7 @@ export default async function EditInvoicePage({
           client_company: invoice.client_company ?? "",
           client_address: invoice.client_address ?? "",
           client_tax_id: invoice.client_tax_id ?? "",
-          line_items: (invoice.line_items as LineItem[]) ?? [{ description: "", quantity: 1, unit_price: 0 }],
+          line_items: toInvoice(invoice).line_items,
           tax_percent: invoice.tax_percent ? String(invoice.tax_percent) : "",
           btc_address: invoice.btc_address ?? "",
           due_date: invoice.due_date ? new Date(invoice.due_date) : undefined,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
+import type { Database } from "@/lib/database.types";
 
 export async function bulkArchive(ids: string[]): Promise<{ archived: number; skipped: number }> {
   const supabase = await createClient();
@@ -20,7 +21,7 @@ export async function bulkArchive(ids: string[]): Promise<{ archived: number; sk
     .neq("status", "archived");
 
   if (fetchError) throw new Error(fetchError.message);
-  const eligible = (rows ?? []) as { id: string; status: string }[];
+  const eligible = rows ?? [];
   if (eligible.length === 0) {
     revalidatePath("/invoices");
     return { archived: 0, skipped: ids.length };
@@ -69,7 +70,7 @@ export async function bulkUnarchive(ids: string[]): Promise<{ unarchived: number
 
   if (fetchError) throw new Error(fetchError.message);
 
-  const archived = (rows ?? []) as { id: string; pre_archive_status: string | null }[];
+  const archived = rows ?? [];
   // A row with no recorded prior status (a legacy NULL) is left archived rather
   // than guessed at: defaulting it to 'pending' could silently downgrade a
   // previously-paid invoice, the worst outcome in a payments app. Report it so
@@ -78,8 +79,8 @@ export async function bulkUnarchive(ids: string[]): Promise<{ unarchived: number
 
   const MONITORABLE = new Set(["pending", "overdue", "payment_detected"]);
   for (const row of restorable) {
-    const restored = row.pre_archive_status as string;
-    const patch: Record<string, unknown> = { status: restored, pre_archive_status: null };
+    const restored = row.pre_archive_status!;
+    const patch: Database["public"]["Tables"]["invoices"]["Update"] = { status: restored, pre_archive_status: null };
     // Resume monitoring from scratch when restoring to a status the sweep
     // watches (v1.4.22-H / M-DB-3), so the archived row's stale schedule and
     // txid don't linger. A restored paid/underpaid row keeps its record.

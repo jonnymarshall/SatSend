@@ -1,5 +1,6 @@
 import { bech32, bech32m } from "bech32";
 import bs58check from "bs58check";
+import type { Json } from "@/lib/database.types";
 
 const ACCESS_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -17,6 +18,12 @@ export interface LineItem {
   description: string;
   quantity: number;
   unit_price: number;
+}
+
+// One home for the JSONB write cast (v1.4.27-H). line_items is a JSONB column
+// whose shape is enforced by the line_items_shape CHECK (migration 0027).
+export function lineItemsToJson(items: LineItem[]): Json {
+  return items as unknown as Json;
 }
 
 export function computeInvoiceTotals(

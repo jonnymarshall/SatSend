@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.27-H — Generated Supabase types.** `src/lib/database.types.ts` is now
+  generated from the database (`npm run gen:types`) and committed, and `Database`
+  is threaded through the three client factories, so every query is typed. The
+  hand-declared invoice row shapes (an `Invoice` written three ways, and two
+  different `InvoiceRow`s) are replaced by types derived from the generated ones,
+  with one home for the `line_items` JSONB cast. Added `npm run typecheck` as the
+  gate. It surfaced real drift: nullable `btc_address`, `send_method` being text
+  rather than a union, and untyped update payloads.
 - **AGENTS.md environment rule reworded** to be explicitly per-database: the
   payment sweep may be enabled in exactly one environment per database (its
   owner), and a local session may enable it temporarily only against the

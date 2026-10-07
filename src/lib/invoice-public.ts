@@ -1,33 +1,27 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LineItem } from "@/lib/invoices";
+import type { Database } from "@/lib/database.types";
 
-export interface Invoice {
-  id: string;
-  user_id: string;
-  invoice_number: string | null;
-  your_name: string | null;
-  your_email: string | null;
-  your_company: string | null;
-  your_address: string | null;
-  your_tax_id: string | null;
-  client_name: string;
-  client_email: string;
-  client_company: string | null;
-  client_address: string | null;
-  client_tax_id: string | null;
-  line_items: LineItem[];
-  subtotal_fiat: number;
-  tax_fiat: number;
-  tax_percent: number;
-  total_fiat: number;
-  currency: string;
-  btc_address: string | null;
-  btc_txid: string | null;
-  status: "draft" | "pending" | "payment_detected" | "paid" | "overdue" | "archived";
-  access_code: string | null;
-  due_date: string | null;
-  created_at: string;
-  updated_at: string;
+type InvoicesRow = Database["public"]["Tables"]["invoices"]["Row"];
+
+// One home for the invoice row shape the app uses (v1.4.27-H). Derived from the
+// generated types, with the one JSONB column (line_items) narrowed from Json to
+// LineItem[]; its shape is enforced by the line_items_shape CHECK (migration 0027).
+export type Invoice = Omit<InvoicesRow, "line_items"> & { line_items: LineItem[] };
+
+// The invoice_email_summary view row = a full invoice plus the last publish
+// email fields. The generated view row is all-nullable (a Postgres view wart
+// where NOT NULL is not propagated), so we build it from Invoice, whose columns
+// come straight from the invoices table.
+export type InvoiceSummaryRow = Invoice & {
+  last_publish_email_status: Database["public"]["Enums"]["email_event_status"] | null;
+  last_publish_email_error: string | null;
+  last_publish_email_at: string | null;
+};
+
+// The single JSONB read cast. Use at the database boundary.
+export function toInvoice(row: InvoicesRow): Invoice {
+  return { ...row, line_items: (row.line_items ?? []) as unknown as LineItem[] };
 }
 
 export async function fetchPublicInvoice(id: string): Promise<Invoice | null> {
@@ -41,7 +35,7 @@ export async function fetchPublicInvoice(id: string): Promise<Invoice | null> {
   if (error || !data) return null;
   if (data.status === "draft") return null;
 
-  return data as Invoice;
+  return toInvoice(data);
 }
 
 // The shape allowed to cross into the client component tree. access_code is

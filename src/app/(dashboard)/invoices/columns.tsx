@@ -14,31 +14,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
+import type { InvoiceSummaryRow } from "@/lib/invoice-public";
 
-export interface InvoiceRow {
-  id: string;
-  invoice_number: string | null;
-  client_name: string | null;
-  client_email: string | null;
-  total_fiat: number;
-  currency: string;
-  status: string;
-  due_date: string | null;
-  created_at: string;
-  sent_at: string | null;
-  send_method: "email" | "manual" | null;
-  email_attempted_at: string | null;
-  last_publish_email_status:
-    | "queued"
-    | "sent"
-    | "delivered"
-    | "bounced"
-    | "complained"
-    | "failed"
-    | "skipped_no_api_key"
-    | null;
-  last_publish_email_error: string | null;
-}
+// Derived from the generated types (v1.4.27-H). The table reads the
+// invoice_email_summary view; it only renders this subset.
+export type InvoiceRow = Pick<
+  InvoiceSummaryRow,
+  | "id"
+  | "invoice_number"
+  | "client_name"
+  | "client_email"
+  | "total_fiat"
+  | "currency"
+  | "status"
+  | "due_date"
+  | "created_at"
+  | "sent_at"
+  | "send_method"
+  | "email_attempted_at"
+  | "last_publish_email_status"
+  | "last_publish_email_error"
+>;
 
 export interface RowActions {
   onPublishOnly: (id: string) => void;

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { computeInvoiceTotals, LineItem, isValidEmail, MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
+import { computeInvoiceTotals, LineItem, isValidEmail, lineItemsToJson, MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
+import { toInvoice, type Invoice } from "@/lib/invoice-public";
 import { canPublishInvoice } from "@/lib/invoices/can-publish";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
@@ -172,7 +173,7 @@ export async function saveDraft(payload: InvoicePayload) {
       client_company: payload.client_company || null,
       client_address: payload.client_address || null,
       client_tax_id: payload.client_tax_id || null,
-      line_items: payload.line_items,
+      line_items: lineItemsToJson(payload.line_items),
       tax_percent: payload.tax_percent,
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
@@ -230,7 +231,7 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
       client_company: payload.client_company || null,
       client_address: payload.client_address || null,
       client_tax_id: payload.client_tax_id || null,
-      line_items: payload.line_items,
+      line_items: lineItemsToJson(payload.line_items),
       tax_percent: payload.tax_percent,
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
@@ -248,23 +249,6 @@ export async function updateDraft(invoiceId: string, payload: InvoicePayload) {
   revalidatePath(`/invoices/${invoiceId}`);
   return data;
 }
-
-type Invoice = Record<string, unknown> & {
-  id: string;
-  user_id: string;
-  status: string;
-  btc_address: string | null;
-  client_email: string | null;
-  client_name: string | null;
-  your_name: string | null;
-  your_company: string | null;
-  your_email: string | null;
-  invoice_number: string | null;
-  total_fiat: number;
-  currency: string;
-  access_code: string | null;
-  due_date: string | null;
-};
 
 async function loadAndAuthorise(invoiceId: string): Promise<{
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -291,10 +275,12 @@ async function loadAndAuthorise(invoiceId: string): Promise<{
     throw new Error("btc_address: Invalid BTC address");
   }
 
-  await assertAddressUniqueness(supabase, invoice.btc_address, invoiceId);
-  await assertAddressFreshness(invoice.btc_address, invoice.id);
+  // canPublishInvoice above guarantees a valid, non-null address.
+  const btcAddress = invoice.btc_address!;
+  await assertAddressUniqueness(supabase, btcAddress, invoiceId);
+  await assertAddressFreshness(btcAddress, invoice.id);
 
-  return { supabase, invoice: invoice as Invoice };
+  return { supabase, invoice: toInvoice(invoice) };
 }
 
 const publishStatePatch = () => ({
@@ -514,7 +500,7 @@ export async function duplicateInvoice(invoiceId: string) {
   // v1.4.25-H: the duplicate copies the source's line items, so it must run the
   // same cap (a pre-existing oversized invoice must not be duplicated into a new
   // oversized one).
-  assertLineItemsLength(source.line_items as LineItem[]);
+  assertLineItemsLength(toInvoice(source).line_items);
 
   // Fetch the numbers this user already has so the duplicate gets a free suffix
   // (v1.4.23-H: the old fixed suffix collided when copying a copy).

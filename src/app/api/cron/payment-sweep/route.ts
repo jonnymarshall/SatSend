@@ -21,6 +21,8 @@ import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { timingSafeStringEqual } from "@/lib/timing-safe";
+import type { Invoice } from "@/lib/invoice-public";
+import type { Database } from "@/lib/database.types";
 
 // Hobby allows up to 60s for a Node function. The loop below drains the due
 // queue within this budget.
@@ -31,24 +33,27 @@ const BATCH_SIZE = 50;
 // endless loop if a row ever fails to advance its next_check_at.
 const MAX_BATCHES = 10;
 
-interface InvoiceRow {
-  id: string;
-  user_id: string;
-  btc_address: string;
-  status: "pending" | "payment_detected" | "overdue";
-  mempool_seen_at: string | null;
-  published_at: string | null;
-  stage_attempt: number;
-  invoice_number: string | null;
-  client_name: string;
-  client_email: string | null;
-  total_fiat: number;
-  currency: string;
-  btc_txid: string | null;
-  your_name: string | null;
-  your_company: string | null;
-  your_email: string | null;
-}
+// The sweep only ever loads payable invoices, so status is narrowed and
+// btc_address is guaranteed non-null (the DB CHECK: status='draft' or
+// btc_address is not null). Derived from Invoice so it cannot drift.
+type SweepInvoice = Pick<
+  Invoice,
+  | "id"
+  | "user_id"
+  | "btc_address"
+  | "mempool_seen_at"
+  | "published_at"
+  | "stage_attempt"
+  | "invoice_number"
+  | "client_name"
+  | "client_email"
+  | "total_fiat"
+  | "currency"
+  | "btc_txid"
+  | "your_name"
+  | "your_company"
+  | "your_email"
+> & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -97,7 +102,7 @@ export async function GET(request: NextRequest) {
       break;
     }
 
-    const invoices = (rows ?? []) as InvoiceRow[];
+    const invoices = (rows ?? []) as SweepInvoice[];
     if (invoices.length === 0) break;
     processed += invoices.length;
 
@@ -134,7 +139,7 @@ export async function GET(request: NextRequest) {
           { btcPrice, tipHeight }
         );
 
-        const update: Record<string, unknown> = {
+        const update: Database["public"]["Tables"]["invoices"]["Update"] = {
           status: decision.newStatus,
           mempool_seen_at: decision.newMempoolSeenAt,
           stage_attempt: decision.newStageAttempt,
