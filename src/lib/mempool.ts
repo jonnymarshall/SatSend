@@ -60,7 +60,9 @@ export async function fetchTipHeight(): Promise<number | null> {
 
 // Esplora-style APIs (mempool.space included) only expose a tx's block
 // height, not a ready-made "confirmations" count — depth is relative to
-// whatever the current tip is, so the caller must supply both.
+// whatever the current tip is, so the caller must supply both. The "how deep is
+// final" rule, and the 1-confirmation reorg rationale, live in
+// payment-schedule.ts → CONFIRMATION_DEPTH_REQUIRED.
 export function confirmationDepth(
   tipHeight: number | null,
   blockHeight: number | undefined

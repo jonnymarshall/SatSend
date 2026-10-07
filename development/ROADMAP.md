@@ -1738,9 +1738,18 @@ Each is one branch. Detail: Appendix A → Phase 2.
   deferred from v1.4.29-H (M-FE-2). Replace the form's three index-synced arrays
   (`line_items`, `rawAmounts`, `itemKeys`) with one `LineItemState[]`, and have the
   form import the shared `invoiceSchema` for client-side validation.
-- ⏳ **v1.4.30-H — Realtime & styling unification** (`refactor/realtime-and-styling`):
-  one `useInvoiceChannel` hook with bounded resubscribe; document the 1-conf reorg
-  risk; pick one color source of truth (do the styling half during v1.5).
+- ✅ **v1.4.30-H — Realtime unification** (`refactor/realtime-and-styling`): shipped —
+  one `useInvoiceChannel` hook (auth + subscription style as explicit parameters)
+  with bounded resubscribe (6 attempts, 1s→30s), replacing two near-duplicate
+  hooks; the three existing exports are thin wrappers, so no call sites moved.
+  `confirmationDepth` now cross-references `CONFIRMATION_DEPTH_REQUIRED` (the
+  reorg rationale already existed). **Split out:** the colour source of truth →
+  v1.4.30.1-H.
+- 🔴 **v1.4.30.1-H — One colour source of truth** (`v1.4.30.1-H/colour-source`):
+  deferred from v1.4.30-H. `brand-colors.ts` and the `globals.css` `.dark` tokens
+  are NOT in lockstep today (see `manual-tests/v1.4.30-H-realtime-unification.md`);
+  decide which is canonical, sync them, then add the drift-guard test (with a
+  tolerance for OKLCH→hex rounding). Do the styling half with v1.5.
 - ⏳ **v1.4.31-H — Integration test layer** (`test/supabase-integration`): the
   PRD-promised suite against a real Supabase instance, starting with
   address-uniqueness (fix the cross-tenant oracle here via a `security definer`
