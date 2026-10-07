@@ -109,6 +109,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.31-H — Address uniqueness across tenants (H-DB-3).** The address
+  uniqueness pre-check ran on the RLS-scoped client, so it only saw the caller's
+  own invoices while the `btc_address` unique index is global: reusing another
+  user's address passed every check, then failed at the insert. A
+  `security definer` RPC (`is_address_registered`, `search_path` pinned, execute
+  limited to authenticated) now answers across tenants, so the collision is caught
+  at validation time. It does **not** close the "is this address registered"
+  oracle (intrinsic to global uniqueness; rate limiting is the mitigation). The
+  integration test harness is split to v1.4.31.1-H. Also marked the stale H-FE-1
+  finding resolved (suite is green).
 - **v1.4.26-H — Abuse controls.** Server-side client-email validation (empty is
   fine, malformed is rejected on save and again at send, where a malformed payer
   address skips quietly); a 6-character minimum for access codes; and a per-user
