@@ -487,6 +487,11 @@ export async function duplicateInvoice(invoiceId: string) {
 
   if (!source || source.user_id !== user!.id) throw new Error("Invoice not found");
 
+  // v1.4.25-H: the duplicate copies the source's line items, so it must run the
+  // same cap (a pre-existing oversized invoice must not be duplicated into a new
+  // oversized one).
+  assertLineItemsLength(source.line_items as LineItem[]);
+
   // Fetch the numbers this user already has so the duplicate gets a free suffix
   // (v1.4.23-H: the old fixed suffix collided when copying a copy).
   const { data: takenRows } = await supabase

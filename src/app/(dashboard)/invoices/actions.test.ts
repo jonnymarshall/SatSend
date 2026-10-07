@@ -726,4 +726,20 @@ describe("duplicateInvoice", () => {
     });
     await expect(duplicateInvoice("inv-src")).rejects.toThrow(/not found/i);
   });
+
+  it("refuses to duplicate a source with more than 100 line items (v1.4.25-H cap)", async () => {
+    const { insertChain } = makeSupabase({
+      fetchData: {
+        ...SOURCE_INVOICE,
+        line_items: Array.from({ length: 101 }, (_, i) => ({
+          description: `Item ${i}`,
+          quantity: 1,
+          unit_price: 1,
+        })),
+      },
+      insertData: { id: "inv-new" },
+    });
+    await expect(duplicateInvoice("inv-src")).rejects.toThrow(/line_items.*100/i);
+    expect(insertChain).not.toHaveBeenCalled();
+  });
 });
