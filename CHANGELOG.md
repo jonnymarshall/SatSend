@@ -150,6 +150,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.37 — Invoice-number uniqueness (roadmap v1.4.23.1-H).** Added the
+  `(user_id, invoice_number)` unique index (partial: non-blank numbers) and
+  resolved production's 8 duplicate groups (16 rows) by renaming the later copies
+  to `<number> (dup N)` — non-destructive, since the v1.4.21-H money trigger blocks
+  deleting non-draft invoices. Applied to test and production.
 - **v1.4.36 — One colour source of truth (roadmap v1.4.30.1-H).** `globals.css`
   `.dark` tokens are canonical; `brand-colors.ts` (the PDF palette) is synced to the
   browser-accurate hex of those tokens, fixing the drift (`#0A0A0A`→`#010101`,

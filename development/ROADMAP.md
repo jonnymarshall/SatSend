@@ -339,14 +339,20 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   duplicate groups (`development/invoice-number-duplicates-audit.md`), so the
   constraint would fail the migration. The generator bug that created them
   (`buildDuplicateInvoiceNumber` used a fixed suffix) **is fixed here**.
-- 🔴 **v1.4.23.1-H — Invoice-number uniqueness** (`v1.4.23.1-H/invoice-number-uniqueness`):
-  the split-out follow-up. Start from the audit listing in
-  `development/invoice-number-duplicates-audit.md`; decide per group (delete /
-  archive your test rows, rename the later copy for real users, never the
-  original); then add the partial unique index
-  `(user_id, invoice_number) where invoice_number is not null` plus a
-  `check (invoice_number <> '')`, and a friendly `23505` message on the create /
-  publish path.
+- ✅ **v1.4.23.1-H — Invoice-number uniqueness** (`v1.4.23.1-H/invoice-number-uniqueness`):
+  shipped (package `1.4.37`) — production's 8 duplicate groups (16 rows) resolved by
+  renaming the later copies to `<number> (dup N)` (**not** deleting: the v1.4.21-H
+  trigger blocks deleting non-draft invoices, and 6 of the 8 groups involve one),
+  then the unique index `invoices_user_id_invoice_number_idx` on
+  `(user_id, invoice_number) where invoice_number is not null and invoice_number <> ''`.
+  **Deviation from spec:** a partial index on non-blank numbers instead of a
+  separate `check (invoice_number <> '')` — the app writes NULL (never '') for blank
+  drafts, so the index already covers it and a blanket CHECK is unnecessary. Applied
+  to test and production. **Split out:** the friendly `23505` message → v1.4.23.2-H.
+- 🔴 **v1.4.23.2-H — Friendly duplicate-invoice-number message** (`v1.4.23.2-H/dup-number-message`):
+  map a `23505` on `invoices_user_id_invoice_number_idx` to an `invoice_number` field
+  error in `dbErrorToFieldError`, so reusing a number surfaces a clear message rather
+  than a raw DB error. Deferred from v1.4.23.1-H.
 - ✅ **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
   the proxy now exports `config` (Next reads it, so the matcher finally applies and
   the proxy stops running on static assets) and validates the token with `getUser`
