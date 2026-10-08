@@ -349,10 +349,10 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   separate `check (invoice_number <> '')` — the app writes NULL (never '') for blank
   drafts, so the index already covers it and a blanket CHECK is unnecessary. Applied
   to test and production. **Split out:** the friendly `23505` message → v1.4.23.2-H.
-- 🔴 **v1.4.23.2-H — Friendly duplicate-invoice-number message** (`v1.4.23.2-H/dup-number-message`):
-  map a `23505` on `invoices_user_id_invoice_number_idx` to an `invoice_number` field
-  error in `dbErrorToFieldError`, so reusing a number surfaces a clear message rather
-  than a raw DB error. Deferred from v1.4.23.1-H.
+- ✅ **v1.4.23.2-H — Friendly duplicate-invoice-number message** (2026-10-08):
+  **already satisfied, no work needed** — `dbErrorToFieldError` (v1.4.29-H) already
+  maps a `23505` on the invoice-number index to `invoice_number` with "You already
+  have an invoice with this number." My earlier split was redundant; closed.
 - ✅ **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
   the proxy now exports `config` (Next reads it, so the matcher finally applies and
   the proxy stops running on static assets) and validates the token with `getUser`
@@ -374,14 +374,19 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   6; and a per-user daily send cap of 200 enforced in the shared send helper. At
   the cap, automated sends (detected/confirmed) are skipped without throwing so the
   sweep/fast-path cannot crash, while owner-initiated sends surface an error.
-  **Split out:** rate limiting and hashed access codes → v1.4.26.1-H.
-- 🔴 **v1.4.26.1-H — Rate limiting & hashed access codes** (`v1.4.26.1-H/rate-limiting-and-hashing`):
-  deferred from v1.4.26-H. Vercel WAF rate-limit rules on access-code verify /
-  email send / PDF route — a Pro+ feature, and the project is on Hobby, so this
-  waits for an upgrade (or an app-level limiter if ever needed). Hashed
-  access-code storage: needs a migration plus two decisions first — owners
-  currently see their code in the dashboard (hashing makes it reset-only), and the
-  check is case-insensitive (hashing needs a normalisation rule).
+  **Split out:** rate limiting → v1.4.26.1-H (hashed access codes were considered
+  and scrapped — see below).
+- ✅ **v1.4.26.1-H — Rate limiting (done); hashed access codes scrapped** (2026-10-08):
+  **Rate limiting: done** — a Vercel Firewall rule (Hobby, free — one rule allowed;
+  30 req / 60 s per IP, 429) on `/invoice/`, `/api/invoice/`, `/api/invoices/`,
+  covering the access-code verify, PDF and payment-polling surfaces. It lives in
+  Vercel, not the repo (see `manual-tests/v1.4.26.1-H-rate-limiting.md` and the
+  `deploy-checklist`); online guessing is now pointless.
+  **Hashed access codes: scrapped, not built.** Considered (HMAC/keyed hash), but the
+  UX and dev cost outweighed the small gain — owners could no longer see or resend
+  their code, and the published email prints it — especially with guessing now
+  rate-limited. Codes stay plaintext in `invoices.access_code`. The v2.3 client-page
+  code cascade is unaffected either way (it never reads invoice codes).
 
 ### Phase 2 — Structural single-sources-of-truth
 
@@ -407,10 +412,12 @@ Each is one branch. Detail: Appendix A → Phase 2.
   validation unchanged), so the refactor is provably safe. **Split out:** the second
   clause (import the shared `invoiceSchema` client-side) → v1.4.29.2-H, since it
   changes validation semantics and messages.
-- 🔴 **v1.4.29.2-H — Schema-backed client-side form validation** (`v1.4.29.2-H/form-schema-validation`):
-  use the shared `invoiceSchema` in the form's `validate()` (map Zod issues to field
-  errors) so client and server rules cannot drift, keeping the publish-time "BTC
-  address required" rule. Deferred from v1.4.29.1-H.
+- ✅ **v1.4.29.2-H — Schema-backed client-side form validation** (`v1.4.29.2-H/form-schema-validation`):
+  shipped (package `1.4.38`) — the form's `validate()` now runs the shared
+  `invoiceSchema` over the payload (one source of truth with the server actions) and
+  maps Zod issues to field errors, keeping the publish-time "BTC address required"
+  rule and the form-only address FORMAT check; error display added for tax percent
+  and access code. Deferred from v1.4.29.1-H.
 - ✅ **v1.4.30-H — Realtime unification** (`refactor/realtime-and-styling`): shipped —
   one `useInvoiceChannel` hook (auth + subscription style as explicit parameters)
   with bounded resubscribe (6 attempts, 1s→30s), replacing two near-duplicate
