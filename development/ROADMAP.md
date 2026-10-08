@@ -412,11 +412,13 @@ Each is one branch. Detail: Appendix A → Phase 2.
   `confirmationDepth` now cross-references `CONFIRMATION_DEPTH_REQUIRED` (the
   reorg rationale already existed). **Split out:** the colour source of truth →
   v1.4.30.1-H.
-- 🔴 **v1.4.30.1-H — One colour source of truth** (`v1.4.30.1-H/colour-source`):
-  deferred from v1.4.30-H. `brand-colors.ts` and the `globals.css` `.dark` tokens
-  are NOT in lockstep today (see `manual-tests/v1.4.30-H-realtime-unification.md`);
-  decide which is canonical, sync them, then add the drift-guard test (with a
-  tolerance for OKLCH→hex rounding). Do the styling half with v1.5.
+- ✅ **v1.4.30.1-H — One colour source of truth** (`v1.4.30.1-H/colour-source`):
+  shipped (package `1.4.36`) — **`globals.css` is canonical** (it is what the app
+  renders; no visual change before the v1.5 redesign). `brand-colors.ts` synced to
+  the browser-accurate hex of the `.dark` tokens (`background #010101`,
+  `surface #070707`, `primary #D02A3A`, `muted #727460`), and `brand-colors.test.ts`
+  now fails if any of the four drifts (OKLCH→hex, ±2/channel). `foreground`/`paper`
+  are PDF-only and unguarded. Visual restyle stays with v1.5.
 - ✅ **v1.4.31-H — Address uniqueness across tenants (H-DB-3)** (`v1.4.31-H/address-uniqueness`):
   shipped — a `security definer` RPC (`is_address_registered`, search_path pinned,
   execute limited to authenticated) lets the pre-check see across tenants, so a
