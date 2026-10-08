@@ -150,6 +150,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.4.36 — One colour source of truth (roadmap v1.4.30.1-H).** `globals.css`
+  `.dark` tokens are canonical; `brand-colors.ts` (the PDF palette) is synced to the
+  browser-accurate hex of those tokens, fixing the drift (`#0A0A0A`→`#010101`,
+  `#181818`→`#070707`, `#DE3C4B`→`#D02A3A`, `#7C7F65`→`#727460`). Added
+  `brand-colors.test.ts`, which fails if the two drift again (OKLCH→hex, ±2/channel).
 - **v1.4.31.1-H — `is_address_registered` was executable by anon.** Supabase's
   default privileges re-grant EXECUTE on new public functions to `anon`, so
   0030's `revoke … from public` + `grant … to authenticated` left anon able to
