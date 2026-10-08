@@ -37,7 +37,7 @@ import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifi
 
 interface InvoiceFormProps {
   invoiceId?: string;
-  initialValues?: Partial<FormState>;
+  initialValues?: Partial<FormState> & { line_items?: LineItem[] };
   // When provided, locks your_email to the session user's email. A future branch
   // can re-introduce per-invoice override behind a toggle — explicit non-goal here.
   sessionEmail?: string;
@@ -55,12 +55,30 @@ interface FormState {
   client_company: string;
   client_address: string;
   client_tax_id: string;
-  line_items: LineItem[];
   tax_percent: string;
   btc_address: string;
   due_date: Date | undefined;
   no_due_date: boolean;
   access_code: string;
+}
+
+interface LineItemState {
+  key: string;
+  description: string;
+  quantity: string;
+  unit_price: string;
+}
+
+const DEFAULT_LINE_ITEMS: LineItem[] = [{ description: "", quantity: 1, unit_price: 0 }];
+
+// Derive the numeric LineItem[] the payload and totals need from the raw text
+// the user typed.
+function toLineItems(items: LineItemState[]): LineItem[] {
+  return items.map((it) => ({
+    description: it.description,
+    quantity: it.quantity === "" ? 0 : parseFloat(it.quantity) || 0,
+    unit_price: it.unit_price === "" ? 0 : parseFloat(it.unit_price) || 0,
+  }));
 }
 
 const DEFAULT_STATE: FormState = {
@@ -75,7 +93,6 @@ const DEFAULT_STATE: FormState = {
   client_company: "",
   client_address: "",
   client_tax_id: "",
-  line_items: [{ description: "", quantity: 1, unit_price: 0 }],
   tax_percent: "",
   btc_address: "",
   due_date: undefined,
@@ -95,17 +112,18 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   const [errors, setErrors] = useState<Record<string, string>>({});
   const initialFormRef = useRef(JSON.stringify(initialState));
 
-  // Raw string display values for qty/unit_price so "0" and "" are distinct
-  const [rawAmounts, setRawAmounts] = useState<{ quantity: string; unit_price: string }[]>(() =>
-    (initialValues?.line_items ?? DEFAULT_STATE.line_items).map((item) => ({
-      quantity: item.quantity !== 0 ? String(item.quantity) : "",
-      unit_price: item.unit_price !== 0 ? String(item.unit_price) : "",
-    }))
-  );
-
-  const [itemKeys, setItemKeys] = useState<string[]>(() =>
-    (initialValues?.line_items ?? DEFAULT_STATE.line_items).map(() => crypto.randomUUID())
-  );
+  // One array of line-item state. `quantity`/`unit_price` hold the raw text so
+  // "0" and "" stay distinct, and the parsed numbers are derived via toLineItems.
+  // This replaces three index-synced arrays (line_items/rawAmounts/itemKeys) that
+  // had to be kept aligned by hand.
+  const initialItems = (initialValues?.line_items ?? DEFAULT_LINE_ITEMS).map((item) => ({
+    key: crypto.randomUUID(),
+    description: item.description,
+    quantity: item.quantity !== 0 ? String(item.quantity) : "",
+    unit_price: item.unit_price !== 0 ? String(item.unit_price) : "",
+  }));
+  const [items, setItems] = useState<LineItemState[]>(initialItems);
+  const initialItemsRef = useRef(JSON.stringify(initialItems));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -116,12 +134,10 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = itemKeys.indexOf(String(active.id));
-    const newIndex = itemKeys.indexOf(String(over.id));
+    const oldIndex = items.findIndex((it) => it.key === String(active.id));
+    const newIndex = items.findIndex((it) => it.key === String(over.id));
     if (oldIndex < 0 || newIndex < 0) return;
-    setItemKeys((prev) => arrayMove(prev, oldIndex, newIndex));
-    setForm((prev) => ({ ...prev, line_items: arrayMove(prev.line_items, oldIndex, newIndex) }));
-    setRawAmounts((prev) => arrayMove(prev, oldIndex, newIndex));
+    setItems((prev) => arrayMove(prev, oldIndex, newIndex));
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -140,40 +156,27 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     return true;
   }
 
-  function updateItem(index: number, field: keyof LineItem, raw: string) {
+  function updateItem(index: number, field: "description" | "quantity" | "unit_price", raw: string) {
     if (field === "quantity" || field === "unit_price") {
       const maxValue = field === "quantity" ? QTY_MAX : UNIT_PRICE_MAX;
       if (!isValidAmountInput(raw, maxValue)) return;
-      setRawAmounts((prev) => {
-        const next = [...prev];
-        next[index] = { ...next[index], [field]: raw };
-        return next;
-      });
-      setForm((prev) => {
-        const items = [...prev.line_items];
-        const n = raw === "" ? 0 : parseFloat(raw);
-        items[index] = { ...items[index], [field]: isNaN(n) ? 0 : n };
-        return { ...prev, line_items: items };
-      });
-    } else {
-      setForm((prev) => {
-        const items = [...prev.line_items];
-        items[index] = { ...items[index], description: raw };
-        return { ...prev, line_items: items };
-      });
     }
+    setItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: raw };
+      return next;
+    });
   }
 
   function addItem() {
-    set("line_items", [...form.line_items, { description: "", quantity: 1, unit_price: 0 }]);
-    setRawAmounts((prev) => [...prev, { quantity: "1", unit_price: "" }]);
-    setItemKeys((prev) => [...prev, crypto.randomUUID()]);
+    setItems((prev) => [
+      ...prev,
+      { key: crypto.randomUUID(), description: "", quantity: "1", unit_price: "" },
+    ]);
   }
 
   function removeItem(i: number) {
-    set("line_items", form.line_items.filter((_, idx) => idx !== i));
-    setRawAmounts((prev) => prev.filter((_, idx) => idx !== i));
-    setItemKeys((prev) => prev.filter((_, idx) => idx !== i));
+    setItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   const errorFieldIds: Record<string, string> = {
@@ -213,7 +216,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       client_company: form.client_company || undefined,
       client_address: form.client_address || undefined,
       client_tax_id: form.client_tax_id || undefined,
-      line_items: form.line_items,
+      line_items: toLineItems(items),
       tax_percent: parseFloat(form.tax_percent) || 0,
       btc_address: form.btc_address.trim() || undefined,
       due_date: !form.no_due_date && form.due_date ? form.due_date.toISOString().split("T")[0] : undefined,
@@ -295,10 +298,12 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     );
 
   const taxPct = parseFloat(form.tax_percent) || 0;
-  const { subtotal, taxFiat, total } = computeInvoiceTotals(form.line_items, taxPct);
+  const { subtotal, taxFiat, total } = computeInvoiceTotals(toLineItems(items), taxPct);
 
   function handleCancel() {
-    const isDirty = JSON.stringify(form) !== initialFormRef.current;
+    const isDirty =
+      JSON.stringify(form) !== initialFormRef.current ||
+      JSON.stringify(items) !== initialItemsRef.current;
     if (isDirty) {
       if (!window.confirm("You have unsaved changes. Discard and go back?")) return;
     }
@@ -414,16 +419,15 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={itemKeys} strategy={verticalListSortingStrategy}>
+          <SortableContext items={items.map((it) => it.key)} strategy={verticalListSortingStrategy}>
             <div id="line-items-list" className="space-y-2">
-              {form.line_items.map((item, i) => (
+              {items.map((item, i) => (
                 <SortableLineItem
-                  key={itemKeys[i]}
-                  id={itemKeys[i]}
+                  key={item.key}
+                  id={item.key}
                   index={i}
                   item={item}
-                  rawAmount={rawAmounts[i]}
-                  canRemove={form.line_items.length > 1}
+                  canRemove={items.length > 1}
                   onChangeField={updateItem}
                   onRemove={removeItem}
                 />
@@ -584,17 +588,15 @@ function SortableLineItem({
   id,
   index,
   item,
-  rawAmount,
   canRemove,
   onChangeField,
   onRemove,
 }: {
   id: string;
   index: number;
-  item: LineItem;
-  rawAmount: { quantity: string; unit_price: string } | undefined;
+  item: LineItemState;
   canRemove: boolean;
-  onChangeField: (i: number, field: keyof LineItem, raw: string) => void;
+  onChangeField: (i: number, field: "description" | "quantity" | "unit_price", raw: string) => void;
   onRemove: (i: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -629,7 +631,7 @@ function SortableLineItem({
           id={`input-line-item-${index}-qty`}
           type="text"
           inputMode="decimal"
-          value={rawAmount?.quantity ?? ""}
+          value={item.quantity}
           onChange={(e) => onChangeField(index, "quantity", e.target.value)}
           className={`w-full ${inputBase}`}
         />
@@ -640,7 +642,7 @@ function SortableLineItem({
           id={`input-line-item-${index}-unit-price`}
           type="text"
           inputMode="decimal"
-          value={rawAmount?.unit_price ?? ""}
+          value={item.unit_price}
           onChange={(e) => onChangeField(index, "unit_price", e.target.value)}
           className={`w-full ${inputBase}`}
           placeholder="0.00"

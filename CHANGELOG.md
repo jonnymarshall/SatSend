@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.35 — Collapse the invoice form's line-item state (roadmap v1.4.29.1-H).**
+  The form's three index-synced arrays (`line_items`, `rawAmounts`, `itemKeys`) are
+  now one `LineItemState[]`; the numeric `LineItem[]` is derived with `toLineItems`.
+  Removes the desync-bug class from add/remove/reorder. Behaviour and markup
+  unchanged. The `-H` name is roadmap naming; the package version is plain SemVer.
 - **v1.4.34 — Branch protection + v1.4.36 close-out.** Added
   `scripts/enable-branch-protection.sh` (idempotent `gh api`) requiring the CI
   `verify` check and blocking direct pushes/force-pushes to `main`, so the CI from
