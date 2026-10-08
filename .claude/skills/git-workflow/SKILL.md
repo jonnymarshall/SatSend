@@ -54,11 +54,12 @@ Interim feature branches should NOT be tagged as GitHub Releases. Follow this lo
 - **PATCH updates** (e.g., 1.0.1): Git Tag + CHANGELOG update only.
 - **MINOR updates** (e.g., 1.1.0): Git Tag + CHANGELOG update only.
 - **MAJOR updates** (e.g., 1.0.0, 2.0.0): Git Tag + CHANGELOG update + GitHub Release.
-- **On every merge to `main`:** bump `package.json` to the merged version and push
-  the matching tag (`git tag vX.Y.Z && git push origin vX.Y.Z`). Keep `package.json`,
-  the tag, and `CHANGELOG.md` in lockstep. Use plain SemVer — no `v` inside the
-  string, and no `-H` (that suffix is roadmap naming, not SemVer; in real SemVer it
-  would mean a prerelease).
+- **On the branch:** bump `package.json` to the branch's version (plain SemVer —
+  no `v` inside the string, no `-H`; that suffix is roadmap naming, not SemVer).
+  The PR therefore carries the version.
+- **On merge to `main`:** push the matching tag
+  (`git tag vX.Y.Z && git push origin vX.Y.Z`). Keep `package.json`, the tag, and
+  `CHANGELOG.md` in lockstep.
 
 This keeps the GitHub Releases tab clean, showcasing only significant completed version milestones.
 

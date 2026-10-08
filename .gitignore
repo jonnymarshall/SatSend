@@ -40,6 +40,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Claude hook state markers (local, machine-specific)
+.claude/.state/
+
 # vercel
 .vercel
 

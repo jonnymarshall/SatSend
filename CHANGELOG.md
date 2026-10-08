@@ -56,6 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.33-H — Claude workflow hooks/skills.** A CI workflow
+  (`.github/workflows/ci.yml`: typecheck + unit tests + lint on every PR) as the
+  real, tool-blind gate. Four warn-only hook scripts in `.claude/hooks/` (commit
+  gate, typecheck-on-Stop, version-sync, roadmap-size) wired via
+  `.claude/settings.json`. Three skills mirrored in `.claude/skills/` and
+  `.agents/skills/`: `pre-merge-verification`, `migration-safety`,
+  `deploy-checklist`. `write-a-prd` now delegates to `grill-me`. A project brief in
+  `AGENTS.md`. `git-workflow` now says bump-on-branch, tag-on-merge.
 - **v1.4.32-H — Roadmap/docs restructure.** Split the completed v1.0–v1.4.18 build
   into `development/ROADMAP-ARCHIVE.md`; the live `ROADMAP.md` is now ~2225 lines
   (the old "< 500" target predated the hardening train — restated honestly). Added
