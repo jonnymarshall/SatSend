@@ -13,7 +13,8 @@ import {
   InvoicePayload,
 } from "@/app/(dashboard)/invoices/actions";
 import { PublishMenu } from "@/components/publish-menu";
-import { computeInvoiceTotals, isValidEmail, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import { invoiceSchema } from "@/lib/invoices/schema";
 import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
   DndContext,
@@ -184,13 +185,22 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     your_email: "input-your-email",
     client_email: "input-client-email",
     btc_address: "input-btc-address",
+    access_code: "input-access-code",
+    tax_percent: "input-tax-percent",
   };
 
   function validate(isPublish: boolean): boolean {
     const errs: Record<string, string> = {};
-    if (form.client_email && !isValidEmail(form.client_email)) errs.client_email = "Must be a valid email";
-    if (form.your_email && !isValidEmail(form.your_email)) errs.your_email = "Must be a valid email";
-    if (form.invoice_number && form.invoice_number.length > 30) errs.invoice_number = "Max 30 characters";
+    // Single source of truth: the same schema the server actions use (v1.4.29.2-H),
+    // so client and server rules cannot drift.
+    const parsed = invoiceSchema.safeParse(buildPayload());
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path.join(".") || "_form";
+        if (!errs[field]) errs[field] = issue.message;
+      }
+    }
+    // Rules the schema deliberately omits: address FORMAT, and required-to-publish.
     const btc = form.btc_address.trim();
     if (btc && !isValidBtcAddress(btc)) errs.btc_address = "Invalid BTC address";
     if (isPublish && !btc) errs.btc_address = "BTC address is required to publish";
@@ -443,7 +453,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
 
       {/* Tax */}
       <section id="section-tax">
-        <Field label="Tax (%)">
+        <Field label="Tax (%)" error={errors.tax_percent}>
           <input
             id="input-tax-percent"
             type="text"
@@ -502,7 +512,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
 
       {/* Access code */}
       <section id="section-access-code">
-        <Field label="Access code (Optional)">
+        <Field label="Access code (Optional)" error={errors.access_code}>
           <input
             id="input-access-code"
             type="text"

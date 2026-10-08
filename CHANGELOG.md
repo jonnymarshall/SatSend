@@ -56,6 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.38 — Schema-backed client-side form validation (roadmap v1.4.29.2-H).** The
+  invoice form's `validate()` now runs the shared `invoiceSchema` (the same one the
+  server actions use) over the payload and maps Zod issues to field errors, so
+  client and server rules cannot drift. The form keeps the publish-time "BTC address
+  required" rule and the form-only address FORMAT check (deliberately not in the
+  schema). Error display added for tax percent and access code. Also: scrapped the
+  planned hashed-access-codes work (Vercel Firewall rate limiting covers the abuse
+  case) and closed v1.4.23.2-H as already satisfied.
 - **v1.4.35 — Collapse the invoice form's line-item state (roadmap v1.4.29.1-H).**
   The form's three index-synced arrays (`line_items`, `rawAmounts`, `itemKeys`) are
   now one `LineItemState[]`; the numeric `LineItem[]` is derived with `toLineItems`.
