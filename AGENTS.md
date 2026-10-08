@@ -28,7 +28,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- BEGIN:project-brief -->
 # Project brief (how to work here)
 
-- **Never commit to `main`.** Work on a branch named for the roadmap item.
+- **Never commit to `main`.** Work on a branch named for the roadmap item. `main`
+  is protected: the CI `verify` check must pass and direct pushes are blocked
+  (`scripts/enable-branch-protection.sh`).
 - **Before any commit:** `npm run test:run`, `npm run typecheck`, and
   `npm run lint` must be green. CI enforces this on the PR; the local hooks are
   fast feedback only.

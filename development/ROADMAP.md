@@ -67,8 +67,10 @@ Completed work is archived verbatim in [`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.
 > result) without the human doing manual testing. Dev-only tooling, never shipped
 > to production. Run it before and alongside the hardening train.
 
-### 🔴 v1.4.36 — Test automation harness
-**Branch:** `chore/test-automation`
+### ✅ v1.4.36 — Test automation harness
+**Branch:** `chore/test-automation` · **closed in v1.4.34** — the only remainder
+(the on-chain testnet wallet sweep) is tracked in
+`development/OUTSTANDING-VERIFICATIONS.md`.
 
 - **Testnet wallet tool** (`test-automation/wallet.mjs`) — done. Derives addresses
   from a testnet seed, locates funds, selects coins, signs, and broadcasts.

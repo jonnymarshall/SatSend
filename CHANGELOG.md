@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.4.34 — Branch protection + v1.4.36 close-out.** Added
+  `scripts/enable-branch-protection.sh` (idempotent `gh api`) requiring the CI
+  `verify` check and blocking direct pushes/force-pushes to `main`, so the CI from
+  v1.4.33-H cannot be bypassed. `AGENTS.md` notes `main` is protected. Closed
+  v1.4.36 (test automation harness) — its only remainder, the on-chain testnet
+  wallet sweep, is now in `development/OUTSTANDING-VERIFICATIONS.md`.
 - **v1.4.33-H — Claude workflow hooks/skills.** A CI workflow
   (`.github/workflows/ci.yml`: typecheck + unit tests + lint on every PR) as the
   real, tool-blind gate. Four warn-only hook scripts in `.claude/hooks/` (commit
