@@ -394,10 +394,17 @@ Each is one branch. Detail: Appendix A → Phase 2.
   translated DB constraint violations (the address unique index → a btc_address
   field error). Structural errors still throw; `parseServerError` deleted.
   **Split out:** the form's three parallel arrays → v1.4.29.1-H.
-- 🔴 **v1.4.29.1-H — Collapse the form's parallel arrays** (`v1.4.29.1-H/form-line-item-state`):
-  deferred from v1.4.29-H (M-FE-2). Replace the form's three index-synced arrays
-  (`line_items`, `rawAmounts`, `itemKeys`) with one `LineItemState[]`, and have the
-  form import the shared `invoiceSchema` for client-side validation.
+- ✅ **v1.4.29.1-H — Collapse the form's parallel arrays** (`v1.4.29.1-H/form-line-item-state`):
+  shipped (package `1.4.35`) — the form's three index-synced arrays (`line_items`,
+  `rawAmounts`, `itemKeys`) are now one `LineItemState[]`; the numeric `LineItem[]`
+  is derived via `toLineItems`. Behaviour-preserving (DOM ids and the existing
+  validation unchanged), so the refactor is provably safe. **Split out:** the second
+  clause (import the shared `invoiceSchema` client-side) → v1.4.29.2-H, since it
+  changes validation semantics and messages.
+- 🔴 **v1.4.29.2-H — Schema-backed client-side form validation** (`v1.4.29.2-H/form-schema-validation`):
+  use the shared `invoiceSchema` in the form's `validate()` (map Zod issues to field
+  errors) so client and server rules cannot drift, keeping the publish-time "BTC
+  address required" rule. Deferred from v1.4.29.1-H.
 - ✅ **v1.4.30-H — Realtime unification** (`refactor/realtime-and-styling`): shipped —
   one `useInvoiceChannel` hook (auth + subscription style as explicit parameters)
   with bounded resubscribe (6 attempts, 1s→30s), replacing two near-duplicate
