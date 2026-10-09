@@ -916,6 +916,42 @@ subscribe button ships without its required disclosure.
 
 ---
 
+### ✅ v1.5.0-H — Internal UI kit (`/styleguide`) before the redesign
+
+**Branch:** `v1.5/ui-kit` · package `1.5.0`
+
+Split out of v1.5 (decided 2026-10-08): build a temporary, internal component
+library first so the whole Signal Amber system can be judged on one page before
+any live screen changes. Kit first, apply second: different risks, different review
+styles, and the kit is disposable.
+
+- [x] Signal Amber tokens copied verbatim from the handoff into
+      `src/styles/signal-amber.css`, **scoped** to `[data-theme="signal-amber"]` so
+      the live dark app is untouched; drift test against
+      `satsend-brand-handoff/design-tokens.css`.
+- [x] Onest loaded (next/font) alongside Geist, kit-only for now.
+- [x] Gated route `/styleguide`: 404 unless `SHOW_UI_KIT=1`, `noindex`, unlinked.
+- [x] Primitives in `src/components/signal/` (Button, Field, Card, StatusBadge) and
+      the supplied logo in `src/components/brand/` (byte-identical, tested).
+- [x] Catalogue: logo, colour, type scale, spacing/radius/elevation, components
+      in all states, product patterns (list, stats, empty, table, payer page),
+      a marketing composition (nav, hero, footer), and a computed contrast audit.
+- [x] Mobile checked at 390px (no overflow; 44px targets).
+
+**Findings for v1.5-H (decisions pending, shown side by side in the kit):**
+- Every spec status text colour fails 4.5:1 on its own soft background at 13px;
+  brand amber fails as text and as the hero's display line (2.35:1); the input
+  outline (1.22:1) and amber focus border (2.43:1) miss the 3:1 UI minimum.
+  `PROPOSED` AA shades live in `src/lib/design/proposed-tokens.ts`.
+- `pending` has no handoff status; the kit maps it to "Sent" blue. `archived` uses
+  neutral, outlined.
+
+**Deletion:** the `src/app/styleguide/` folder is deleted at the end of v1.5-H
+(tracked in `OUTSTANDING-VERIFICATIONS.md`). Primitives, tokens, logo and the
+contrast helper are keepers and get promoted.
+
+---
+
 ### ⏳ v1.5 — Full Site Redesign (Brand Handoff — "Signal Amber", Option D)
 
 **Branch:** `v1.5/redesign`
@@ -952,10 +988,15 @@ subscribe button ships without its required disclosure.
 - [ ] Build marketing pages using the product UI itself as the core visual.
 - [ ] Mobile: 44px minimum touch targets.
 - [ ] Accessibility/contrast pass before completion.
-- [ ] Light/dark: the handoff defines a light canvas and dark text. Decide whether
-      the app becomes light-first (retiring the old dark-only theme) or ships both;
-      record the decision in the PR. The old mandatory dark/light toggle is
-      superseded.
+- [ ] Light/dark: **decided 2026-10-08 — light-first, retire dark.** Removing the
+      `dark` class from the root layout is this branch's scope (not v1.5.0-H).
+      Tokens make re-adding dark cheap later if users ask. The old mandatory
+      dark/light toggle is superseded.
+- [ ] Promote the v1.5.0-H keepers: scoped tokens become `:root`, Signal
+      primitives replace `src/components/ui/*` usages, Onest moves to the root
+      layout. Resolve the kit's contrast findings first.
+- [ ] **Delete `src/app/styleguide/`** (the internal kit) as the last step, and tick
+      it off in `OUTSTANDING-VERIFICATIONS.md`.
 
 **Coordinates with:** Appendix A → A-3 (realtime & styling unification) — its
 styling half lands here, not separately.

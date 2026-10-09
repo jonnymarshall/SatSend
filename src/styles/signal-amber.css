@@ -1,0 +1,107 @@
+/*
+ * SatSend — Option D / Signal Amber tokens (v1.5.0-H).
+ *
+ * Values are copied verbatim from satsend-brand-handoff/design-tokens.css and
+ * guarded against drift by src/lib/design/signal-amber-tokens.test.ts.
+ *
+ * SCOPED, not global: only elements inside [data-theme="signal-amber"] get these
+ * tokens, so the live (dark) app is untouched until v1.5-H. In v1.5-H this selector
+ * becomes :root and the old palette in globals.css is retired.
+ *
+ * The --font-display / --font-body values point at the next/font variables loaded
+ * by the styleguide layout (Onest + Geist), with the handoff names as fallbacks.
+ */
+[data-theme="signal-amber"] {
+  --font-display: var(--font-onest), "Onest", sans-serif;
+  --font-body: var(--font-geist-sans), "Geist", "Geist Sans", sans-serif;
+
+  --color-ink: #151C2E;
+  --color-canvas: #FCFBF7;
+  --color-surface: #FFFFFF;
+  --color-brand: #D89B24;
+  --color-brand-hover: #C48716;
+  --color-brand-soft: #F8E9BF;
+  --color-text-secondary: #6F7282;
+  --color-border: #ECE8DD;
+
+  --color-success: #2F9A74;
+  --color-success-soft: #E7F6F0;
+  --color-sent: #4776E6;
+  --color-sent-soft: #EAF0FF;
+  --color-detected: #6E7CF6;
+  --color-detected-soft: #ECEEFF;
+  --color-warning: #F0A43B;
+  --color-warning-soft: #FFF2DD;
+  --color-danger: #D95F5F;
+  --color-danger-soft: #FCE8E8;
+  --color-neutral: #7A8190;
+  --color-neutral-soft: #F0F1F3;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+  --space-10: 128px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 4px 24px rgba(21, 28, 46, 0.08);
+  --shadow-overlay:
+    0 12px 36px rgba(21, 28, 46, 0.12),
+    0 2px 8px rgba(21, 28, 46, 0.06);
+
+  --container-max: 1280px;
+
+  /*
+   * PROPOSED (not in the handoff): AA-safe TEXT shades. Every spec status colour
+   * fails 4.5:1 as small text on its own soft background, and brand amber fails as
+   * text on canvas. Each proposal is the spec hue mixed toward --color-ink just far
+   * enough to reach 4.5:1 (see the contrast audit on /styleguide). Dots, fills and
+   * large type keep the spec colours. Decision pending — see the v1.5.0-H PR.
+   */
+  --color-success-text: #297C63;
+  --color-sent-text: #3F68C9;
+  --color-detected-text: #5864C4;
+  --color-warning-text: #906835;
+  --color-danger-text: #AA4F53;
+  --color-neutral-text: #676E7D;
+  --color-brand-text: #926D28;
+  /* PROPOSED: input outline reaching the 3:1 non-text minimum on white. */
+  --color-border-strong: #949495;
+
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The root layout still paints the old dark body; don't let it show on overscroll. */
+body:has([data-theme="signal-amber"]) {
+  background: #FCFBF7;
+}
+
+[data-theme="signal-amber"] .font-display {
+  font-family: var(--font-display);
+}
+
+/* Onest headings: tight tracking, less aggressive below ~28px (DESIGN.md §4). */
+[data-theme="signal-amber"] .tracking-display {
+  letter-spacing: -0.045em;
+}
+[data-theme="signal-amber"] .tracking-heading {
+  letter-spacing: -0.025em;
+}
+
+[data-theme="signal-amber"] ::selection {
+  background: var(--color-brand-soft);
+  color: var(--color-ink);
+}

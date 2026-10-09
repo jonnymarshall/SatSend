@@ -43,5 +43,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
   marked SUPERSEDED.
 - **Skills:** `next-feature` (plan the next item, then stop for approval),
   `git-workflow` (branching/SemVer), `migration-safety`, `deploy-checklist`,
-  `pre-merge-verification`.
+  `pre-merge-verification`, `ui-element-ids` (give UI elements hierarchical ids
+  so they can be named in conversation; apply on any UI/design work).
 <!-- END:project-brief -->
