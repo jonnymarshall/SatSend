@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Button } from "@/components/signal/button";
+import { Button, buttonVariants } from "@/components/signal/button";
 import { PublishMenu } from "@/components/publish-menu";
 import { MarkAsMenu } from "@/components/mark-as-menu";
 import {
@@ -81,12 +81,12 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
       : null;
 
   return (
-    <div id="invoice-actions" className="space-y-3 pb-8">
+    <div id="invoice-actions" className="space-y-3">
       {error && (
         <div
           id="invoice-actions--error"
           role="alert"
-          className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="rounded-(--radius-md) border border-(--color-danger)/30 bg-(--color-danger-soft) px-4 py-3 text-sm text-(--color-danger-text)"
         >
           {error}
         </div>
@@ -95,32 +95,46 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         <div
           id="invoice-actions--notice"
           role="status"
-          className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
+          className="rounded-(--radius-md) border border-(--color-success)/30 bg-(--color-success-soft) px-4 py-3 text-sm text-(--color-success-text)"
         >
           {notice}
         </div>
       )}
       {deliveryLine && (
-        <p id="invoice-actions--delivery-status" className="text-sm text-muted-foreground">
+        <p id="invoice-actions--delivery-status" className="text-sm text-(--color-text-secondary)">
           {deliveryLine}
         </p>
       )}
-      <div id="invoice-actions--buttons" className="flex gap-3 flex-wrap">
+      <div id="invoice-actions--buttons" className="flex flex-wrap gap-2 sm:gap-3">
         {isDraft && (
-          <Link href={`/invoices/${invoice.id}/edit`}>
-            <Button id="invoice-actions--edit-draft-button" variant="secondary">Edit draft</Button>
+          <Link
+            id="invoice-actions--edit-draft-button"
+            href={`/invoices/${invoice.id}/edit`}
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            Edit draft
           </Link>
         )}
 
         {!isDraft && (
-          <Link href={`/invoice/${invoice.id}`} target="_blank">
-            <Button id="invoice-actions--view-public-button" variant="secondary">View public invoice</Button>
+          <Link
+            id="invoice-actions--view-public-button"
+            href={`/invoice/${invoice.id}`}
+            target="_blank"
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            View public invoice
           </Link>
         )}
 
         {!isDraft && (
-          <a href={`/api/invoices/${invoice.id}/pdf`} download>
-            <Button id="invoice-actions--download-pdf-button" variant="secondary">Download PDF</Button>
+          <a
+            id="invoice-actions--download-pdf-button"
+            href={`/api/invoices/${invoice.id}/pdf`}
+            download
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            Download PDF
           </a>
         )}
 
@@ -246,8 +260,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
         <Button
           id="invoice-actions--delete-button"
-          variant="secondary"
-          className="text-primary border-primary/30 hover:bg-primary/10"
+          variant="danger"
           onClick={handleDelete}
           disabled={busy}
         >

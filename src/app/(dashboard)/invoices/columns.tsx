@@ -57,10 +57,10 @@ function sortableHeader(label: string) {
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="-ml-3 h-8"
+        className="-ml-3 h-11 px-3 text-[13px] md:h-9 font-medium text-(--color-text-secondary) hover:text-(--color-ink)"
       >
         {label}
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
       </Button>
     );
   }
@@ -96,7 +96,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
         return (
           <Link
             href={`/invoices/${invoice.id}`}
-            className="font-medium hover:underline"
+            className="proxy-id--invoice-row--number-link inline-flex min-h-11 items-center font-semibold md:min-h-0 text-(--color-ink) underline-offset-4 decoration-(--color-brand) decoration-2 hover:underline"
           >
             {invoice.invoice_number || "—"}
           </Link>
@@ -107,7 +107,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       accessorKey: "client_name",
       header: sortableHeader("Client"),
       cell: ({ row }) => (
-        <span className="text-muted-foreground">
+        <span className="text-(--color-text-secondary)">
           {row.original.client_name || "—"}
         </span>
       ),
@@ -116,7 +116,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       accessorKey: "created_at",
       header: sortableHeader("Date Sent"),
       cell: ({ row }) => (
-        <span className="text-muted-foreground">
+        <span className="text-(--color-text-secondary)">
           {format(new Date(row.original.created_at), "MMM d, yyyy")}
         </span>
       ),
@@ -127,7 +127,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       cell: ({ row }) => {
         const d = row.original.due_date;
         return (
-          <span className="text-muted-foreground">
+          <span className="text-(--color-text-secondary)">
             {d ? format(new Date(d + "T12:00:00"), "MMM d, yyyy") : "—"}
           </span>
         );
@@ -140,10 +140,10 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-mr-3 h-8"
+            className="-mr-3 h-11 px-3 text-[13px] md:h-9 font-medium text-(--color-text-secondary) hover:text-(--color-ink)"
           >
             Amount
-            <ArrowUpDown className="ml-2 h-4 w-4" />
+            <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
           </Button>
         </div>
       ),
@@ -152,7 +152,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
           style: "currency",
           currency: row.original.currency,
         }).format(row.original.total_fiat);
-        return <div className="text-right font-medium">{formatted}</div>;
+        return <div className="text-right font-semibold tabular-nums">{formatted}</div>;
       },
     },
     {
@@ -175,28 +175,28 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                 : null;
         const trailingIcon = failureLabel ? (
           <AlertCircle
-            className="proxy-id--invoice-row--email-failed-indicator h-3.5 w-3.5 text-destructive"
+            className="proxy-id--invoice-row--email-failed-indicator h-4 w-4 text-(--color-danger-text)"
             aria-label={failureLabel}
           >
             <title>{failureLabel}</title>
           </AlertCircle>
         ) : r.send_method === "email" ? (
           <Mail
-            className="h-3.5 w-3.5 text-muted-foreground"
+            className="h-4 w-4 text-(--color-text-secondary)"
             aria-label="Sent via email"
           >
             <title>Sent via email</title>
           </Mail>
         ) : r.send_method === "manual" ? (
           <HandHelping
-            className="h-3.5 w-3.5 text-muted-foreground"
+            className="h-4 w-4 text-(--color-text-secondary)"
             aria-label="Marked as sent manually"
           >
             <title>Marked as sent manually</title>
           </HandHelping>
         ) : null;
         return (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={r.status} />
             {trailingIcon}
           </div>
@@ -229,7 +229,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="icon" className="proxy-id--invoice-row--menu-trigger size-11 md:size-9">
                   <span className="sr-only">Open menu</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -305,7 +305,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => actions.onDelete(invoice.id)}
-                className="text-destructive focus:text-destructive"
+                variant="destructive"
               >
                 Delete
               </DropdownMenuItem>

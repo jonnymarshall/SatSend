@@ -1,3 +1,5 @@
+import { Spinner } from "@/components/signal/spinner";
+
 export default function Loading() {
   return (
     <div
@@ -6,7 +8,7 @@ export default function Loading() {
       role="status"
       aria-live="polite"
     >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      <Spinner />
       <span className="sr-only">Loading invoice</span>
     </div>
   );

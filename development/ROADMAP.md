@@ -953,15 +953,16 @@ folder stays untouched as the designer's record.
 - **Fixed:** inputs flashed red on focus (the old base style's red ring colour
   animated into amber).
 
-**Deletion:** the `src/app/styleguide/` folder is deleted at the end of v1.5-H
+**Deletion:** the `src/app/styleguide/` folder is deleted at the end of v1.5.2-H
+(moved from v1.5-H on 2026-10-10)
 (tracked in `OUTSTANDING-VERIFICATIONS.md`). Primitives, tokens, logo and the
 contrast helper are keepers and get promoted.
 
 ---
 
-### ⏳ v1.5 — Full Site Redesign (Brand Handoff — "Signal Amber", Option D)
+### ✅ v1.5-H — Full Site Redesign, in-app screens (Brand Handoff — "Signal Amber", Option D)
 
-**Branch:** `v1.5/redesign`
+**Branch:** `v1.5/redesign` · package `1.5.1`
 
 > **Design source of truth:** `satsend-brand-handoff/` — read `DESIGN.md` first,
 > then `design-tokens.css` and `agent-implementation-brief.md`. Written tokens and
@@ -982,39 +983,75 @@ contrast helper are keepers and get promoted.
   warning orange = Underpaid; red = Overdue.
 - Bitcoin visual explicitness ≈ 2–2.5 / 5.
 
-**Scope**
-- [ ] Load Onest + Geist Sans; import `design-tokens.css` globally; retire the
-      current near-black + red `#DE3C4B` palette.
-- [ ] Rebuild the base primitives against the tokens: Button, Input, Card,
-      StatusBadge.
-- [ ] Use the supplied `SatSendLogo.tsx` inline-SVG lockup (do not rebuild the
-      wordmark from separately positioned spans).
-- [ ] Apply neutral surfaces and borders across the product **before** adding amber.
-- [ ] Apply the semantic status colours across badge, email templates, and PDF.
-- [ ] Refactor the dashboard, invoice detail, and public payer pages onto the new
-      spacing and type scales.
-- [ ] Build marketing pages using the product UI itself as the core visual.
-- [ ] Mobile: 44px minimum touch targets.
-- [ ] Accessibility/contrast pass before completion.
-- [ ] Light/dark: **decided 2026-10-08 — light-first, retire dark.** Removing the
-      `dark` class from the root layout is this branch's scope (not v1.5.0-H).
-      Tokens make re-adding dark cheap later if users ask. The old mandatory
-      dark/light toggle is superseded.
-- [ ] Promote the v1.5.0-H keepers: scoped tokens become `:root`, Signal
-      primitives replace `src/components/ui/*` usages, Onest moves to the root
-      layout. Use the adopted tokens decided in v1.5.0-H (see above).
-- [ ] The handoff's logo SVG assets (`satsend-brand-handoff/assets/*.svg`) still use
-      the old `.me` spacing; regenerate them with the decided spacing before any
-      email, PDF or favicon uses them.
-- [ ] **Delete `src/app/styleguide/`** (the internal kit) as the last step, and tick
-      it off in `OUTSTANDING-VERIFICATIONS.md`.
+**Split (decided 2026-10-10).** v1.5 is delivered in three slices so each review
+stays a manageable size: **v1.5-H** in-app screens (this section), **v1.5.1-H**
+emails + PDF, **v1.5.2-H** marketing page. The `/styleguide` kit is deleted at the
+end of v1.5.2-H (not v1.5-H) so it stays available as the reference while emails
+and the marketing page are restyled. The dashboard is **restyled only**; a layout
+rework is out of scope.
+
+**Scope (v1.5-H)**
+- [x] Load Onest + Geist Sans in the root layout; Signal Amber tokens are global
+      (`:root`); the near-black + red `#DE3C4B` palette is retired. shadcn's
+      variables (`--background`, `--primary`, ...) alias the tokens.
+- [x] Light/dark: **decided 2026-10-08 — light-first, retire dark.** The `dark`
+      class is removed from the root layout and every `dark:` class is gone.
+- [x] Promote the v1.5.0-H keepers: Signal Button/Input/Card/StatusBadge replace
+      `src/components/ui/button` + `input` (deleted); dropdown, popover, alert
+      dialog, calendar, checkbox and table restyled in place.
+- [x] `brand-colors.ts` mirrors `signal-amber.css` (drift-tested). The PDF picks up
+      ink text and the AA amber `#926D28` for accents; its layout is v1.5.1-H.
+- [x] App shell: header with the `SatSendLogo` component, loading spinner, error
+      and 404 screens.
+- [x] App icon: the handoff's dark favicon mark, with its "S" converted to the real
+      Onest 800 outline (`scripts/brand/outline-mark.py`) so it renders without
+      the font: `src/app/icon.svg`, `apple-icon.png` (180, full-bleed),
+      `favicon.ico` (16/32/48).
+- [x] Screens, neutral first then amber: login, invoice list + table, invoice
+      form (new/edit), invoice detail (actions, activity), public payer page and
+      access-code gate. Status colours exactly as locked above.
+- [x] Mobile at 390px: no horizontal page scroll; 44px touch targets on phones.
+- [x] Contrast pass on the real screens: all text meets WCAG AA.
 
 **Coordinates with:** Appendix A → A-3 (realtime & styling unification) — its
 styling half lands here, not separately.
 
-**Done when:** every surface (dashboard, invoice detail, public payer page, emails,
-PDF) renders in the Signal Amber system, the logo is the supplied component, the
-status-colour mapping is exactly as locked above, and an accessibility pass is clean.
+**Found, not fixed here:** the invoice form logs a dnd-kit hydration warning
+(`aria-describedby="DndDescribedBy-N"` differs between server and browser). It is
+harmless and predates this branch; the fix is a stable `id` on `DndContext`.
+
+**Done when:** every in-app surface renders in the Signal Amber system, the logo is
+the supplied component, the status-colour mapping is exactly as locked above, and
+an accessibility pass is clean.
+
+---
+
+### ⏳ v1.5.1-H — Redesign: emails + PDF
+
+**Branch:** `v1.5.1/emails-pdf`
+
+- [ ] Restyle the email templates (`src/lib/email/templates/*`) in Signal Amber;
+      the publish email's button is still red `#DE3C4B`.
+- [ ] Restyle the invoice PDF layout (colours already follow `brand-colors.ts`).
+- [ ] Apply the semantic status colours in emails and PDF.
+- [ ] Logo files: export font-independent, outlined-path versions of the wordmark
+      (default, reversed, monochrome) with the decided `.me` spacing (dx=1.5),
+      from the Onest outlines (extend `scripts/brand/outline-mark.py`). Emails
+      need a PNG of it (most email apps do not show SVG). The handoff folder stays
+      untouched; the new files live in the app.
+
+---
+
+### ⏳ v1.5.2-H — Redesign: marketing page
+
+**Branch:** `v1.5.2/marketing`
+
+- [ ] Build the marketing page at `/` (today `/` redirects to `/dashboard`), using
+      the product UI itself as the core visual (DESIGN.md §10).
+- [ ] Optional follow-up from v1.5-H: on phones, show the invoice table as stacked
+      rows instead of sideways scrolling (a layout change, so it needs a decision).
+- [ ] **Delete `src/app/styleguide/`** (the internal kit) as the last step, and tick
+      it off in `OUTSTANDING-VERIFICATIONS.md`.
 
 ---
 

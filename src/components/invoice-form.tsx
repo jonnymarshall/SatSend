@@ -3,6 +3,9 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/signal/button";
+import { Card } from "@/components/signal/card";
+import { inputClassName } from "@/components/signal/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/date-picker";
 import {
   saveDraft,
@@ -323,13 +326,13 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   return (
     <div id="form-invoice" className="space-y-8">
       {errors._form && (
-        <div id="form-error" className="rounded-md bg-primary/10 border border-primary/30 px-4 py-3 text-sm text-primary">
+        <div id="form-error" role="alert" className="rounded-(--radius-md) border border-(--color-danger)/30 bg-(--color-danger-soft) px-4 py-3 text-sm text-(--color-danger-text)">
           {errors._form}
         </div>
       )}
 
       {/* Invoice number */}
-      <section id="section-invoice-number">
+      <Card id="section-invoice-number" className="space-y-0">
         <Field label="Invoice number" error={errors.invoice_number}>
           <div className="max-w-xs">
             <input
@@ -343,18 +346,18 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             />
             <p
               id="counter-invoice-number"
-              className="mt-1 text-xs text-muted-foreground tabular-nums"
+              className="mt-1.5 text-xs text-(--color-text-secondary) tabular-nums"
             >
               {form.invoice_number.length} / 30
             </p>
           </div>
         </Field>
-      </section>
+      </Card>
 
       {/* YOU / CLIENT split */}
-      <div id="section-parties" className="grid grid-cols-2">
-        <section id="section-you" className="space-y-2 border-r border-border" style={{ paddingRight: "2.5rem" }}>
-          <h2 id="heading-you" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">You</h2>
+      <Card id="section-parties" className="grid gap-8 md:grid-cols-2 md:gap-0">
+        <section id="section-you" className="space-y-4 md:border-r md:border-(--color-border) md:pr-8">
+          <h2 id="heading-you" className="font-display tracking-heading text-lg font-semibold text-(--color-ink)">You</h2>
           <Field label="Name">
             <input id="input-your-name" type="text" value={form.your_name} onChange={(e) => set("your_name", e.target.value)} className={inputCls} />
           </Field>
@@ -365,7 +368,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
               value={form.your_email}
               onChange={(e) => set("your_email", e.target.value)}
               disabled={!!sessionEmail}
-              className={`${inputCls} disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70`}
+              className={inputCls}
             />
           </Field>
           <Field label="Company">
@@ -379,8 +382,8 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           </Field>
         </section>
 
-        <section id="section-client" className="space-y-2" style={{ paddingLeft: "2.5rem" }}>
-          <h2 id="heading-client" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Client</h2>
+        <section id="section-client" className="space-y-4 md:pl-8">
+          <h2 id="heading-client" className="font-display tracking-heading text-lg font-semibold text-(--color-ink)">Client</h2>
           <Field label="Name" error={errors.client_name}>
             <input id="input-client-name" type="text" value={form.client_name} onChange={(e) => set("client_name", e.target.value)} className={inputCls} />
           </Field>
@@ -397,30 +400,31 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             <input id="input-client-tax-id" type="text" value={form.client_tax_id} onChange={(e) => set("client_tax_id", e.target.value)} className={inputCls} />
           </Field>
         </section>
-      </div>
+      </Card>
 
       {/* Line items */}
+      <Card id="section-invoice-body" className="space-y-8">
       <section id="section-line-items" className="space-y-3">
-        <h2 id="heading-line-items" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Line Items</h2>
+        <h2 id="heading-line-items" className="font-display tracking-heading text-lg font-semibold text-(--color-ink)">Line Items</h2>
 
-        <div id="line-items-header" className="flex items-end" style={{ gap: "0.75rem" }}>
+        <div id="line-items-header" className="hidden items-end gap-3 sm:flex">
           <div className="flex-1 min-w-0">
             <label id="label-line-item-description" htmlFor="input-line-item-0-description" className="text-sm font-medium">
               Description
             </label>
           </div>
-          <div className="shrink-0" style={{ width: "5rem" }}>
+          <div className="w-20 shrink-0">
             <label id="label-line-item-qty" htmlFor="input-line-item-0-qty" className="text-sm font-medium">
               Qty
             </label>
           </div>
-          <div className="shrink-0" style={{ width: "7rem" }}>
+          <div className="w-28 shrink-0">
             <label id="label-line-item-unit-price" htmlFor="input-line-item-0-unit-price" className="text-sm font-medium">
               Unit price
             </label>
           </div>
-          <div className="shrink-0" style={{ width: "2rem" }} aria-hidden="true" />
-          <div className="shrink-0" style={{ width: "1.5rem" }} aria-hidden="true" />
+          <div className="w-9 shrink-0" aria-hidden="true" />
+          <div className="w-7 shrink-0" aria-hidden="true" />
         </div>
 
         <DndContext
@@ -430,7 +434,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={items.map((it) => it.key)} strategy={verticalListSortingStrategy}>
-            <div id="line-items-list" className="space-y-2">
+            <div id="line-items-list" className="space-y-4 sm:space-y-2">
               {items.map((item, i) => (
                 <SortableLineItem
                   key={item.key}
@@ -446,7 +450,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           </SortableContext>
         </DndContext>
 
-        <button id="btn-add-line-item" type="button" onClick={addItem} className="text-sm text-primary hover:underline cursor-pointer">
+        <button id="btn-add-line-item" type="button" onClick={addItem} className="-mx-2 inline-flex min-h-11 cursor-pointer items-center rounded-(--radius-sm) px-2 text-sm font-semibold text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4 hover:bg-(--color-neutral-soft)">
           + Add line item
         </button>
       </section>
@@ -461,7 +465,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             value={form.tax_percent}
             onChange={(e) => set("tax_percent", e.target.value)}
             placeholder="0"
-            className={`${inputCls} max-w-[6rem]`}
+            className={`${inputCls} max-w-[7rem]`}
           />
         </Field>
       </section>
@@ -470,13 +474,11 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       <section id="section-due-date">
         <Field label="Due date">
           <div className="space-y-2">
-            <label id="label-no-due-date" htmlFor="input-no-due-date" className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <input
+            <label id="label-no-due-date" htmlFor="input-no-due-date" className="flex min-h-11 w-fit cursor-pointer items-center gap-3 text-[15px] text-(--color-ink)">
+              <Checkbox
                 id="input-no-due-date"
-                type="checkbox"
                 checked={form.no_due_date}
-                onChange={(e) => set("no_due_date", e.target.checked)}
-                className="rounded border-border"
+                onCheckedChange={(checked) => set("no_due_date", checked)}
               />
               No due date
             </label>
@@ -494,6 +496,9 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       </section>
 
       {/* Bitcoin address — required to publish, optional for drafts */}
+      </Card>
+
+      <Card id="section-payment" className="space-y-6">
       <section id="section-btc-address" className="space-y-3">
         <Field label="BTC address" error={errors.btc_address}>
           <input
@@ -504,7 +509,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             className={inputCls}
             placeholder="bc1q…"
           />
-          <p id="hint-btc-address" className="text-xs text-muted-foreground">
+          <p id="hint-btc-address" className="text-sm text-(--color-text-secondary)">
             Required to publish. Each invoice needs a fresh, unique address — reusing one breaks payment detection.
           </p>
         </Field>
@@ -518,32 +523,34 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             type="text"
             value={form.access_code}
             onChange={(e) => set("access_code", e.target.value.toLowerCase().slice(0, 16))}
-            className={`${inputCls} max-w-[200px] font-mono tracking-widest`}
+            className={`${inputCls} max-w-[220px] font-mono tracking-widest`}
             placeholder="e.g. mycode01"
           />
-          <p id="hint-access-code" className="text-xs text-muted-foreground">Leave blank for no access code — anyone with the link can view. Otherwise use at least 6 characters.</p>
+          <p id="hint-access-code" className="text-sm text-(--color-text-secondary)">Leave blank for no access code — anyone with the link can view. Otherwise use at least 6 characters.</p>
         </Field>
       </section>
 
+      </Card>
+
       {/* Totals */}
-      <div id="section-totals" className="rounded-lg border border-border bg-card px-5 py-4 space-y-1.5 text-sm">
-        <div id="row-subtotal" className="flex justify-between text-muted-foreground">
+      <Card id="section-totals" className="space-y-2 text-[15px] md:ml-auto md:max-w-sm">
+        <div id="row-subtotal" className="flex justify-between text-(--color-text-secondary) tabular-nums">
           <span>Subtotal</span>
           <span id="value-subtotal">${subtotal.toFixed(2)}</span>
         </div>
         {taxPct > 0 && (
-          <div id="row-tax" className="flex justify-between text-muted-foreground">
+          <div id="row-tax" className="flex justify-between text-(--color-text-secondary) tabular-nums">
             <span>Tax ({taxPct}%)</span>
             <span id="value-tax">${taxFiat.toFixed(2)}</span>
           </div>
         )}
-        <div id="row-total" className="flex justify-between font-semibold text-base pt-1 border-t border-border">
+        <div id="row-total" className="mt-1 flex items-baseline justify-between border-t border-(--color-border) pt-3 text-lg font-semibold tabular-nums">
           <span>Total</span>
           <span id="value-total">${total.toFixed(2)} USD</span>
         </div>
-      </div>
+      </Card>
 
-      <div id="section-actions" className="flex gap-3 items-start">
+      <div id="section-actions" className="flex flex-wrap items-start gap-3">
         <Button id="btn-save-draft" variant="secondary" onClick={handleSaveDraft} disabled={saving}>
           Save draft
         </Button>
@@ -568,10 +575,8 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   );
 }
 
-const inputBase =
-  "rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring h-9";
-
-const inputCls = `w-full ${inputBase}`;
+// Signal Amber control styling (v1.5-H): 44px, warm outline, amber focus ring.
+const inputCls = inputClassName;
 
 const noSpinner =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -587,9 +592,9 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      {label && <label className="block text-sm font-medium">{label}</label>}
+      {label && <label className="block text-sm font-medium text-(--color-ink)">{label}</label>}
       {children}
-      {error && <p className="text-xs text-primary">{error}</p>}
+      {error && <p className="text-sm text-(--color-danger-text)">{error}</p>}
     </div>
   );
 }
@@ -615,69 +620,71 @@ function SortableLineItem({
     transition,
     opacity: isDragging ? 0.5 : undefined,
     zIndex: isDragging ? 10 : undefined,
-    gap: "0.75rem",
   };
 
   return (
     <div
       ref={setNodeRef}
       id={`line-item-${index}`}
-      className="group flex items-center relative bg-background"
+      className="group relative flex flex-wrap items-center gap-2 rounded-(--radius-md) bg-(--color-surface) sm:flex-nowrap sm:gap-3"
       style={style}
     >
-      <div id={`line-item-${index}-description`} className="flex-1 min-w-0">
+      <div id={`line-item-${index}-description`} className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
         <input
           id={`input-line-item-${index}-description`}
           type="text"
           value={item.description}
           onChange={(e) => onChangeField(index, "description", e.target.value)}
-          className={`w-full ${inputBase}`}
+          className={inputCls}
           placeholder="e.g. Design work"
         />
       </div>
 
-      <div id={`line-item-${index}-qty`} className="shrink-0" style={{ width: "5rem" }}>
+      <div id={`line-item-${index}-qty`} className="w-20 shrink-0">
         <input
           id={`input-line-item-${index}-qty`}
           type="text"
           inputMode="decimal"
           value={item.quantity}
           onChange={(e) => onChangeField(index, "quantity", e.target.value)}
-          className={`w-full ${inputBase}`}
+          aria-label={index === 0 ? undefined : `Quantity, line ${index + 1}`}
+          placeholder="Qty"
+          className={inputCls}
         />
       </div>
 
-      <div id={`line-item-${index}-unit-price`} className="shrink-0" style={{ width: "7rem" }}>
+      <div id={`line-item-${index}-unit-price`} className="min-w-0 flex-1 sm:w-28 sm:flex-none">
         <input
           id={`input-line-item-${index}-unit-price`}
           type="text"
           inputMode="decimal"
           value={item.unit_price}
           onChange={(e) => onChangeField(index, "unit_price", e.target.value)}
-          className={`w-full ${inputBase}`}
+          className={inputCls}
           placeholder="0.00"
         />
       </div>
 
-      <div id={`line-item-${index}-actions`} className="shrink-0 flex items-center justify-center" style={{ width: "2rem" }}>
+      <div id={`line-item-${index}-actions`} className="flex w-11 shrink-0 items-center justify-center sm:w-9">
         {canRemove && (
           <button
             id={`btn-line-item-${index}-remove`}
             type="button"
             onClick={() => onRemove(index)}
-            className="h-9 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors text-lg cursor-pointer"
+            aria-label={`Remove line item ${index + 1}`}
+            className="flex size-11 cursor-pointer items-center justify-center rounded-(--radius-sm) text-lg text-(--color-text-secondary) transition-colors hover:bg-(--color-neutral-soft) hover:text-(--color-ink) sm:size-9"
           >
             ×
           </button>
         )}
       </div>
 
-      <div id={`line-item-${index}-drag`} className="shrink-0 flex items-center justify-center" style={{ width: "1.5rem" }}>
+      <div id={`line-item-${index}-drag`} className="flex w-11 shrink-0 items-center justify-center sm:w-7">
         <button
           id={`drag-handle-line-item-${index}`}
           type="button"
           aria-label={`Reorder line item ${index + 1}`}
-          className="h-9 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 transition-opacity"
+          className="flex size-11 items-center justify-center rounded-(--radius-sm) text-(--color-text-secondary) hover:text-(--color-ink) sm:h-9 sm:w-7 cursor-grab active:cursor-grabbing touch-none opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 transition-opacity"
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}

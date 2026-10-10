@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.1 — Signal Amber redesign of the in-app screens (roadmap v1.5-H).** The
+  whole app moves from the near-black + red theme to the light Signal Amber system:
+  canvas `#FCFBF7`, ink `#151C2E`, amber `#D89B24` for actions, Onest for headings
+  and the logo, Geist for UI. Tokens are now global (`src/styles/signal-amber.css`
+  at `:root`) and shadcn's variables alias them; the old palette, the root `dark`
+  class and every `dark:` class are removed (light-first, decided 2026-10-08).
+  Signal Button/Input/Card/StatusBadge replace `src/components/ui/button` and
+  `input` (deleted); dropdown, popover, alert dialog, calendar, checkbox and table
+  are restyled in place. New app header with the `SatSendLogo` wordmark, restyled
+  loading/error/404 screens, and a new app icon (`icon.svg`, `apple-icon.png`,
+  `favicon.ico`) whose "S" is the real Onest outline
+  (`scripts/brand/outline-mark.py`), so it renders correctly without the font.
+  Restyled: login, invoice list/table, invoice form, invoice detail + activity,
+  public payer page and access-code gate. Status badges everywhere use the locked
+  semantic colours (dot + label). Phones: no sideways page scroll at 390px and
+  44px touch targets; all text passes WCAG AA. `brand-colors.ts` now mirrors the
+  Signal Amber tokens (drift-tested), so the PDF uses ink text and an AA amber
+  accent instead of red; the full email/PDF restyle is v1.5.1-H. Fixed the invoice
+  page's links-wrapping-buttons (`<a><button>`), which is invalid HTML.
 - **v1.5.0 — Internal UI kit for the Signal Amber redesign (roadmap v1.5.0-H).** A
   temporary, internal-only page at `/styleguide` (404 unless `SHOW_UI_KIT=1`,
   `noindex`, unlinked) showing every token and component of the v1.5 brand

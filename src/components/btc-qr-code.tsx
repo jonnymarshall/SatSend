@@ -22,7 +22,7 @@ export function BtcQrCode({ uri, size = 240 }: Props) {
   if (!dataUrl) {
     return (
       <div
-        className="bg-muted animate-pulse rounded"
+        className="animate-pulse rounded-(--radius-sm) bg-(--color-neutral-soft)"
         style={{ width: size, height: size }}
       />
     );

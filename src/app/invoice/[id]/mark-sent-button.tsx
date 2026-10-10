@@ -200,7 +200,7 @@ function PollingSession({ invoiceId, btcAddress, onTimedOut, onStatusChange }: S
       </AlertDialogHeader>
       <div
         id="invoice-view--mark-sent-progress"
-        className="h-2 w-full overflow-hidden rounded-full bg-muted"
+        className="h-2 w-full overflow-hidden rounded-(--radius-pill) bg-(--color-neutral-soft)"
         role="progressbar"
         aria-label="Checking progress"
         aria-valuemin={0}
@@ -208,7 +208,7 @@ function PollingSession({ invoiceId, btcAddress, onTimedOut, onStatusChange }: S
         aria-valuenow={Math.round(progressPercent)}
       >
         <div
-          className="h-full bg-primary transition-[width] duration-300 ease-out"
+          className="h-full bg-(--color-brand) transition-[width] duration-300 ease-out motion-reduce:transition-none"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -216,7 +216,7 @@ function PollingSession({ invoiceId, btcAddress, onTimedOut, onStatusChange }: S
         <AlertDialogCancel id="invoice-view--mark-sent-cancel" variant="secondary">
           Cancel
         </AlertDialogCancel>
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-sm text-(--color-text-secondary)">
           Click here if you have not yet made the Bitcoin payment
         </p>
       </AlertDialogFooter>
@@ -257,7 +257,7 @@ function TimedOutView({ btcAddress }: { btcAddress: string }) {
           href={mempoolAddressUrl(btcAddress)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline underline-offset-4 hover:no-underline"
+          className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4 hover:decoration-(--color-brand-hover)"
         >
           View address on mempool.space
         </a>

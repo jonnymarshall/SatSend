@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { Card } from "@/components/signal/card";
 import {
   Mail,
   MailCheck,
@@ -63,30 +64,30 @@ const ICON_CLASS = "h-4 w-4 shrink-0";
 
 function emailIcon(status: EmailEventStatus) {
   if (status === "failed") {
-    return <AlertCircle data-icon="alert-circle" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
+    return <AlertCircle data-icon="alert-circle" className={`${ICON_CLASS} text-(--color-danger-text)`} />;
   }
   if (status === "delivered") {
-    return <MailCheck data-icon="mail-check" className={`${ICON_CLASS} text-green-600 dark:text-green-400`} />;
+    return <MailCheck data-icon="mail-check" className={`${ICON_CLASS} text-(--color-success-text)`} />;
   }
   if (status === "bounced") {
-    return <MailX data-icon="mail-x" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
+    return <MailX data-icon="mail-x" className={`${ICON_CLASS} text-(--color-danger-text)`} />;
   }
   if (status === "complained") {
-    return <MailWarning data-icon="mail-warning" className={`${ICON_CLASS} text-orange-600 dark:text-orange-400`} />;
+    return <MailWarning data-icon="mail-warning" className={`${ICON_CLASS} text-(--color-warning-text)`} />;
   }
-  return <Mail data-icon="mail" className={`${ICON_CLASS} text-muted-foreground`} />;
+  return <Mail data-icon="mail" className={`${ICON_CLASS} text-(--color-text-secondary)`} />;
 }
 
 function manualIcon(type: InvoiceEventType) {
   switch (type) {
     case "marked_as_sent":
-      return <Send data-icon="send" className={`${ICON_CLASS} text-muted-foreground`} />;
+      return <Send data-icon="send" className={`${ICON_CLASS} text-(--color-text-secondary)`} />;
     case "marked_as_paid":
-      return <CheckCircle data-icon="check-circle" className={`${ICON_CLASS} text-green-600 dark:text-green-400`} />;
+      return <CheckCircle data-icon="check-circle" className={`${ICON_CLASS} text-(--color-success-text)`} />;
     case "marked_as_overdue":
-      return <Clock data-icon="clock" className={`${ICON_CLASS} text-red-600 dark:text-red-400`} />;
+      return <Clock data-icon="clock" className={`${ICON_CLASS} text-(--color-danger-text)`} />;
     case "marked_as_unpaid":
-      return <RotateCcw data-icon="rotate-ccw" className={`${ICON_CLASS} text-muted-foreground`} />;
+      return <RotateCcw data-icon="rotate-ccw" className={`${ICON_CLASS} text-(--color-text-secondary)`} />;
   }
 }
 
@@ -137,16 +138,16 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
   ].sort((a, b) => b.data.created_at.localeCompare(a.data.created_at));
 
   return (
-    <section id="invoice-detail--activity" className="space-y-3">
+    <Card id="invoice-detail--activity" className="space-y-3">
       <h2
         id="invoice-detail--activity-heading"
-        className="text-xs font-semibold text-muted-foreground uppercase tracking-widest"
+        className="font-display tracking-heading text-lg font-semibold"
       >
         Activity
       </h2>
       <ul
         id="invoice-detail--activity-list"
-        className="rounded-lg border border-border"
+        className="divide-y divide-(--color-border) border-y border-(--color-border)"
       >
         {rows.map((row) => {
           const ts = format(new Date(row.data.created_at), "MMM d, h:mm a");
@@ -155,18 +156,18 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
             return (
               <li
                 key={`email-${evt.id}`}
-                className="proxy-id--invoice-detail--activity-row flex items-center gap-3 px-4 py-2.5 text-sm"
+                className="proxy-id--invoice-detail--activity-row flex items-center gap-3 py-3 text-sm"
               >
                 {emailIcon(evt.status)}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate">
+                  <p className="truncate text-[15px]">
                     <span className="font-medium">{emailLabel(evt)}</span>
                     {evt.recipient && (
-                      <span className="text-muted-foreground"> — {evt.recipient}</span>
+                      <span className="text-(--color-text-secondary)"> — {evt.recipient}</span>
                     )}
                   </p>
                   {(evt.status === "failed" || evt.status === "bounced") && evt.error_message && (
-                    <p className="proxy-id--invoice-detail--activity-error text-xs text-red-600 dark:text-red-400 break-words">
+                    <p className="proxy-id--invoice-detail--activity-error text-xs text-(--color-danger-text) break-words">
                       {evt.error_message}
                     </p>
                   )}
@@ -174,7 +175,7 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
                 <time
                   dateTime={evt.created_at}
                   title={evt.created_at}
-                  className="text-xs text-muted-foreground tabular-nums shrink-0"
+                  className="text-xs text-(--color-text-secondary) tabular-nums shrink-0"
                 >
                   {ts}
                 </time>
@@ -185,7 +186,7 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
           return (
             <li
               key={`manual-${evt.id}`}
-              className="proxy-id--invoice-detail--activity-row flex items-center gap-3 px-4 py-2.5 text-sm"
+              className="proxy-id--invoice-detail--activity-row flex items-center gap-3 py-3 text-sm"
             >
               {manualIcon(evt.event_type)}
               <p className="min-w-0 flex-1 truncate font-medium">
@@ -194,7 +195,7 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
               <time
                 dateTime={evt.created_at}
                 title={evt.created_at}
-                className="text-xs text-muted-foreground tabular-nums shrink-0"
+                className="text-xs text-(--color-text-secondary) tabular-nums shrink-0"
               >
                 {ts}
               </time>
@@ -202,6 +203,6 @@ export async function InvoiceActivityCard({ invoiceId }: { invoiceId: string }) 
           );
         })}
       </ul>
-    </section>
+    </Card>
   );
 }

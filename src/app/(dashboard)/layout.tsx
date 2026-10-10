@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { Button } from "@/components/signal/button";
 import { signOutAction } from "./sign-out-action";
+import { AppHeader, AppMain } from "./app-header";
 
 export default async function DashboardLayout({
   children,
@@ -15,13 +15,8 @@ export default async function DashboardLayout({
     if (cookieStore.get("dev-auth-bypass")?.value === "playwright") {
       return (
         <div className="min-h-screen flex flex-col">
-          <header id="nav--header" className="border-b border-border px-6 py-4 flex items-center justify-between">
-            <Link href="/invoices" className="font-semibold tracking-tight text-primary">SatSend</Link>
-            <span id="nav--user-email" className="text-sm text-muted-foreground">dev@playwright.test</span>
-          </header>
-          <main id="dashboard--main" className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
-            {children}
-          </main>
+          <AppHeader email="dev@playwright.test" />
+          <AppMain>{children}</AppMain>
         </div>
       );
     }
@@ -34,18 +29,14 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header id="nav--header" className="border-b border-border px-6 py-4 flex items-center justify-between">
-        <Link href="/invoices" className="font-semibold tracking-tight text-primary">SatSend</Link>
-        <div id="nav--right" className="flex items-center gap-4">
-          <span id="nav--user-email" className="text-sm text-muted-foreground">{user.email}</span>
-          <form action={signOutAction}>
-            <Button id="nav--sign-out-button" type="submit" variant="secondary" size="sm">Log out</Button>
-          </form>
-        </div>
-      </header>
-      <main id="dashboard--main" className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
-        {children}
-      </main>
+      <AppHeader email={user.email ?? ""}>
+        <form action={signOutAction}>
+          <Button id="nav--sign-out-button" type="submit" variant="secondary" size="sm" className="h-11 md:h-9">
+            Log out
+          </Button>
+        </form>
+      </AppHeader>
+      <AppMain>{children}</AppMain>
     </div>
   );
 }
