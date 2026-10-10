@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party agent skills (gitignored local tooling, not product code).
+    ".opencode/skills/**",
   ]),
 ]);
 

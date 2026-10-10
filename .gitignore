@@ -43,6 +43,9 @@ yarn-error.log*
 # Claude hook state markers (local, machine-specific)
 .claude/.state/
 
+# third-party agent skills (local tooling, not product code)
+.opencode/skills/
+
 # vercel
 .vercel
 

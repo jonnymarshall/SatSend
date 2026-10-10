@@ -43,3 +43,4 @@ Open work that these feed into is tracked in
 | v1.4.31-H | [v1.4.31-H-address-uniqueness.md](./v1.4.31-H-address-uniqueness.md) |
 | v1.4.31.1-H | [v1.4.31.1-H-supabase-integration.md](./v1.4.31.1-H-supabase-integration.md) |
 | v1.4.31.2-H | [v1.4.31.2-H-db-invariants.md](./v1.4.31.2-H-db-invariants.md) |
+| v1.5.0-H | [v1.5.0-H-ui-kit.md](./v1.5.0-H-ui-kit.md) |

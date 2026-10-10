@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.0 — Internal UI kit for the Signal Amber redesign (roadmap v1.5.0-H).** A
+  temporary, internal-only page at `/styleguide` (404 unless `SHOW_UI_KIT=1`,
+  `noindex`, unlinked) showing every token and component of the v1.5 brand
+  handoff, rendered with real code: logo, colour, type scale, spacing/radius/
+  elevation, components in all states, product patterns, a marketing nav/hero/
+  footer, and a computed WCAG contrast audit. Tokens are copied verbatim from
+  `satsend-brand-handoff/` and **scoped** so the live app is visually unchanged;
+  drift tests guard tokens and the logo. New keepers: `src/components/signal/*`,
+  `src/components/brand/*`, `src/lib/design/*`, `src/styles/signal-amber.css`.
+  Review decisions are adopted (2026-10-09): AA status text, Payment detected
+  moves to violet so it no longer looks like Pending, links are ink with an amber
+  underline, a 3:1 amber (`--color-brand-strong`) for the hero line and input focus,
+  a 3:1 input outline, and the logo's `.me` sits one dot-gap from "SatSend". Every
+  pairing in the kit's contrast check now passes. Fixed inputs briefly flashing red
+  on focus. Also: the `ui-element-ids` skill is now tracked in
+  both skill folders, and ESLint ignores the gitignored `.opencode/skills/`.
 - **v1.4.31.2-H — Integration harness, second suite (DB invariants).**
   `test-automation/db-invariants.mjs` (`npm run test:db`) proves migration 0027
   against real Postgres: impossible money is rejected by the CHECK constraints,
