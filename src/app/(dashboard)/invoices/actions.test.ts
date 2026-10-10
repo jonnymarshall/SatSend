@@ -145,6 +145,18 @@ describe("saveDraft", () => {
     expect(insertSingle).not.toHaveBeenCalled();
   });
 
+  it("rejects an address from the other bitcoin network with a clear message, without a network call (fix/address-freshness-check)", async () => {
+    // Tests run on mainnet (NEXT_PUBLIC_BTC_NETWORK unset). mempool.space answers a
+    // testnet address on mainnet with HTTP 400, which used to surface as the
+    // misleading "Couldn't verify ... try again" message.
+    const { insertSingle } = makeSupabase();
+    const res = await saveDraft({ ...VALID_DRAFT, btc_address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx" });
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/testnet address/i);
+    expect(addressHasHistory).not.toHaveBeenCalled();
+    expect(insertSingle).not.toHaveBeenCalled();
+  });
+
   it("skips the freshness check when btc_address is absent (no address to check)", async () => {
     const { insertSingle } = makeSupabase();
     await saveDraft({ ...VALID_DRAFT, btc_address: undefined });
@@ -394,6 +406,17 @@ describe("publishInvoice (publish-only, no email)", () => {
     vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
     const res = await publishInvoice("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
+  });
+
+  it("refuses to publish an address from the other bitcoin network (fix/address-freshness-check)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHABLE_INVOICE, btc_address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx" },
+    });
+    const res = await publishInvoice("inv-1");
+    expect(res).toMatchObject({ ok: false, field: "btc_address" });
+    if (!res.ok) expect(res.message).toMatch(/testnet address/i);
+    expect(addressHasHistory).not.toHaveBeenCalled();
+    expect(updateChain).not.toHaveBeenCalled();
   });
 
   it("proceeds when the BTC address has no prior history (v1.4.12)", async () => {
