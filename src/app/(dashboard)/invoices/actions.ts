@@ -19,8 +19,13 @@ import { logInvoiceEvent } from "@/lib/invoice-events";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 import { addressHasHistory } from "@/lib/mempool";
+import { addressNetworkError } from "@/lib/btc-network";
 
 async function addressFreshnessError(address: string, contextId?: string): Promise<FieldError | null> {
+  // An address for the other network can never be looked up (mempool.space returns
+  // 400) and could never be paid here, so say so instead of "try again".
+  const wrongNetwork = addressNetworkError(address);
+  if (wrongNetwork) return { ok: false, field: "btc_address", message: wrongNetwork };
   const hasHistory = await addressHasHistory(address);
   if (hasHistory === true) {
     return {

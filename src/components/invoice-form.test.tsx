@@ -374,3 +374,19 @@ describe("InvoiceForm — server-error field placement and scroll on save-draft 
     expect(scrollSpy).toHaveBeenCalled();
   });
 });
+
+describe("InvoiceForm BTC address network (fix/address-freshness-check)", () => {
+  it("flags a testnet address on a mainnet app before calling the server", async () => {
+    // Tests run on mainnet (NEXT_PUBLIC_BTC_NETWORK unset).
+    const user = userEvent.setup();
+    vi.mocked(saveDraft).mockClear();
+    render(<InvoiceForm sessionEmail="owner@example.com" />);
+
+    const addressInput = document.getElementById("input-btc-address") as HTMLInputElement;
+    await user.type(addressInput, "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx");
+    await user.click(screen.getByRole("button", { name: /save draft/i }));
+
+    await screen.findByText(/this is a testnet address/i);
+    expect(saveDraft).not.toHaveBeenCalled();
+  });
+});
