@@ -932,19 +932,26 @@ styles, and the kit is disposable.
 - [x] Onest loaded (next/font) alongside Geist, kit-only for now.
 - [x] Gated route `/styleguide`: 404 unless `SHOW_UI_KIT=1`, `noindex`, unlinked.
 - [x] Primitives in `src/components/signal/` (Button, Field, Card, StatusBadge) and
-      the supplied logo in `src/components/brand/` (byte-identical, tested).
+      the supplied logo in `src/components/brand/` (handoff copy plus the one
+      decided spacing change, tested).
 - [x] Catalogue: logo, colour, type scale, spacing/radius/elevation, components
       in all states, product patterns (list, stats, empty, table, payer page),
       a marketing composition (nav, hero, footer), and a computed contrast audit.
 - [x] Mobile checked at 390px (no overflow; 44px targets).
 
-**Findings for v1.5-H (decisions pending, shown side by side in the kit):**
-- Every spec status text colour fails 4.5:1 on its own soft background at 13px;
-  brand amber fails as text and as the hero's display line (2.35:1); the input
-  outline (1.22:1) and amber focus border (2.43:1) miss the 3:1 UI minimum.
-  `PROPOSED` AA shades live in `src/lib/design/proposed-tokens.ts`.
-- `pending` has no handoff status; the kit maps it to "Sent" blue. `archived` uses
-  neutral, outlined.
+**Review decisions (2026-10-09, from `manual-tests/v1.5.0-H-ui-kit.md`).** Recorded
+in `src/lib/design/adopted-tokens.ts` + `src/styles/signal-amber.css`; the handoff
+folder stays untouched as the designer's record.
+- **Status text:** AA shades (`--color-*-text`); dots and fills keep the spec colour.
+- **Payment detected → violet** `#8B5CF6` / soft `#F3EFFE` (override of `#6E7CF6`,
+  which read as the same blue as Pending). Matches the brief's "violet".
+- **Pending:** stays "Sent" blue, label "Pending". `archived`: neutral, outlined.
+- **Links:** ink text with an amber underline (spec amber text was 2.35:1).
+- **Hero amber line + input focus border:** `--color-brand-strong` `#BC8925` (3:1).
+- **Input outline:** `--color-border-strong` `#949495` (3:1).
+- **Logo:** `.me` `dx` is `1.5` (handoff `-1.5`), so the d→dot gap equals dot→m.
+- **Fixed:** inputs flashed red on focus (the old base style's red ring colour
+  animated into amber).
 
 **Deletion:** the `src/app/styleguide/` folder is deleted at the end of v1.5-H
 (tracked in `OUTSTANDING-VERIFICATIONS.md`). Primitives, tokens, logo and the
@@ -970,7 +977,8 @@ contrast helper are keepers and get promoted.
 - Direction: Option D / Signal Amber.
 - Display/logo font: **Onest**. UI/body font: **Geist Sans**.
 - Primary: `#D89B24`. Canvas: `#FCFBF7`. Text: `#151C2E`.
-- Not green-led. Green = success/Paid; violet = Payment detected; blue = Sent;
+- Not green-led. Green = success/Paid; violet (`#8B5CF6`, decided v1.5.0-H) =
+  Payment detected; blue = Sent/Pending;
   warning orange = Underpaid; red = Overdue.
 - Bitcoin visual explicitness ≈ 2–2.5 / 5.
 
@@ -994,7 +1002,10 @@ contrast helper are keepers and get promoted.
       dark/light toggle is superseded.
 - [ ] Promote the v1.5.0-H keepers: scoped tokens become `:root`, Signal
       primitives replace `src/components/ui/*` usages, Onest moves to the root
-      layout. Resolve the kit's contrast findings first.
+      layout. Use the adopted tokens decided in v1.5.0-H (see above).
+- [ ] The handoff's logo SVG assets (`satsend-brand-handoff/assets/*.svg`) still use
+      the old `.me` spacing; regenerate them with the decided spacing before any
+      email, PDF or favicon uses them.
 - [ ] **Delete `src/app/styleguide/`** (the internal kit) as the last step, and tick
       it off in `OUTSTANDING-VERIFICATIONS.md`.
 

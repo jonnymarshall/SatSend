@@ -17,7 +17,7 @@ const NAV = [
   ["components", "Components"],
   ["patterns", "Patterns"],
   ["marketing", "Marketing"],
-  ["audit", "Audit"],
+  ["audit", "Contrast"],
 ] as const;
 
 export default function StyleguidePage() {
@@ -64,8 +64,8 @@ export default function StyleguidePage() {
         <MarketingSection />
         <AuditSection />
         <footer id="styleguide--footer" className="border-t border-(--color-border) py-10 text-sm text-(--color-text-secondary)">
-          Sources: satsend-brand-handoff/DESIGN.md, design-tokens.css and OPTION-D-reference.png. Proposed tokens are
-          marked as such and are not part of the handoff.
+          Sources: satsend-brand-handoff/DESIGN.md, design-tokens.css and OPTION-D-reference.png. Everything we changed
+          or added after the 9 Oct review is recorded in src/lib/design/adopted-tokens.ts.
         </footer>
       </main>
     </>

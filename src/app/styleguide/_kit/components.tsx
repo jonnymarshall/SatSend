@@ -8,6 +8,10 @@ import { KitSection, Specimen } from "./section";
 
 const STATUSES = Object.keys(STATUS_TONES) as InvoiceStatus[];
 
+/** Text link: ink with an amber underline (decided 2026-10-09). */
+export const LINK =
+  "rounded-[2px] font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-[3px] transition-[text-decoration-color] duration-150 hover:decoration-(--color-ink) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink)";
+
 export function ComponentsSection() {
   return (
     <KitSection
@@ -58,7 +62,7 @@ export function ComponentsSection() {
           </Card>
         </Specimen>
 
-        <Specimen id="styleguide--components--inputs" title="Inputs" note="Label above, help and errors below. Focus uses a translucent amber ring.">
+        <Specimen id="styleguide--components--inputs" title="Inputs" note="Label above, help and errors below. Click or Tab into a field: the border turns amber with a soft amber ring, and nothing flashes on the way.">
           <Card className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field id="styleguide--components--inputs--default" label="Client name" placeholder="e.g. Acme Studio" />
             <Field
@@ -89,11 +93,11 @@ export function ComponentsSection() {
               helper="Set when the invoice is created"
             />
             <Field
-              id="styleguide--components--inputs--strong"
-              label="Proposed AA outline"
-              placeholder="Compare with the field above"
-              outline="strong"
-              helper="Darker outline that meets 3:1 on white"
+              id="styleguide--components--inputs--amount"
+              label="Amount"
+              inputMode="decimal"
+              placeholder="0.00"
+              helper="In the invoice currency"
             />
           </Card>
         </Specimen>
@@ -102,20 +106,13 @@ export function ComponentsSection() {
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Specimen id="styleguide--components--badges" title="Status badges" note="Every app status, with a dot and a word.">
           <Card className="flex flex-col gap-4">
-            {(["spec", "aa"] as const).map((mode) => (
-              <div key={mode} id={`styleguide--components--badges--${mode}`} className="flex flex-col gap-2">
-                <p className="text-[13px] font-medium text-(--color-text-secondary)">
-                  {mode === "spec" ? "Handoff spec" : "AA proposal"}
-                </p>
-                <div className="flex flex-wrap gap-2.5">
-                  {STATUSES.map((s) => (
-                    <StatusBadge key={s} status={s} text={mode} className={`proxy-id--styleguide--components--badge-${mode}`} />
-                  ))}
-                </div>
-              </div>
-            ))}
+            <div id="styleguide--components--badges--all" className="flex flex-wrap gap-2.5">
+              {STATUSES.map((s) => (
+                <StatusBadge key={s} status={s} className="proxy-id--styleguide--components--badge" />
+              ))}
+            </div>
             <div className="flex flex-wrap items-center gap-2.5 border-t border-(--color-border) pt-4">
-              <StatusBadge status="paid" text="aa" />
+              <StatusBadge status="paid" />
               <span
                 id="styleguide--components--overpaid-chip"
                 className="inline-flex min-h-7 items-center rounded-(--radius-pill) border border-(--color-border) px-2.5 text-[13px] font-medium text-(--color-ink)"
@@ -146,6 +143,28 @@ export function ComponentsSection() {
           </div>
         </Specimen>
       </div>
+
+      <Specimen
+        id="styleguide--components--links"
+        title="Links"
+        note="Ink text with an amber underline: the amber marks it as a link, the ink keeps it readable. Spec amber as text (2.35:1) was too faint (decided 9 Oct)."
+        className="mt-5"
+      >
+        <Card className="flex flex-col gap-3 text-[15px] leading-[1.6]">
+          <p id="styleguide--components--links--inline">
+            Your client can pay from any bitcoin wallet.{" "}
+            <a id="styleguide--components--links--inline-link" href="#styleguide--components--links" className={LINK}>
+              See which wallets work
+            </a>
+            , or{" "}
+            <a id="styleguide--components--links--inline-link-2" href="#styleguide--components--links" className={LINK}>
+              read how payments are detected
+            </a>
+            .
+          </p>
+          <p className="text-sm text-(--color-text-secondary)">Hover a link: the underline turns ink. Tab to one: an ink focus outline.</p>
+        </Card>
+      </Specimen>
     </KitSection>
   );
 }

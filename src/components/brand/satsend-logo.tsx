@@ -15,7 +15,8 @@ export type SatSendLogoProps = SVGProps<SVGSVGElement> & {
  * IMPORTANT:
  * - Keep this component in sync with assets/satsend-logo.svg.
  * - Onest must be loaded by the application.
- * - The `.me` spacing is intentionally tightened with dx="-1.5".
+ * - The `.me` offset is dx="1.5" (handoff: -1.5). Decided 2026-10-09: at -1.5 the
+ *   "d" and "." almost touch; 1.5 makes the d-to-dot gap equal the dot-to-m gap.
  * - Do not replace this with two independently positioned HTML spans.
  */
 export function SatSendLogo({
@@ -63,7 +64,7 @@ export function SatSendLogo({
           SatSend
         </tspan>
         <tspan
-          dx="-1.5"
+          dx="1.5"
           fill={domainColor}
           fontSize="42"
           fontWeight="700"

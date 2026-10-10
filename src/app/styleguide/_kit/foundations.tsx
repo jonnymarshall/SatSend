@@ -2,11 +2,11 @@ import tokens from "../../../../satsend-brand-handoff/design-tokens.json";
 import { SatSendLogo } from "@/components/brand/satsend-logo";
 import { SatSendMark } from "@/components/brand/satsend-mark";
 import { StatusBadge, type InvoiceStatus } from "@/components/signal/status-badge";
+import { BORDER_STRONG, BRAND_STRONG, OVERRIDES, PALETTE, TEXT_SHADES } from "@/lib/design/adopted-tokens";
 import { contrastRatio } from "@/lib/design/contrast";
-import { PROPOSED_TEXT_SHADES } from "@/lib/design/proposed-tokens";
 import { KitSection, Specimen, Tok } from "./section";
 
-const C = tokens.color;
+const C = PALETTE;
 
 /* ---------------------------------------------------------------- Logo */
 
@@ -16,7 +16,7 @@ export function LogoSection() {
       id="logo"
       index={1}
       title="Logo"
-      intro="The supplied SatSendLogo component, unchanged. It is live SVG text, so it needs Onest loaded; that is why it only looks right inside this kit for now."
+      intro="The supplied SatSendLogo component with one change: .me now sits one dot-width further out, so the gap after the d matches the gap after the dot (decided 9 Oct). It is live SVG text, so it needs Onest loaded; that is why it only looks right inside this kit for now."
     >
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div id="styleguide--logo--primary" className="flex flex-col gap-4 rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface) p-8">
@@ -55,6 +55,7 @@ export function LogoSection() {
           <ul className="flex list-disc flex-col gap-2 rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface) p-6 pl-10 text-[15px] leading-[1.5]">
             <li>No coin, bolt, shield or padlock in the mark.</li>
             <li>.me always smaller than SatSend.</li>
+            <li>The gap from d to the dot equals the gap from the dot to m.</li>
             <li>Clear space at least the height of the lowercase a.</li>
             <li>Never rebuilt from two positioned spans.</li>
           </ul>
@@ -77,13 +78,19 @@ const BRAND: Array<{ key: keyof typeof C; token: string; role: string }> = [
   { key: "brandSoft", token: "--color-brand-soft", role: "Subtle brand highlights" },
 ];
 
-const STATUS_ROWS: Array<{ status: InvoiceStatus; name: string; fg: keyof typeof C; soft: keyof typeof C; shade: keyof typeof PROPOSED_TEXT_SHADES }> = [
+const STATUS_ROWS: Array<{ status: InvoiceStatus; name: string; fg: keyof typeof C; soft: keyof typeof C; shade: keyof typeof TEXT_SHADES }> = [
   { status: "paid", name: "Success / Paid", fg: "success", soft: "successSoft", shade: "success" },
   { status: "pending", name: "Sent / Pending", fg: "sent", soft: "sentSoft", shade: "sent" },
   { status: "payment_detected", name: "Payment detected", fg: "detected", soft: "detectedSoft", shade: "detected" },
   { status: "underpaid", name: "Warning / Underpaid", fg: "warning", soft: "warningSoft", shade: "warning" },
   { status: "overdue", name: "Danger / Overdue", fg: "danger", soft: "dangerSoft", shade: "danger" },
   { status: "draft", name: "Neutral / Draft", fg: "neutral", soft: "neutralSoft", shade: "neutral" },
+];
+
+const ADDED = [
+  { ...BRAND_STRONG, role: "Amber that must be seen: hero line two, input focus border" },
+  { ...TEXT_SHADES.brand, role: "Amber icons and small amber text on light" },
+  { ...BORDER_STRONG, role: "Input outlines" },
 ];
 
 function Swatch({ hex, bordered }: { hex: string; bordered?: boolean }) {
@@ -120,9 +127,35 @@ export function ColourSection() {
       </Specimen>
 
       <Specimen
+        id="styleguide--colour--added"
+        title="Added in review"
+        note="Not in the handoff. Each is a darker version of a handoff colour, made so it is easy to see (decided 9 Oct)."
+        className="mt-10"
+      >
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {ADDED.map((a) => (
+            <div key={a.token} className="proxy-id--styleguide--colour--added-swatch flex flex-col gap-2">
+              <Swatch hex={a.value} />
+              <div>
+                <p className="text-sm font-semibold">{a.role}</p>
+                <Tok>{a.token}</Tok>
+                <p className="font-mono text-[12px] text-(--color-text-secondary)">{a.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Specimen>
+
+      <Specimen
         id="styleguide--colour--status"
         title="Status colours"
-        note="Left badge uses the handoff text colour. Right badge uses the proposed AA text shade (dot unchanged). Ratios are text on the soft background."
+        note={
+          <>
+            The dot and background use the bright colour; the word uses a darker shade of the same hue so it is easy
+            to read (decided 9 Oct). Payment detected is now violet, so it no longer looks like Pending (it was{" "}
+            {OVERRIDES["--color-detected"].spec} in the handoff).
+          </>
+        }
         className="mt-12"
       >
         <div className="overflow-x-auto rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface)">
@@ -130,17 +163,17 @@ export function ColourSection() {
             <thead>
               <tr className="border-b border-(--color-border) text-[13px] text-(--color-text-secondary)">
                 <th scope="col" className="px-5 py-3 font-medium">State</th>
-                <th scope="col" className="px-5 py-3 font-medium">Foreground</th>
-                <th scope="col" className="px-5 py-3 font-medium">Soft</th>
-                <th scope="col" className="px-5 py-3 font-medium">Spec badge</th>
-                <th scope="col" className="px-5 py-3 font-medium">AA proposal</th>
+                <th scope="col" className="px-5 py-3 font-medium">Dot</th>
+                <th scope="col" className="px-5 py-3 font-medium">Background</th>
+                <th scope="col" className="px-5 py-3 font-medium">Text</th>
+                <th scope="col" className="px-5 py-3 font-medium">Badge</th>
               </tr>
             </thead>
             <tbody>
               {STATUS_ROWS.map((r) => {
-                const shade = PROPOSED_TEXT_SHADES[r.shade].value;
+                const shade = TEXT_SHADES[r.shade].value;
                 return (
-                  <tr key={r.status} className="proxy-id--styleguide--colour--status-row border-b border-(--color-border) last:border-0">
+                  <tr key={r.status} id={`styleguide--colour--status--${r.status}`} className="proxy-id--styleguide--colour--status-row border-b border-(--color-border) last:border-0">
                     <td className="px-5 py-3.5 font-medium">{r.name}</td>
                     <td className="px-5 py-3.5">
                       <span className="flex items-center gap-2">
@@ -155,17 +188,15 @@ export function ColourSection() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="flex items-center gap-3">
-                        <StatusBadge status={r.status} text="spec" />
-                        <Tok>{contrastRatio(C[r.fg], C[r.soft]).toFixed(2)}:1</Tok>
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden className="size-4 rounded-full" style={{ background: shade }} />
+                        <span className="font-mono text-[12px]">{shade}</span>
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="flex items-center gap-3">
-                        <StatusBadge status={r.status} text="aa" />
-                        <Tok>
-                          {contrastRatio(shade, C[r.soft]).toFixed(2)}:1 ({shade})
-                        </Tok>
+                        <StatusBadge status={r.status} />
+                        <Tok>{contrastRatio(shade, C[r.soft]).toFixed(1)}:1</Tok>
                       </span>
                     </td>
                   </tr>

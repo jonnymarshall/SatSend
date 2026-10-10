@@ -3,12 +3,14 @@ import tokens from "../../../../satsend-brand-handoff/design-tokens.json";
 import { SatSendLogo } from "@/components/brand/satsend-logo";
 import { buttonVariants } from "@/components/signal/button";
 import { aaThreshold, contrastRatio, type ContrastUse } from "@/lib/design/contrast";
-import { PROPOSED_BORDER_STRONG, PROPOSED_TEXT_SHADES } from "@/lib/design/proposed-tokens";
+import { BORDER_STRONG, BRAND_STRONG, PALETTE, TEXT_SHADES } from "@/lib/design/adopted-tokens";
 import { cn } from "@/lib/utils";
 import { InvoiceListItem, PaymentPanel } from "./patterns";
 import { KitSection, Tok, Verdict } from "./section";
 
-const C = tokens.color;
+/** The handoff as delivered, and the palette we use now (handoff + decided overrides). */
+const SPEC = tokens.color;
+const NOW = PALETTE;
 
 /* ------------------------------------------------- Marketing composition */
 
@@ -17,7 +19,7 @@ function NavLink({ id, children }: { id: string; children: React.ReactNode }) {
     <a
       id={id}
       href="#styleguide--marketing"
-      className="inline-flex min-h-11 items-center rounded-(--radius-sm) px-1 text-[15px] font-medium text-(--color-ink) hover:text-(--color-brand-text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink)"
+      className="inline-flex min-h-11 items-center rounded-(--radius-sm) px-1 text-[15px] font-medium text-(--color-ink) decoration-(--color-brand) decoration-2 underline-offset-[6px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink)"
     >
       {children}
     </a>
@@ -72,7 +74,7 @@ export function MarketingSection() {
             >
               Invoice in minutes.
               <br />
-              <span className="text-(--color-brand)">Get paid in bitcoin.</span>
+              <span className="text-(--color-brand-strong)">Get paid in bitcoin.</span>
             </h1>
             <p className="mt-6 max-w-[44ch] text-[18px] leading-[1.55] text-(--color-text-secondary)">
               Create an invoice, share a payment link, and see the moment your client pays in bitcoin.
@@ -123,98 +125,104 @@ export function MarketingSection() {
 
 /* ---------------------------------------------------- Contrast audit */
 
-type Row = { pair: string; where: string; fg: string; bg: string; use: ContrastUse; proposal?: { fg: string; label: string }; resolved?: string };
+type Pair = { fg: string; bg: string };
+type Row = { what: string; where: string; use: ContrastUse; spec: Pair; now: Pair & { label: string } };
+
+const same = (p: Pair, label = "Unchanged") => ({ ...p, label });
 
 const ROWS: Row[] = [
-  { pair: "Ink on brand", where: "Primary button label", fg: C.ink, bg: C.brand, use: "text" },
-  { pair: "White on brand", where: "Rejected primary label", fg: "#FFFFFF", bg: C.brand, use: "text", resolved: "Not used: buttons use ink" },
-  { pair: "Ink on canvas", where: "Body text, headings", fg: C.ink, bg: C.canvas, use: "text" },
-  { pair: "Secondary on canvas", where: "Metadata, helper text", fg: C.textSecondary, bg: C.canvas, use: "text" },
-  { pair: "Secondary on surface", where: "Metadata in cards", fg: C.textSecondary, bg: C.surface, use: "text" },
-  { pair: "Brand on canvas, small", where: "Links (DESIGN.md says brand)", fg: C.brand, bg: C.canvas, use: "text", proposal: { fg: PROPOSED_TEXT_SHADES.brand.value, label: "--color-brand-text" } },
-  { pair: "Brand on canvas, display", where: "Hero line two (reference board)", fg: C.brand, bg: C.canvas, use: "large-text", proposal: { fg: PROPOSED_TEXT_SHADES.brand.value, label: "--color-brand-text" } },
-  { pair: "Brand on surface", where: "Input focus border", fg: C.brand, bg: C.surface, use: "ui" },
-  { pair: "Border on surface", where: "Input outline", fg: C.border, bg: C.surface, use: "ui", proposal: { fg: PROPOSED_BORDER_STRONG.value, label: "--color-border-strong" } },
-  { pair: "Danger on surface", where: "Form error text", fg: C.danger, bg: C.surface, use: "text", proposal: { fg: PROPOSED_TEXT_SHADES.danger.value, label: "--color-danger-text" } },
+  { what: "Ink on amber", where: "Primary button label", use: "text", spec: { fg: SPEC.ink, bg: SPEC.brand }, now: same({ fg: NOW.ink, bg: NOW.brand }) },
+  { what: "White on amber", where: "Primary button label (alternative)", use: "text", spec: { fg: "#FFFFFF", bg: SPEC.brand }, now: { fg: NOW.ink, bg: NOW.brand, label: "Not used: buttons use ink text" } },
+  { what: "Ink on page", where: "Body text, headings", use: "text", spec: { fg: SPEC.ink, bg: SPEC.canvas }, now: same({ fg: NOW.ink, bg: NOW.canvas }) },
+  { what: "Grey text on page", where: "Metadata, helper text", use: "text", spec: { fg: SPEC.textSecondary, bg: SPEC.canvas }, now: same({ fg: NOW.textSecondary, bg: NOW.canvas }) },
+  { what: "Grey text on card", where: "Metadata in cards", use: "text", spec: { fg: SPEC.textSecondary, bg: SPEC.surface }, now: same({ fg: NOW.textSecondary, bg: NOW.surface }) },
+  { what: "Link text", where: "Links in body copy", use: "text", spec: { fg: SPEC.brand, bg: SPEC.canvas }, now: { fg: NOW.ink, bg: NOW.canvas, label: "Ink text, amber underline" } },
+  { what: "Amber headline", where: "Hero line two", use: "large-text", spec: { fg: SPEC.brand, bg: SPEC.canvas }, now: { fg: BRAND_STRONG.value, bg: NOW.canvas, label: `${BRAND_STRONG.token} ${BRAND_STRONG.value}` } },
+  { what: "Input focus border", where: "Text fields while typing", use: "ui", spec: { fg: SPEC.brand, bg: SPEC.surface }, now: { fg: BRAND_STRONG.value, bg: NOW.surface, label: `${BRAND_STRONG.token} ${BRAND_STRONG.value}` } },
+  { what: "Input outline", where: "Text fields at rest", use: "ui", spec: { fg: SPEC.border, bg: SPEC.surface }, now: { fg: BORDER_STRONG.value, bg: NOW.surface, label: `${BORDER_STRONG.token} ${BORDER_STRONG.value}` } },
+  { what: "Error text", where: "Form error messages", use: "text", spec: { fg: SPEC.danger, bg: SPEC.surface }, now: { fg: TEXT_SHADES.danger.value, bg: NOW.surface, label: `${TEXT_SHADES.danger.token} ${TEXT_SHADES.danger.value}` } },
   ...(["success", "sent", "detected", "warning", "danger", "neutral"] as const).map((k) => ({
-    pair: `${k[0].toUpperCase()}${k.slice(1)} on its soft`,
-    where: "Status badge label, 13px",
-    fg: C[k],
-    bg: C[`${k}Soft` as const],
+    what: `${{ success: "Paid", sent: "Pending", detected: "Payment detected", warning: "Underpaid", danger: "Overdue", neutral: "Draft" }[k]} badge`,
+    where: "Status badge word, 13px",
     use: "text" as const,
-    proposal: { fg: PROPOSED_TEXT_SHADES[k].value, label: PROPOSED_TEXT_SHADES[k].token },
+    spec: { fg: SPEC[k], bg: SPEC[`${k}Soft` as const] },
+    now: { fg: TEXT_SHADES[k].value, bg: NOW[`${k}Soft` as const], label: `${TEXT_SHADES[k].token} ${TEXT_SHADES[k].value}` },
   })),
 ];
 
+function Ratio({ pair, use }: { pair: Pair; use: ContrastUse }) {
+  const r = contrastRatio(pair.fg, pair.bg);
+  return (
+    <span className="flex items-center gap-2">
+      <Verdict pass={r >= aaThreshold(use)} />
+      <Tok>{r.toFixed(1)}:1</Tok>
+    </span>
+  );
+}
+
 export function AuditSection() {
-  const fails = ROWS.filter((r) => !r.resolved && contrastRatio(r.fg, r.bg) < aaThreshold(r.use)).length;
+  const fails = (p: (r: Row) => Pair) => ROWS.filter((r) => contrastRatio(p(r).fg, p(r).bg) < aaThreshold(r.use)).length;
+  const specFails = fails((r) => r.spec);
+  const nowFails = fails((r) => r.now);
   return (
     <KitSection
       id="audit"
       index={8}
-      title="Contrast audit"
+      title="Contrast check"
       intro={
         <>
-          Every ratio here is computed from the tokens, against WCAG 2.2 AA (4.5:1 text, 3:1 large text and UI).{" "}
-          <strong className="font-semibold text-(--color-ink)">{fails} spec pairings fail.</strong> Where the fix is
-          mechanical, a proposal sits beside it, made by darkening the same hue toward ink. Nothing is adopted until
-          you decide.
+          <p>
+            Contrast is how much a colour stands out from what is behind it. 1:1 is invisible; black on white is 21:1.
+            Small text needs at least <strong className="font-semibold text-(--color-ink)">4.5:1</strong>; big headings
+            and the outlines of controls need <strong className="font-semibold text-(--color-ink)">3:1</strong>. Every
+            number below is calculated from the real colours.
+          </p>
+          <p id="styleguide--audit--summary" className="mt-3 font-semibold text-(--color-ink)">
+            {nowFails === 0 ? `Everything we use now passes (${ROWS.length} of ${ROWS.length}).` : `${nowFails} of ${ROWS.length} still fail.`}{" "}
+            <span className="font-normal text-(--color-text-secondary)">
+              The handoff had {specFails} that did not. The last column shows what each one uses now.
+            </span>
+          </p>
         </>
       }
     >
       <div className="overflow-x-auto rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface)">
-        <table id="styleguide--audit--table" className="w-full min-w-[820px] border-collapse text-left text-sm">
+        <table id="styleguide--audit--table" className="w-full min-w-[860px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-(--color-border) text-[13px] text-(--color-text-secondary)">
-              <th scope="col" className="px-5 py-3 font-medium">Pairing</th>
-              <th scope="col" className="px-5 py-3 font-medium">Used for</th>
+              <th scope="col" className="px-5 py-3 font-medium">What</th>
+              <th scope="col" className="px-5 py-3 font-medium">Where</th>
               <th scope="col" className="px-5 py-3 font-medium">Needs</th>
-              <th scope="col" className="px-5 py-3 font-medium">Spec</th>
-              <th scope="col" className="px-5 py-3 font-medium">Proposal</th>
+              <th scope="col" className="px-5 py-3 font-medium">Handoff</th>
+              <th scope="col" className="px-5 py-3 font-medium">Now</th>
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((r) => {
-              const ratio = contrastRatio(r.fg, r.bg);
-              const need = aaThreshold(r.use);
-              const p = r.proposal ? contrastRatio(r.proposal.fg, r.bg) : null;
-              return (
-                <tr key={r.pair} className="proxy-id--styleguide--audit--row border-b border-(--color-border) last:border-0">
-                  <td className="px-5 py-3 font-medium">
-                    <span className="flex items-center gap-2">
-                      <span aria-hidden className="flex size-6 items-center justify-center rounded-(--radius-sm) border border-(--color-border) text-[12px] font-bold" style={{ background: r.bg, color: r.fg }}>
-                        Aa
-                      </span>
-                      {r.pair}
+            {ROWS.map((r) => (
+              <tr key={r.what} className="proxy-id--styleguide--audit--row border-b border-(--color-border) last:border-0">
+                <td className="px-5 py-3 font-medium">
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-(--radius-sm) border border-(--color-border) text-[12px] font-bold" style={{ background: r.now.bg, color: r.now.fg }}>
+                      Aa
                     </span>
-                  </td>
-                  <td className="px-5 py-3 text-(--color-text-secondary)">{r.where}</td>
-                  <td className="px-5 py-3">
-                    <Tok>{need}:1</Tok>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="flex items-center gap-2">
-                      <Verdict pass={ratio >= need} />
-                      <Tok>{ratio.toFixed(2)}:1</Tok>
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    {r.proposal && ratio < need ? (
-                      <span className="flex items-center gap-2">
-                        <Verdict pass={p! >= need} />
-                        <Tok>
-                          {p!.toFixed(2)}:1 {r.proposal.label} {r.proposal.fg}
-                        </Tok>
-                      </span>
-                    ) : ratio < need ? (
-                      <span className="text-(--color-text-secondary)">{r.resolved ?? "Decision needed"}</span>
-                    ) : (
-                      <span className="text-(--color-text-secondary)">None needed</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+                    {r.what}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-(--color-text-secondary)">{r.where}</td>
+                <td className="px-5 py-3">
+                  <Tok>{aaThreshold(r.use)}:1</Tok>
+                </td>
+                <td className="px-5 py-3">
+                  <Ratio pair={r.spec} use={r.use} />
+                </td>
+                <td className="px-5 py-3">
+                  <span className="flex flex-col gap-1">
+                    <Ratio pair={r.now} use={r.use} />
+                    <span className="text-[12px] text-(--color-text-secondary)">{r.now.label}</span>
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

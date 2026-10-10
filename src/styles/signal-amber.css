@@ -28,8 +28,10 @@
   --color-success-soft: #E7F6F0;
   --color-sent: #4776E6;
   --color-sent-soft: #EAF0FF;
-  --color-detected: #6E7CF6;
-  --color-detected-soft: #ECEEFF;
+  /* OVERRIDE (decided 2026-10-09): handoff #6E7CF6 / #ECEEFF read as the same blue
+     as Pending. A true violet, per the brief's "Payment detected uses violet". */
+  --color-detected: #8B5CF6;
+  --color-detected-soft: #F3EFFE;
   --color-warning: #F0A43B;
   --color-warning-soft: #FFF2DD;
   --color-danger: #D95F5F;
@@ -62,21 +64,31 @@
   --container-max: 1280px;
 
   /*
-   * PROPOSED (not in the handoff): AA-safe TEXT shades. Every spec status colour
-   * fails 4.5:1 as small text on its own soft background, and brand amber fails as
-   * text on canvas. Each proposal is the spec hue mixed toward --color-ink just far
-   * enough to reach 4.5:1 (see the contrast audit on /styleguide). Dots, fills and
-   * large type keep the spec colours. Decision pending — see the v1.5.0-H PR.
+   * ADOPTED (decided 2026-10-09, not in the handoff). Mirrored in
+   * src/lib/design/adopted-tokens.ts; the drift test asserts both agree and pass AA.
+   *
+   * Text shades: the spec hue darkened toward ink until it reaches 4.5:1 on its
+   * own soft background. Dots, fills and large type keep the brighter spec colour.
    */
   --color-success-text: #297C63;
   --color-sent-text: #3F68C9;
-  --color-detected-text: #5864C4;
+  --color-detected-text: #7B53DB;
   --color-warning-text: #906835;
   --color-danger-text: #AA4F53;
   --color-neutral-text: #676E7D;
   --color-brand-text: #926D28;
-  /* PROPOSED: input outline reaching the 3:1 non-text minimum on white. */
+  /* Input outline: reaches the 3:1 minimum for control boundaries on white. */
   --color-border-strong: #949495;
+  /* Amber that must be seen (hero line two, input focus border): 3:1 on canvas. */
+  --color-brand-strong: #BC8925;
+
+  /*
+   * The root layout's base style gives every element `outline-color: ring/50`, and
+   * the old --ring is red. Without this, inputs fade from red to amber on focus.
+   * Retired with the old palette in v1.5-H.
+   */
+  --ring: var(--color-brand-strong);
+  --color-ring: var(--color-brand-strong);
 
   background: var(--color-canvas);
   color: var(--color-ink);

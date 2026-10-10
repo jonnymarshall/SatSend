@@ -25,7 +25,6 @@ export function InvoiceListItem({
   fiat,
   btc,
   status,
-  badgeText = "aa",
   className,
 }: {
   idPrefix: string;
@@ -35,7 +34,6 @@ export function InvoiceListItem({
   fiat: string;
   btc: string;
   status: InvoiceStatus;
-  badgeText?: "spec" | "aa";
   className?: string;
 }) {
   return (
@@ -70,7 +68,6 @@ export function InvoiceListItem({
         </p>
         <StatusBadge
           status={status}
-          text={badgeText}
           id={`${idPrefix}--invoice-item--status`}
           className="mt-1"
         />
@@ -234,7 +231,7 @@ export function InvoiceTable({ idPrefix }: { idPrefix: string }) {
                 </span>
               </td>
               <td className="px-5 py-3.5">
-                <StatusBadge status={r.status} text="aa" />
+                <StatusBadge status={r.status} />
               </td>
             </tr>
           ))}
@@ -280,7 +277,6 @@ export function PaymentPanel({
         </div>
         <StatusBadge
           status={status}
-          text="aa"
           id={`${idPrefix}--payment--status`}
         />
       </div>

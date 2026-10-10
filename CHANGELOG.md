@@ -18,8 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `satsend-brand-handoff/` and **scoped** so the live app is visually unchanged;
   drift tests guard tokens and the logo. New keepers: `src/components/signal/*`,
   `src/components/brand/*`, `src/lib/design/*`, `src/styles/signal-amber.css`.
-  The kit surfaces 11 failing contrast pairings and shows a proposed AA fix next to
-  each; nothing is adopted yet. Also: the `ui-element-ids` skill is now tracked in
+  Review decisions are adopted (2026-10-09): AA status text, Payment detected
+  moves to violet so it no longer looks like Pending, links are ink with an amber
+  underline, a 3:1 amber (`--color-brand-strong`) for the hero line and input focus,
+  a 3:1 input outline, and the logo's `.me` sits one dot-gap from "SatSend". Every
+  pairing in the kit's contrast check now passes. Fixed inputs briefly flashing red
+  on focus. Also: the `ui-element-ids` skill is now tracked in
   both skill folders, and ESLint ignores the gitignored `.opencode/skills/`.
 - **v1.4.31.2-H — Integration harness, second suite (DB invariants).**
   `test-automation/db-invariants.mjs` (`npm run test:db`) proves migration 0027

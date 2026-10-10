@@ -14,11 +14,20 @@ describe("Signal primitives", () => {
     }
   });
 
-  it("StatusBadge AA mode swaps only the text colour", () => {
-    const { container } = render(<StatusBadge status="paid" text="aa" />);
+  it("StatusBadge uses the AA text shade and keeps the bright dot", () => {
+    const { container } = render(<StatusBadge status="paid" />);
     const cls = container.firstElementChild!.className;
     expect(cls).toContain("text-(--color-success-text)");
     expect(container.querySelector("[aria-hidden]")!.className).toContain("bg-(--color-success)");
+  });
+
+  it("Field sets its ring colour at rest, so focus never animates through another colour", () => {
+    render(<Field id="kit-name" label="Name" />);
+    const cls = screen.getByLabelText("Name").className;
+    expect(cls).toMatch(/(^| )outline-\[rgba\(216,155,36/);
+    expect(cls).not.toContain("outline-color");
+    expect(cls).toContain("border-(--color-border-strong)");
+    expect(cls).toContain("focus-visible:border-(--color-brand-strong)");
   });
 
   it("Button defaults to a 44px primary and reports loading", () => {
