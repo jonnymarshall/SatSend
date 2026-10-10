@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { inputClassName } from "./input";
 
 /**
  * Signal Amber text field (v1.5.0-H): label above, helper and error below, never a
@@ -10,9 +11,8 @@ import { cn } from "@/lib/utils";
  * --color-brand-strong (3:1), both decided 2026-10-09: the handoff's #ECE8DD
  * outline (1.22:1) and #D89B24 focus border (2.43:1) were too faint to see.
  *
- * The ring colour is set in the resting state, not only under :focus-visible, so
- * focusing changes the ring's width and never animates its colour. (The old base
- * style's red ring colour used to flash through on the way to amber.)
+ * Control styling (outline, focus ring, error, disabled) is shared with the bare
+ * Input via `inputClassName` (./input.tsx).
  */
 export type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   id: string;
@@ -60,13 +60,8 @@ export function Field({
           aria-invalid={error ? true : undefined}
           aria-describedby={[errorId, helperId].filter(Boolean).join(" ") || undefined}
           className={cn(
-            "h-11 w-full rounded-(--radius-md) border bg-(--color-surface) px-3.5 text-base text-(--color-ink)",
-            "border-(--color-border-strong) outline-offset-1 outline-[rgba(216,155,36,0.22)]",
-            "placeholder:text-(--color-text-secondary) transition-[border-color] duration-150",
-            "focus-visible:border-(--color-brand-strong) focus-visible:outline-3",
+            inputClassName,
             leadingIcon && "pl-10",
-            error && "border-(--color-danger) outline-[rgba(217,95,95,0.2)] focus-visible:border-(--color-danger)",
-            disabled && "cursor-not-allowed bg-(--color-neutral-soft) text-(--color-text-secondary)",
             forceFocus && "border-(--color-brand-strong) outline-3",
           )}
           {...props}

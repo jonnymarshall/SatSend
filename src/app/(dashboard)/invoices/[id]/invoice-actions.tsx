@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import { PublishMenu } from "@/components/publish-menu";
 import { MarkAsMenu } from "@/components/mark-as-menu";
 import {
@@ -108,19 +108,19 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
       <div id="invoice-actions--buttons" className="flex gap-3 flex-wrap">
         {isDraft && (
           <Link href={`/invoices/${invoice.id}/edit`}>
-            <Button id="invoice-actions--edit-draft-button" variant="outline">Edit draft</Button>
+            <Button id="invoice-actions--edit-draft-button" variant="secondary">Edit draft</Button>
           </Link>
         )}
 
         {!isDraft && (
           <Link href={`/invoice/${invoice.id}`} target="_blank">
-            <Button id="invoice-actions--view-public-button" variant="outline">View public invoice</Button>
+            <Button id="invoice-actions--view-public-button" variant="secondary">View public invoice</Button>
           </Link>
         )}
 
         {!isDraft && (
           <a href={`/api/invoices/${invoice.id}/pdf`} download>
-            <Button id="invoice-actions--download-pdf-button" variant="outline">Download PDF</Button>
+            <Button id="invoice-actions--download-pdf-button" variant="secondary">Download PDF</Button>
           </a>
         )}
 
@@ -208,7 +208,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {isArchived && (
           <Button
             id="invoice-actions--unarchive-button"
-            variant="outline"
+            variant="secondary"
             onClick={() =>
               run(async () => {
                 const { unarchived } = await bulkUnarchive([invoice.id]);
@@ -227,7 +227,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {!isArchived && !isDraft && (
           <Button
             id="invoice-actions--archive-button"
-            variant="outline"
+            variant="secondary"
             onClick={() => run(() => bulkArchive([invoice.id]))}
             disabled={busy}
           >
@@ -237,7 +237,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
         <Button
           id="invoice-actions--duplicate-button"
-          variant="outline"
+          variant="secondary"
           onClick={() => run(() => duplicateInvoice(invoice.id))}
           disabled={busy}
         >
@@ -246,7 +246,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
         <Button
           id="invoice-actions--delete-button"
-          variant="outline"
+          variant="secondary"
           className="text-primary border-primary/30 hover:bg-primary/10"
           onClick={handleDelete}
           disabled={busy}

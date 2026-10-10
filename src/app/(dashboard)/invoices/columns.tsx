@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal, Mail, HandHelping, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,

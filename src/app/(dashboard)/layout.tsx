@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import { signOutAction } from "./sign-out-action";
 
 export default async function DashboardLayout({
@@ -39,7 +39,7 @@ export default async function DashboardLayout({
         <div id="nav--right" className="flex items-center gap-4">
           <span id="nav--user-email" className="text-sm text-muted-foreground">{user.email}</span>
           <form action={signOutAction}>
-            <Button id="nav--sign-out-button" type="submit" variant="outline" size="sm">Log out</Button>
+            <Button id="nav--sign-out-button" type="submit" variant="secondary" size="sm">Log out</Button>
           </form>
         </div>
       </header>

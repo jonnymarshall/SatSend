@@ -4,14 +4,14 @@
  * Values are copied verbatim from satsend-brand-handoff/design-tokens.css and
  * guarded against drift by src/lib/design/signal-amber-tokens.test.ts.
  *
- * SCOPED, not global: only elements inside [data-theme="signal-amber"] get these
- * tokens, so the live (dark) app is untouched until v1.5-H. In v1.5-H this selector
- * becomes :root and the old palette in globals.css is retired.
+ * GLOBAL since v1.5-H (scoped to the /styleguide kit in v1.5.0-H). globals.css
+ * maps the shadcn variables (--background, --primary, ...) onto these tokens, so
+ * there is one palette. The old dark/red palette is retired.
  *
  * The --font-display / --font-body values point at the next/font variables loaded
- * by the styleguide layout (Onest + Geist), with the handoff names as fallbacks.
+ * by the root layout (Onest + Geist), with the handoff names as fallbacks.
  */
-[data-theme="signal-amber"] {
+:root {
   --font-display: var(--font-onest), "Onest", sans-serif;
   --font-body: var(--font-geist-sans), "Geist", "Geist Sans", sans-serif;
 
@@ -82,38 +82,25 @@
   /* Amber that must be seen (hero line two, input focus border): 3:1 on canvas. */
   --color-brand-strong: #BC8925;
 
-  /*
-   * The root layout's base style gives every element `outline-color: ring/50`, and
-   * the old --ring is red. Without this, inputs fade from red to amber on focus.
-   * Retired with the old palette in v1.5-H.
-   */
-  --ring: var(--color-brand-strong);
-  --color-ring: var(--color-brand-strong);
-
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 
-/* The root layout still paints the old dark body; don't let it show on overscroll. */
-body:has([data-theme="signal-amber"]) {
-  background: #FCFBF7;
-}
-
-[data-theme="signal-amber"] .font-display {
+.font-display {
   font-family: var(--font-display);
 }
 
 /* Onest headings: tight tracking, less aggressive below ~28px (DESIGN.md §4). */
-[data-theme="signal-amber"] .tracking-display {
+.tracking-display {
   letter-spacing: -0.045em;
 }
-[data-theme="signal-amber"] .tracking-heading {
+.tracking-heading {
   letter-spacing: -0.025em;
 }
 
-[data-theme="signal-amber"] ::selection {
+::selection {
   background: var(--color-brand-soft);
   color: var(--color-ink);
 }

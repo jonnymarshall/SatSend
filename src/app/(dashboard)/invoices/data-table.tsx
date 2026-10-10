@@ -14,8 +14,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/signal/button";
+import { Input } from "@/components/signal/input";
 import {
   Table,
   TableBody,
@@ -301,7 +301,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
             render={
               <Button
                 id="invoice-data-table--bulk-actions"
-                variant="outline"
+                variant="secondary"
                 disabled={!hasSelection || pending}
               >
                 Bulk actions {hasSelection && `(${selectedIds.length})`}
@@ -332,7 +332,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
 
         <Button
           id="invoice-data-table--archive-toggle"
-          variant="outline"
+          variant="secondary"
           onClick={() => setShowArchived((v) => !v)}
         >
           {showArchived ? "Hide archived" : "Show archived"}
@@ -342,7 +342,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" className="ml-auto">
+              <Button variant="secondary" className="ml-auto">
                 Columns
               </Button>
             }
@@ -428,7 +428,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
         </div>
         <div className="space-x-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
@@ -436,7 +436,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
             Previous
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}

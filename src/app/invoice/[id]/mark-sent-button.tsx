@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchAddressTxs, txPaysToAddress } from "@/lib/mempool";
 import { mempoolAddressUrl } from "@/lib/btc-network";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -213,7 +213,7 @@ function PollingSession({ invoiceId, btcAddress, onTimedOut, onStatusChange }: S
         />
       </div>
       <AlertDialogFooter className="flex-col sm:flex-col sm:items-stretch">
-        <AlertDialogCancel id="invoice-view--mark-sent-cancel" variant="outline">
+        <AlertDialogCancel id="invoice-view--mark-sent-cancel" variant="secondary">
           Cancel
         </AlertDialogCancel>
         <p className="text-center text-xs text-muted-foreground">

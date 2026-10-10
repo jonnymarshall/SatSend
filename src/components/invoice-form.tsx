@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import { DatePicker } from "@/components/date-picker";
 import {
   saveDraft,
@@ -544,7 +544,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       </div>
 
       <div id="section-actions" className="flex gap-3 items-start">
-        <Button id="btn-save-draft" variant="outline" onClick={handleSaveDraft} disabled={saving}>
+        <Button id="btn-save-draft" variant="secondary" onClick={handleSaveDraft} disabled={saving}>
           Save draft
         </Button>
         <PublishMenu
@@ -560,7 +560,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           onDownloadAndMarkSent={handleDownloadAndMarkSent}
           onPublishOnly={handlePublishOnly}
         />
-        <Button id="btn-cancel" variant="outline" type="button" onClick={handleCancel} disabled={saving}>
+        <Button id="btn-cancel" variant="secondary" type="button" onClick={handleCancel} disabled={saving}>
           Cancel
         </Button>
       </div>

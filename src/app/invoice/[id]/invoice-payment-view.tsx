@@ -8,7 +8,7 @@ import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { InvoiceDates } from "@/components/invoice-dates";
 import { PaymentWatcher } from "./payment-watcher";
 import { MarkSentButton } from "./mark-sent-button";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
@@ -91,7 +91,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
               href={`/api/invoice/${invoice.id}/pdf`}
               download
             >
-              <Button variant="outline" size="sm">Download PDF</Button>
+              <Button variant="secondary" size="sm">Download PDF</Button>
             </a>
             {invoice.btc_address ? (
               <PaymentWatcher
