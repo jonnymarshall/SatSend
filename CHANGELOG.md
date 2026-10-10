@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **v1.5.1 — Signal Amber redesign of the in-app screens (roadmap v1.5-H).** The
+- **v1.5.2 — Signal Amber redesign of the in-app screens (roadmap v1.5-H).** The
   whole app moves from the near-black + red theme to the light Signal Amber system:
   canvas `#FCFBF7`, ink `#151C2E`, amber `#D89B24` for actions, Onest for headings
   and the logo, Geist for UI. Tokens are now global (`src/styles/signal-amber.css`

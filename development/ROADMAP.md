@@ -962,7 +962,7 @@ contrast helper are keepers and get promoted.
 
 ### ✅ v1.5-H — Full Site Redesign, in-app screens (Brand Handoff — "Signal Amber", Option D)
 
-**Branch:** `v1.5/redesign` · package `1.5.1`
+**Branch:** `v1.5/redesign` · package `1.5.2`
 
 > **Design source of truth:** `satsend-brand-handoff/` — read `DESIGN.md` first,
 > then `design-tokens.css` and `agent-implementation-brief.md`. Written tokens and
