@@ -1369,3 +1369,475 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ---
 
+---
+
+## Archived 2026-10-11 (moved verbatim from ROADMAP.md)
+
+> Finished (✅) and superseded sections moved out to keep the live roadmap small.
+> v1.4.23 (Marketing Landing Page) is superseded by v1.5.2-H, which absorbs its
+> scope; v1.4.19 and v1.4.28 were already superseded by v1.4.19-H and v1.4.28-H.
+
+### ✅ v1.4.36 — Test automation harness
+**Branch:** `chore/test-automation` · **closed in v1.4.34** — the only remainder
+(the on-chain testnet wallet sweep) is tracked in
+`development/OUTSTANDING-VERIFICATIONS.md`.
+
+- **Testnet wallet tool** (`test-automation/wallet.mjs`) — done. Derives addresses
+  from a testnet seed, locates funds, selects coins, signs, and broadcasts.
+- **Harness + runner** (`test-automation/lib.mjs`, `harness.mjs`) — done. Creates a
+  test user and published invoices with fresh addresses, pays them, drives the
+  app's payment route, waits for confirmations, and asserts the verdict, the
+  recorded amounts, and the emails. Proven for `underpaid` (automated, PASS) and
+  `paid`/`overpaid` (manually driven).
+- **Separate Supabase test project** (`SatSend-dev`) — done. Local development no
+  longer shares the production database, which completes the environment half of
+  S2.2 and stops the stale production deployment from corrupting test results.
+- **Dev-only automation API** — deferred. Not needed for testing (the harness
+  writes directly with the service role); fold it into the v2.8 agent API instead.
+
+**Leftover — final action before retiring the test wallet.** The wallet's
+spendable balance sits at high address indices that the wallet UI does not display
+(the gap limit is ~20). Sweep every remaining testnet fund back to a
+wallet-visible low address as the last on-chain action: the visible address is
+`m/84'/1'/0'/0/102`; the hidden funds are at indices 300, 500, 1000 and 1001.
+Do this on whichever branch is live once no further on-chain tests are needed.
+
+**Done when:** the agent can run a full payment scenario start to finish against a
+disposable database and report a pass/fail result, with the human only approving
+merges.
+
+---
+
+#### ✅ v1.4.19-H (S0) — Green the build
+**Branch:** `fix/green-the-build` · Detail: Appendix A → S0
+The test suite is red on `main`: 5 tests in `actions.test.ts` fail because a
+fixture `due_date` (2026-07-10) is now in the past, and lint exits 1
+(`columns.tsx:59`). Freeze time in the test with `vi.setSystemTime`, fix the
+display-name lint error. Nothing else proceeds on a red suite.
+**Done when:** `npm run test:run`, `npx tsc --noEmit`, `npm run lint` all exit 0.
+
+---
+
+#### ✅ v1.4.20-H (S1) — Close the four anon database exposures
+**Branch:** `fix/rls-critical-exposures` · Detail: Appendix A → S1
+Highest priority in the project. Fixed: (1) the `invoice_email_summary` view
+leaked all invoices — `set (security_invoker = on)` + revoke anon; (2)
+`webhook_deliveries` had RLS off — enabled it, no policies (server-role-only,
+by design); (3) the `anon_select_non_draft` policy exposed every non-draft
+invoice — dropped it and moved the payer page onto a server-published
+**broadcast** channel instead of `postgres_changes` (so no anon table read is
+needed); (4) reverted `REPLICA IDENTITY` to `DEFAULT`. Also stripped
+`access_code`/`user_id` from the public payload and marked `admin.ts`
+`server-only`.
+
+**Deviations from the original spec:**
+- The "shrink the realtime publication" step (per-table `publish` restriction
+  via `ALTER PUBLICATION ... ADD TABLE ... WITH (publish = ...)`) turned out to
+  be invalid Postgres syntax — `publish` is a publication-wide setting, not a
+  per-table one. Dropped that step entirely: dropping the anon SELECT policy
+  already fully blocks anon from `postgres_changes` regardless of publication
+  config, so no publication change was needed to close the exposure.
+- Two gaps were found only after the first push of migration `0022` (already
+  applied to remote by then), so they shipped as a follow-up migration `0023`
+  rather than editing an already-applied file: `realtime.broadcast_changes()`
+  sends via `realtime.send()`, which defaults `private = true` — anon needs an
+  explicit RLS policy on `realtime.messages` (not `invoices`) to receive
+  broadcasts, and the client must open the channel with
+  `{ config: { private: true } }`. Added that policy, scoped to the
+  `invoice:<uuid>` topic pattern rather than joining back to `invoices` (anon
+  can no longer read that table). Also added a guard so the trigger never
+  broadcasts for `status = 'draft'` invoices.
+- `server-only` was not previously an installed dependency; added it, plus a
+  `vitest.config.ts` alias to Next's own no-op build of that package (the same
+  alias Next's webpack config uses on the server layer), since Vitest doesn't
+  apply Next's RSC bundling-layer separation and would otherwise hit
+  `server-only`'s throwing implementation in every test that transitively
+  imports `admin.ts`.
+- Manual TEST 4 surfaced two more bugs, both fixed in follow-up commits/migrations:
+  1. The client subscribed to the private broadcast channel without first
+     calling `supabase.realtime.setAuth()` — private channels (which is what
+     `realtime.broadcast_changes()` sends by default) are only authorized
+     against `realtime.messages` RLS once the socket has a JWT attached, even
+     for an anonymous client. Fixed in `use-public-invoice-realtime.ts`.
+  2. **More severe:** `broadcast_invoice_status_change()` sets `search_path = ''`
+     (correct hardening) but referenced the `invoice_broadcast_record`
+     composite type unqualified. With an empty search path Postgres couldn't
+     resolve it, so **every non-draft UPDATE to `invoices` threw `42704` and
+     aborted the whole transaction** — not just breaking the broadcast, but
+     silently blocking every invoice update (mark-as-paid, edits, cron
+     sweeps) from the moment `0022` was applied until migration
+     `0024_fix_broadcast_type_search_path.sql` qualified the reference as
+     `public.invoice_broadcast_record`.
+
+**Done when:** no anon request with the public key can read any invoice, summary,
+or webhook row; the payer page still updates live; `supabase db lint` is clean.
+Manual test guide: `manual-tests/v1.4.20-H-rls-critical-exposures.md`.
+
+---
+
+#### ✅ v1.4.19-H (S2) — Payment forgery fix + amount verification (absorbs old v1.4.19)
+**Branch:** `v1.4.19/payment-amount-awareness` · Detail: Appendix A → S2
+The payment-status API trusted the client's `status:"paid"` claim and checked
+no amount, so a 1-sat tx could forge a paid invoice. Fixed: the route now
+passes the REAL fetched tx into the shared scheduler (the synthetic tx is
+gone), requires the access-code cookie, and both detection callsites
+(fast-path route + cron) require a 2-block confirmation depth (computed from
+a fetched chain tip, since mempool.space only exposes a confirmed/not-confirmed
+flag plus block height) and a fiat-coverage check (5% tolerance) before landing
+on `paid`, `underpaid`, or `paid`+`overpaid`.
+
+**Deviation from the original spec (planning discussion, pre-implementation):**
+the spec above called for snapshotting `expected_sats` (and the BTC price used)
+at **publish** time. That was caught as wrong during planning: locking the sats
+target to the publish-time price means a payer who pays the correct fiat amount
+later, after BTC has moved, would be wrongly flagged over/underpaid purely
+because of price drift the invoice never priced in. Implemented instead: no
+publish-time snapshot; the paying tx's sats are converted to fiat using the
+BTC price fetched at confirmation time and compared against `total_fiat`. New
+columns are `amount_received_sats`, `btc_price_at_detection`,
+`amount_received_fiat`, `overpaid` (no `expected_sats` column). If the price
+oracle is unavailable when a tx confirms, the verdict is deferred (invoice
+stays `payment_detected`) rather than guessed, and retried on the next tick.
+
+**Done when:** a forged-`paid` POST cannot move an invoice past
+`payment_detected`; a real but below-tolerance payment lands on `underpaid`;
+the amount received and the price used to judge it are persisted; a confirmed
+tx below 2-block depth does not finalize a verdict.
+
+---
+
+#### ✅ v1.4.19.1-H (S2.1) — Restore public invoice live updates
+**Branch:** `fix/public-invoice-realtime-authorization` · Detail: Appendix A → S2.1
+The public `/invoice/[id]` page was refused access to its private `invoice:<id>`
+broadcast channel, so payment status changes only appeared on a refresh. Migration
+`0023` wrote the `realtime.messages` policy against the `topic` **column**;
+Supabase evaluates it against the **requested** topic, exposed via the
+`realtime.topic()` helper, so the predicate never matched. Fixed in migration
+`0026_fix_invoice_realtime_policy.sql`, which recreates the policy with
+`(select realtime.topic())`.
+
+**Also widened from `to anon` to `to anon, authenticated`:** payers are anonymous,
+but an owner previewing their own public link is signed in, and their socket
+connects with the `authenticated` role, which the old `to anon` rule did not cover.
+No new exposure — the invoice UUID is already the capability for anon, a draft
+never broadcasts, and the payload is only `{id, status, btc_txid}`.
+
+**Done when:** a public invoice page logs `SUBSCRIBED`, never logs a
+`CHANNEL_ERROR`, and its status changes from a service-role update within about
+one second without refreshing the page.
+Manual test guide: `manual-tests/v1.4.19.1-H-public-invoice-live-updates.md`.
+
+---
+
+#### ✅ v1.4.19.2-H (S2.2) — One writer per database (stop cross-version cron writes)
+**Branch:** `fix/environment-and-deployment-hygiene` · Detail: Appendix A → S2.2
+Resolved, in three parts: (1) local development moved to its own Supabase project
+(`SatSend-dev`), so test runs no longer share the production database; (2) the
+stale `v1.4.18` production build was replaced by redeploying `main` to Vercel, so
+production now runs current code; (3) the sweep route gained a single-writer guard
+— it no-ops unless `PAYMENT_SWEEP_ENABLED=true` is set in that environment, so a
+stray, test, or future stale deployment cannot sweep a shared database.
+**Done when:** only one code version can write to a given database; a fresh local
+test invoice is never touched by another environment's cron and its
+`paid`/`underpaid` verdict always carries amounts; and production serves the
+current branch.
+**Note:** the guard must be switched on (`PAYMENT_SWEEP_ENABLED=true`) in whichever
+environment owns the sweep (production, or the external scheduler) — see the
+pre-deployment checklist and `AGENTS.md`.
+
+---
+
+#### ✅ v1.4.19.3-H (S2.3) — First controlled real-bitcoin smoke test (mainnet)
+**Branch:** `chore/mainnet-smoke-tooling` · Detail: Appendix A → S2.3
+The mainnet dry-run had never succeeded and was the highest-risk unverified path in
+a Bitcoin product. Done: a real mainnet payment was made to an invoice and the app
+detected, confirmed, and judged it correctly.
+**Result (2026-10-06):** invoice `MAINNET-SMOKE` for $1, paid 1,169 sats (fee 141
+sats) in tx `3424e270…`; after 2 confirmations it landed on `paid` with
+`amount_received_sats=1169`, `btc_price_at_detection=85587`,
+`amount_received_fiat=1.0005`, `overpaid=false`.
+Tooling: `test-automation/mainnet-smoke.mjs`, with the shared library made
+network-aware. Prereqs were: S2 merged; S2.2 done; a real receive address;
+`NEXT_PUBLIC_BTC_NETWORK=mainnet`; a tiny amount; the payer page open (the cron is
+not per-minute yet).
+
+---
+
+#### ✅ v1.4.28-H (S3) — Restore sub-daily detection (absorbs old v1.4.28)
+**Branch:** `v1.4.28/cron-strategy` · Detail: Appendix A → S3
+Shipped: `.github/workflows/payment-sweep.yml` drives `/api/cron/payment-sweep`
+every ~5 min (GitHub Actions' minimum; Vercel Hobby's own cron stays as a daily
+placeholder). The schedule is now time-based — anchored on `published_at`
+(pre-mempool) and `mempool_seen_at` (post-mempool) — so a late or missed tick
+lands on the correct boundary instead of burning a stage. The sweep orders by
+`next_check_at`, includes `overdue` (M-DB-2), drains the due queue past one batch,
+and sets `maxDuration = 60`. New column `published_at` (migration `0028`).
+**Verified:** unit + route tests; the production workflow returned a green run
+(2026-10-06); and a real testnet4 payment was detected end-to-end against the
+local test database (`manual-tests/v1.4.22-H-testnet-detection-e2e.md`) — the
+`pending → payment_detected` hard gate passed. Still unrun as one combination: a
+real payment detected by the external scheduler against production.
+
+---
+
+#### ✅ v1.4.21-H (S4) — DB defends money state
+**Branch:** `fix/db-money-invariants` · Detail: Appendix A → S4
+Migration `0027_money_invariants.sql`: CHECK constraints (amounts >= 0, tax
+percent 0-100, currency USD, totals consistent, line_items shape) added NOT VALID
+then validated; a trigger freezing a paid / mid-payment invoice's money and payment
+fields; a delete-guard trigger allowing only drafts. Code: `bulkDelete` is now
+draft-only to match. Verified on the test database: a paid invoice's total cannot
+be changed, a non-draft cannot be deleted, a negative or inconsistent total is
+rejected, and a benign update on a paid invoice (the detection flow) still works.
+**Done when:** a PATCH to a paid invoice's total is rejected by the DB, non-draft
+deletes are rejected, and negative/inconsistent amounts cannot be written. ✅
+
+> **END OF PHASE 0 = safe for mainnet.** A first **controlled real-bitcoin smoke
+> test (S2.3)** runs earlier, right after S2.2, on a deliberately tiny amount — so
+> real mainnet exposure is validated while S3/S4 continue. Full mainnet readiness
+> still requires all of Phase 0. The phase-end check is the same flow repeated
+> through the external cron once S3 lands; the detection logic behind that path is
+> now verified end-to-end on testnet4
+> (`manual-tests/v1.4.22-H-testnet-detection-e2e.md`), so the remaining gap is only
+> the mainnet-plus-scheduler combination itself.
+
+---
+
+### ⏳ v1.4.19 — Payment Amount Awareness (Under / Overpayment) — SUPERSEDED by v1.4.19-H (S2)
+
+> **Superseded:** implement this as part of **v1.4.19-H (S2)** in the hardening
+> train above, which adds the forgery fix and amount verification on top of this
+> spec. This section is kept for its detailed schema/test spec only.
+
+**Branch:** `v1.4.19/payment-amount-awareness`
+
+**Context:** Today the on-chain detector flips an invoice to `paid` the moment it sees *any* tx at the address. It does not compare amount to invoice total. Two real failure modes follow: a payer sends less than billed (BTC price moved between invoicing and payment, or they fat-fingered) and the invoice is marked fully paid; or they overpay and the surplus is silently absorbed into the "paid" state. This branch closes both gaps for single-payment invoices, denominating in fiat with BTC as the rail and a 5% under/over tolerance.
+
+Decisions locked during v1.4.10 planning:
+- **Invoices remain fiat-denominated.** `total_fiat` + `currency` is the source of truth. BTC price at the moment of detection (mempool.space + Coinbase API) converts received sats to fiat for the comparison.
+- **5% tolerance, both sides.** `coverage = received_fiat / total_fiat`. `< 0.95` → underpaid; `0.95 ≤ x ≤ 1.05` → paid (clean); `> 1.05` → paid + overpaid flag. The 5% band is wide enough to absorb dust and small price wobble; tunable later.
+- **`underpaid` is its own status.** Mirrors the existing `paid` / `overdue` enum values. Owners can manually flip an underpaid invoice to paid (e.g., they took the rest in fiat off-platform) via the Mark As menu shipped in v1.4.10.
+- **`overpaid` is a flag, not a status.** The invoice is paid; it is also overpaid. UI surfaces the surplus as a small indicator alongside the status badge.
+- **Single-payment-only.** Multi-payment-toward-total and the multi-rail `invoice_payments` table are explicitly deferred; v1.4.12's fresh-address rule forecloses multi-payment by definition (any second tx lands on an address that now has prior on-chain history).
+
+**Schema — new migration `supabase/migrations/00XX_payment_amount_awareness.sql`**
+
+```sql
+alter type invoice_status add value if not exists 'underpaid';
+
+alter table invoices add column amount_received_sats bigint;
+alter table invoices add column btc_price_at_detection numeric;     -- USD per BTC at detection time
+alter table invoices add column amount_received_fiat numeric;        -- = amount_received_sats × btc_price_at_detection / 1e8
+alter table invoices add column overpaid boolean not null default false;
+```
+
+No backfill — existing invoices keep their current `paid` status with NULLs in the new columns. The new logic only applies to detections going forward.
+
+**Detection wiring**
+- [ ] On every detection callsite (currently `src/app/api/invoices/[id]/payment-status/route.ts` and `src/app/api/cron/payment-sweep/route.ts`), replace the unconditional `status='paid'` write with a `decidePaymentOutcome(receivedSats, totalFiat, btcPrice)` pure function that returns `{ status: 'paid' | 'underpaid', overpaid: boolean }`.
+- [ ] Add `src/lib/btc-price.ts` — fetches the current BTC/USD spot price from Coinbase (`GET https://api.coinbase.com/v2/exchange-rates?currency=BTC`). Used at detection time only. Cache for 60s in-memory to avoid hammering on cron sweeps.
+- [ ] If the price oracle fails, **do not flip status**. Schedule a retry on the next cron tick. Log a `[btc-price] oracle unavailable, deferring detection for invoice <id>`. Do not fall back to a stale price; an incorrect status is worse than a delayed one.
+- [ ] Persist `amount_received_sats`, `btc_price_at_detection`, `amount_received_fiat`, `overpaid` alongside the status flip in the same UPDATE.
+
+**UI**
+- [ ] Status badge: add an `underpaid` variant (amber/red, "Underpaid").
+- [ ] Detail page: when `overpaid=true` (regardless of `paid` / `underpaid` status), show a small "Overpaid by $X (Y%)" indicator next to the status badge. When `underpaid`, show "Received $X of $Y (Z%)" inline below the badge.
+- [ ] `/invoices` list: extend the status-column filters to include `underpaid`.
+- [ ] Mark As menu (v1.4.10): include `underpaid` in `UNPAID_STATES`-equivalent set so the owner can flip an underpaid invoice to paid (manual override) or back to pending. Decision: leaving `underpaid → unpaid` semantics the same as today (clears to pending; address is now tainted by the prior on-chain tx, so re-publish would be blocked by v1.4.12's freshness check — owner is expected to issue a new invoice with a fresh address).
+
+**Email templates**
+- [ ] `payment_detected` email: include the actual amount received and the invoice total. If underpaid, the subject line and body explicitly call it out ("Partial payment received: $X of $Y").
+- [ ] `payment_confirmed` email: same — include amount + overpaid surplus if applicable.
+
+**Tests**
+- [ ] `decidePaymentOutcome`: 90% coverage → `{ status: 'underpaid', overpaid: false }`.
+- [ ] `decidePaymentOutcome`: 100% coverage → `{ status: 'paid', overpaid: false }`.
+- [ ] `decidePaymentOutcome`: 95.0% (lower bound) → `paid`, no overpaid.
+- [ ] `decidePaymentOutcome`: 105.0% (upper bound) → `paid`, no overpaid.
+- [ ] `decidePaymentOutcome`: 110% coverage → `{ status: 'paid', overpaid: true }`.
+- [ ] Detection happy path: paid amount lands on `paid` status with the amount columns populated and `overpaid=false`.
+- [ ] Detection underpaid path: tx for 80% of total → status flips to `underpaid`; amount columns reflect what landed.
+- [ ] Detection overpaid path: tx for 120% → status `paid`, `overpaid=true`, amount columns populated.
+- [ ] Oracle-down path: Coinbase mock returns 5xx → detector defers (status stays in prior state, e.g. `pending` / `payment_detected`); next cron tick retries.
+- [ ] Mark As menu shows the right items on an `underpaid` invoice (Paid + Overdue, no Unpaid since it's already in an unpaid-equivalent state — TBD in implementation, depending on how the menu's `UNPAID_STATES` set evolves).
+
+**Out of scope (deferred to later branches)**
+- Multi-payment toward a single invoice total (would foreclose v1.4.12's freshness rule). Revisit if real users hit the use case.
+- `invoice_payments` table — the unifying multi-rail architecture sketched during v1.4.10 planning. Stays deferred until multi-payment or programmatic fiat reconciliation is needed.
+- Programmatic fiat reconciliation (auto-detecting Stripe / bank-transfer payments). For now, the owner manually flips underpaid → paid via the Mark As menu when fiat tops up the balance off-platform — covered by v1.4.10's existing menu.
+- Refund flows for overpaid invoices (out-of-band; the surface only flags it).
+- Multi-currency support beyond the per-invoice `currency` field (v2.12 territory).
+
+**Done when:** A BTC payment of any size resolves to one of `paid` / `paid+overpaid` / `underpaid` based on a 5% tolerance band against the invoice's fiat total at detection time; the actual amount received and the BTC price used for conversion are persisted on the invoice row; the UI surfaces both states clearly; the price-oracle failure mode does not corrupt status.
+
+---
+
+### ⏳ v1.4.28 — Cron strategy decision before launch (Vercel Hobby workaround) — SUPERSEDED by v1.4.28-H (S3)
+
+> **Superseded:** the decision is made (Option B — free external scheduler on
+> Hobby tier) and the work is **v1.4.28-H (S3)** in the hardening train above,
+> which also fixes the time-based schedule. This section is kept for reference.
+
+**Branch:** `v1.4.28/cron-strategy` (or fold into the Vercel deploy/launch branch when that lands)
+
+**Context:** v1.4.18 shipped with `vercel.json` cron set to `0 0 * * *` (once daily) because Vercel Hobby tier hard-rejects sub-daily schedules at deploy time. The original schedule (`* * * * *`, every minute) drives two important behaviours that the daily fallback breaks:
+
+1. **BTC payment detection backfill.** The cron is what notices a payer's tx landed when the payer doesn't have the public payer page open. With daily cron, pay-and-walk-away payers don't appear as paid in the owner's dashboard until up to 24h later. Engaged payers (with the public page open) still get realtime detection via the WebSocket + REST polling that v1.4.13 wired up, so this is a "stale-tab" UX problem, not a complete outage.
+2. **`next_check_at` exponential backoff (v1.4.1).** The per-invoice schedule assumes minute-ish tick rates. Daily ticks push `next_check_at` days or weeks out after only a few runs, so the schedule effectively stops working for older invoices.
+
+Acceptable while there are zero real paying users; must be resolved before launch.
+
+**Options**
+
+- **Option A , Vercel Pro ($20/mo).** Restore `* * * * *` in `vercel.json`. Zero code changes. Cleanest. The "right" answer for a real product.
+- **Option B , External cron service.** Keep `vercel.json` on daily, but point a free third-party cron service (`cron-job.org`, `EasyCron`, `cron-job.de`) at `https://<production-domain>/api/cron/payment-sweep` every minute. The route already accepts `Authorization: Bearer $CRON_SECRET` (`src/app/api/cron/payment-sweep/route.ts:38`) , no code changes needed, just configure the external service with the URL + bearer header. Free, every-minute, full restoration of behaviour. Downside: one extra third-party dependency in a payment-critical path; must monitor it.
+
+**Scope**
+- [ ] Pick Option A or Option B (decision call, not implementation work).
+- [ ] If A: upgrade the Vercel project to Pro; revert `vercel.json` to `* * * * *`; verify cron runs as expected in production logs.
+- [ ] If B: pick the external service, configure the cron job with the production URL and `CRON_SECRET` bearer header, leave `vercel.json` on daily, verify the external service successfully hits the endpoint and produces a `200`.
+
+**Done when:** payment-sweep is verifiably running on a sub-daily cadence in production, and the Activity feed / dashboard reflects on-server detection within minutes of a payer's tx confirming.
+
+---
+
+### ⏳ v1.4.23 — Marketing Landing Page
+
+**Branch:** `v1.4.23/marketing-landing-page`
+
+> **Sequencing note:** Should land **after** v1.4.15 (rename to SatSend) so the page is branded correctly from the start. Should land **before** v1.5 (design-system overhaul) so the colour-scheme decision applies to the marketing page too. Slot inside the v1.4 train rather than v1.5 because the page is launch-blocking: the root URL needs to render something purposeful to first-time visitors.
+
+**Context:** The product currently has no marketing page. Hitting `/` (unauthenticated) lands users on whatever the App Router default is, which is not designed to convert. v1 launches as a bitcoin-only invoicing product and that positioning needs a real surface to live on. This branch builds that surface and propagates the same positioning to all non-app touch points (page metadata, OpenGraph, README).
+
+**Scope**
+- [ ] Build a public landing page at `/` (or wherever the unauthenticated root currently routes) for first-time visitors. Pitch: "Bitcoin-only invoicing for freelancers". Sections: hero with one-line value prop and CTA, three-to-five product highlights (publish a bitcoin invoice in seconds; live BTC/fiat conversion at view time; on-chain payment detection; no fiat rails to set up; you keep your own keys), a short "How it works" walkthrough (1-2-3 steps), and a sign-in / sign-up CTA at the bottom.
+- [ ] Authenticated users hitting `/` should redirect to `/invoices` (or the existing dashboard route), not see the marketing page. Detect via the existing auth helper.
+- [ ] Page metadata: `src/app/layout.tsx` (or per-route metadata if the marketing page has its own layout) — `title`, `description`, `openGraph.title`, `openGraph.description`, `openGraph.images`. All copy reads as bitcoin-only positioning.
+- [ ] `README.md` — top-of-file description matches the new positioning. Reuse the hero copy where appropriate.
+- [ ] OpenGraph image — generate one (Vercel OG image route is the simplest path) that includes the SatSend wordmark, a "Bitcoin-only invoicing" tagline, and a visual cue (small QR or BTC sigil). Wire it into `openGraph.images` so social previews render correctly.
+- [ ] Audit existing copy for any non-bitcoin-only positioning that survived v1.4.14: `grep -ri "accept bitcoin\|fiat payment\|pay with" src/` and any `*.md` files. Update or remove.
+- [ ] No newsletter signup, no analytics beyond what's already wired, no third-party form embeds. Keep the page tight.
+
+**Tests**
+- [ ] Page renders with no auth: hero copy is present.
+- [ ] Authenticated request to `/` redirects to the dashboard route (snapshot the redirect target).
+- [ ] Metadata snapshot: `title` and `openGraph.title` contain "SatSend" and "bitcoin".
+- [ ] Manual smoke: open the page in dev, confirm visual hierarchy and CTA functionality.
+
+**Out of scope**
+- Pricing page, blog, docs site, FAQ — none of these exist for v1 launch.
+- A/B testing infrastructure — premature. One landing page, one variant.
+- Analytics integration beyond what's already in the app.
+- Custom illustrations or paid imagery — use simple typography and subtle background treatments. Polish can land in v1.5 with the design-system overhaul.
+
+**Done when:** The unauthenticated root URL renders a purposeful landing page that pitches the product as bitcoin-only invoicing; all metadata, OpenGraph, and README copy reflect the same positioning; authenticated users skip the page; no copy anywhere in the codebase contradicts the bitcoin-only positioning.
+
+---
+
+### ✅ v1.5.0-H — Internal UI kit (`/styleguide`) before the redesign
+
+**Branch:** `v1.5/ui-kit` · package `1.5.0`
+
+Split out of v1.5 (decided 2026-10-08): build a temporary, internal component
+library first so the whole Signal Amber system can be judged on one page before
+any live screen changes. Kit first, apply second: different risks, different review
+styles, and the kit is disposable.
+
+- [x] Signal Amber tokens copied verbatim from the handoff into
+      `src/styles/signal-amber.css`, **scoped** to `[data-theme="signal-amber"]` so
+      the live dark app is untouched; drift test against
+      `satsend-brand-handoff/design-tokens.css`.
+- [x] Onest loaded (next/font) alongside Geist, kit-only for now.
+- [x] Gated route `/styleguide`: 404 unless `SHOW_UI_KIT=1`, `noindex`, unlinked.
+- [x] Primitives in `src/components/signal/` (Button, Field, Card, StatusBadge) and
+      the supplied logo in `src/components/brand/` (handoff copy plus the one
+      decided spacing change, tested).
+- [x] Catalogue: logo, colour, type scale, spacing/radius/elevation, components
+      in all states, product patterns (list, stats, empty, table, payer page),
+      a marketing composition (nav, hero, footer), and a computed contrast audit.
+- [x] Mobile checked at 390px (no overflow; 44px targets).
+
+**Review decisions (2026-10-09, from `manual-tests/v1.5.0-H-ui-kit.md`).** Recorded
+in `src/lib/design/adopted-tokens.ts` + `src/styles/signal-amber.css`; the handoff
+folder stays untouched as the designer's record.
+- **Status text:** AA shades (`--color-*-text`); dots and fills keep the spec colour.
+- **Payment detected → violet** `#8B5CF6` / soft `#F3EFFE` (override of `#6E7CF6`,
+  which read as the same blue as Pending). Matches the brief's "violet".
+- **Pending:** stays "Sent" blue, label "Pending". `archived`: neutral, outlined.
+- **Links:** ink text with an amber underline (spec amber text was 2.35:1).
+- **Hero amber line + input focus border:** `--color-brand-strong` `#BC8925` (3:1).
+- **Input outline:** `--color-border-strong` `#949495` (3:1).
+- **Logo:** `.me` `dx` is `1.5` (handoff `-1.5`), so the d→dot gap equals dot→m.
+- **Fixed:** inputs flashed red on focus (the old base style's red ring colour
+  animated into amber).
+
+**Deletion:** the `src/app/styleguide/` folder is deleted at the end of v1.5.2-H
+(moved from v1.5-H on 2026-10-10)
+(tracked in `OUTSTANDING-VERIFICATIONS.md`). Primitives, tokens, logo and the
+contrast helper are keepers and get promoted.
+
+---
+
+### ✅ v1.5-H — Full Site Redesign, in-app screens (Brand Handoff — "Signal Amber", Option D)
+
+**Branch:** `v1.5/redesign` · package `1.5.2`
+
+> **Design source of truth:** `satsend-brand-handoff/` — read `DESIGN.md` first,
+> then `design-tokens.css` and `agent-implementation-brief.md`. Written tokens and
+> component rules win over any generated reference imagery. The supplied
+> `SatSendLogo.tsx` is the wordmark component to use.
+>
+> **Sequencing:** run this immediately after the hardening train's Phase 0 + Phase
+> 1 are green (tech working), and before the remaining feature queue — so the
+> redesign is only built once. The old "pick a colour scheme" blocker is resolved
+> by this handoff.
+
+**Locked brand decisions**
+- Direction: Option D / Signal Amber.
+- Display/logo font: **Onest**. UI/body font: **Geist Sans**.
+- Primary: `#D89B24`. Canvas: `#FCFBF7`. Text: `#151C2E`.
+- Not green-led. Green = success/Paid; violet (`#8B5CF6`, decided v1.5.0-H) =
+  Payment detected; blue = Sent/Pending;
+  warning orange = Underpaid; red = Overdue.
+- Bitcoin visual explicitness ≈ 2–2.5 / 5.
+
+**Split (decided 2026-10-10).** v1.5 is delivered in three slices so each review
+stays a manageable size: **v1.5-H** in-app screens (this section), **v1.5.1-H**
+emails + PDF, **v1.5.2-H** marketing page. The `/styleguide` kit is deleted at the
+end of v1.5.2-H (not v1.5-H) so it stays available as the reference while emails
+and the marketing page are restyled. The dashboard is **restyled only**; a layout
+rework is out of scope.
+
+**Scope (v1.5-H)**
+- [x] Load Onest + Geist Sans in the root layout; Signal Amber tokens are global
+      (`:root`); the near-black + red `#DE3C4B` palette is retired. shadcn's
+      variables (`--background`, `--primary`, ...) alias the tokens.
+- [x] Light/dark: **decided 2026-10-08 — light-first, retire dark.** The `dark`
+      class is removed from the root layout and every `dark:` class is gone.
+- [x] Promote the v1.5.0-H keepers: Signal Button/Input/Card/StatusBadge replace
+      `src/components/ui/button` + `input` (deleted); dropdown, popover, alert
+      dialog, calendar, checkbox and table restyled in place.
+- [x] `brand-colors.ts` mirrors `signal-amber.css` (drift-tested). The PDF picks up
+      ink text and the AA amber `#926D28` for accents; its layout is v1.5.1-H.
+- [x] App shell: header with the `SatSendLogo` component, loading spinner, error
+      and 404 screens.
+- [x] App icon: the handoff's dark favicon mark, with its "S" converted to the real
+      Onest 800 outline (`scripts/brand/outline-mark.py`) so it renders without
+      the font: `src/app/icon.svg`, `apple-icon.png` (180, full-bleed),
+      `favicon.ico` (16/32/48).
+- [x] Screens, neutral first then amber: login, invoice list + table, invoice
+      form (new/edit), invoice detail (actions, activity), public payer page and
+      access-code gate. Status colours exactly as locked above.
+- [x] Mobile at 390px: no horizontal page scroll; 44px touch targets on phones.
+- [x] Contrast pass on the real screens: all text meets WCAG AA.
+
+**Coordinates with:** Appendix A → A-3 (realtime & styling unification) — its
+styling half lands here, not separately.
+
+**Found, not fixed here:** the invoice form logs a dnd-kit hydration warning
+(`aria-describedby="DndDescribedBy-N"` differs between server and browser). It is
+harmless and predates this branch; the fix is a stable `id` on `DndContext`.
+
+**Done when:** every in-app surface renders in the Signal Amber system, the logo is
+the supplied component, the status-colour mapping is exactly as locked above, and
+an accessibility pass is clean.
