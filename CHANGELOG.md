@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.1 — Address on the wrong bitcoin network gave a misleading error.** With
+  `NEXT_PUBLIC_BTC_NETWORK` on mainnet (or unset), a testnet address passed the
+  format check, mempool.space answered the freshness lookup with HTTP 400 ("Address
+  on invalid network"), and the app showed "Couldn't verify this address is unused
+  right now — the network check failed. Please try again in a moment." on every
+  attempt. Saving and publishing now check the address belongs to the network
+  SatSend runs on (`addressNetworkError` in `src/lib/btc-network.ts`, same mainnet
+  default as `getMempoolBaseUrl`) and say so plainly, before any network call. The
+  form shows the same message instantly. This also stops a mainnet app from
+  publishing an invoice whose payment it could never detect.
+
 ### Added
 
 - **v1.5.1 — Signal Amber redesign of the in-app screens (roadmap v1.5-H).** The

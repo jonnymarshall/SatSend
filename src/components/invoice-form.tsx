@@ -17,6 +17,7 @@ import {
 } from "@/app/(dashboard)/invoices/actions";
 import { PublishMenu } from "@/components/publish-menu";
 import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
+import { addressNetworkError } from "@/lib/btc-network";
 import { invoiceSchema } from "@/lib/invoices/schema";
 import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
@@ -206,6 +207,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     // Rules the schema deliberately omits: address FORMAT, and required-to-publish.
     const btc = form.btc_address.trim();
     if (btc && !isValidBtcAddress(btc)) errs.btc_address = "Invalid BTC address";
+    else if (btc && addressNetworkError(btc)) errs.btc_address = addressNetworkError(btc)!;
     if (isPublish && !btc) errs.btc_address = "BTC address is required to publish";
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
