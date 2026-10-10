@@ -1026,6 +1026,50 @@ an accessibility pass is clean.
 
 ---
 
+### ⏳ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
+
+**Branch:** `fix/realtime-channel-reuse` · package: next patch at merge (`1.5.3` if
+after v1.5-H) · **Do next**, before v1.5.1-H: live updates matter for the full
+payment run-through. Independent of the redesign (realtime code is untouched on
+`v1.5/redesign`); found while testing it, 2026-10-11.
+
+**Symptom.** Opening an invoice detail page in dev throws: ``cannot add
+`postgres_changes` callbacks for realtime:invoice:<id> after `subscribe()` ``
+(`use-invoice-realtime.ts:34` via `use-invoice-channel.ts:85`).
+
+**Cause.** `supabase.channel(name)` (realtime-js 2.103) **returns the existing
+channel** when one with the same topic is still registered. `removeChannel()` is
+async: the old channel stays registered until the server acknowledges the
+unsubscribe. `useInvoiceChannel` creates the new channel without waiting, so any
+quick re-open gets the old, already-subscribed channel back, and `.on()` throws.
+Three ways to hit it:
+1. React Strict Mode mounts effects twice in dev (every detail-page load).
+2. Leaving a page and coming straight back.
+3. **Production too:** `scheduleReconnect()` calls `removeChannel()` without
+   `await`, then `connect()`. After a dropped connection the reconnect throws, the
+   error is swallowed as an unhandled promise rejection, and live updates stop
+   silently (dashboard list, detail page, and the public payer page all use this
+   hook).
+
+**Fix** (all in `src/lib/realtime/use-invoice-channel.ts`):
+- [ ] In `connect()`, before `supabase.channel(name)`, find any registered channel
+      with topic `realtime:${name}` (`supabase.getChannels()`) and
+      `await supabase.removeChannel(...)` it.
+- [ ] In `scheduleReconnect()`, `await` the removal before calling `connect()`.
+- [ ] Wrap `connect()`'s body in try/catch: log and `scheduleReconnect()` instead of
+      leaving an unhandled rejection.
+- [ ] Tests (fake Supabase client): a stale same-topic channel is removed before
+      the new one is set up; a Strict-Mode style mount → unmount → mount does not
+      throw; the reconnect path awaits removal; an error in `connect()` schedules a
+      retry.
+- [ ] Manual: open an invoice detail page in dev (no error overlay); publish or
+      mark paid in another tab and see the detail page update by itself.
+
+**Not in scope:** two components subscribing to the same topic at once would still
+share one channel. Nothing does that today.
+
+---
+
 ### ⏳ v1.5.1-H — Redesign: emails + PDF
 
 **Branch:** `v1.5.1/emails-pdf`
