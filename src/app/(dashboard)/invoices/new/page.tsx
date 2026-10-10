@@ -8,8 +8,8 @@ export default async function NewInvoicePage() {
   if (!user?.email) redirect("/login");
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">New Invoice</h1>
+    <div id="invoice-form-page" className="space-y-6">
+      <h1 id="invoice-form-page--heading" className="font-display tracking-heading text-[28px] leading-tight font-bold md:text-[32px]">New Invoice</h1>
       <InvoiceForm sessionEmail={user.email} />
     </div>
   );

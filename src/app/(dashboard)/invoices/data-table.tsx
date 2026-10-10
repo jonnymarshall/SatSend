@@ -14,8 +14,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/signal/button";
+import { Input } from "@/components/signal/input";
 import {
   Table,
   TableBody,
@@ -281,7 +281,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
   return (
     <div id="invoice-data-table">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 py-4">
+      <div id="invoice-data-table--toolbar" className="flex flex-wrap items-center gap-2 pb-4">
         <Input
           id="invoice-data-table--filter"
           type="search"
@@ -292,7 +292,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
           data-lpignore="true"
           data-form-type="other"
           data-1p-ignore="true"
-          className="max-w-sm"
+          className="w-full sm:max-w-sm"
         />
 
         {/* Bulk actions dropdown */}
@@ -301,7 +301,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
             render={
               <Button
                 id="invoice-data-table--bulk-actions"
-                variant="outline"
+                variant="secondary"
                 disabled={!hasSelection || pending}
               >
                 Bulk actions {hasSelection && `(${selectedIds.length})`}
@@ -313,7 +313,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
             <DropdownMenuItem onClick={handleBulkArchive}>Archive</DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setDeleteTarget(selectedIds)}
-              className="text-destructive focus:text-destructive"
+              variant="destructive"
             >
               Delete
             </DropdownMenuItem>
@@ -332,7 +332,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
 
         <Button
           id="invoice-data-table--archive-toggle"
-          variant="outline"
+          variant="secondary"
           onClick={() => setShowArchived((v) => !v)}
         >
           {showArchived ? "Hide archived" : "Show archived"}
@@ -342,7 +342,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" className="ml-auto">
+              <Button id="invoice-data-table--columns" variant="secondary" className="sm:ml-auto">
                 Columns
               </Button>
             }
@@ -368,13 +368,13 @@ export function InvoiceDataTable({ data, userId }: Props) {
         <div
           id="invoice-data-table--archive-feedback"
           role="status"
-          className="mb-3 flex items-start justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+          className="mb-3 flex items-start justify-between gap-3 rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-4 py-3 text-sm"
         >
           <span>{archiveFeedback}</span>
           <button
             type="button"
             onClick={() => setArchiveFeedback(null)}
-            className="text-muted-foreground hover:text-foreground"
+            className="-my-2 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-(--radius-sm) text-lg text-(--color-text-secondary) hover:bg-(--color-neutral-soft) hover:text-(--color-ink) md:size-8"
             aria-label="Dismiss"
           >
             ×
@@ -383,7 +383,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-md border">
+      <div id="invoice-data-table--frame" className="overflow-hidden rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface)">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -411,7 +411,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-(--color-text-secondary)">
                   No results.
                 </TableCell>
               </TableRow>
@@ -421,23 +421,25 @@ export function InvoiceDataTable({ data, userId }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between py-4">
-        <div className="text-sm text-muted-foreground">
+      <div id="invoice-data-table--footer" className="flex flex-wrap items-center justify-between gap-3 py-4">
+        <div id="invoice-data-table--selection-count" className="text-sm text-(--color-text-secondary)">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {table.getFilteredRowModel().rows.length} invoices selected.
         </div>
-        <div className="space-x-2">
+        <div id="invoice-data-table--pager" className="flex gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
+            className="h-11 md:h-9"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
             Previous
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
+            className="h-11 md:h-9"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
@@ -460,7 +462,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={pending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="danger"
             >
               Delete
             </AlertDialogAction>

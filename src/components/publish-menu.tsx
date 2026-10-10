@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,7 @@ export interface PublishMenuProps {
   onDownloadAndMarkSent: (id: string) => void;
   onPublishOnly: (id: string) => void;
   triggerLabel?: string;
-  triggerVariant?: "default" | "outline";
+  triggerVariant?: "primary" | "secondary";
   busy?: boolean;
 }
 
@@ -36,7 +36,7 @@ export function PublishMenu({
   onDownloadAndMarkSent,
   onPublishOnly,
   triggerLabel,
-  triggerVariant = "default",
+  triggerVariant = "primary",
   busy,
 }: PublishMenuProps) {
   const emailDisabled = !!emailAttemptedAt || !clientEmail;

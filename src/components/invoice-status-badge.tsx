@@ -1,21 +1,11 @@
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:             { label: "Draft",             className: "bg-muted text-muted-foreground" },
-  pending:           { label: "Pending",           className: "bg-yellow-500/15 text-yellow-400" },
-  payment_detected:  { label: "Payment Detected",  className: "bg-blue-500/15 text-blue-400" },
-  paid:              { label: "Paid",              className: "bg-green-500/15 text-green-400" },
-  underpaid:         { label: "Underpaid",         className: "bg-amber-500/15 text-amber-400" },
-  overdue:           { label: "Overdue",           className: "bg-destructive/15 text-destructive" },
-  archived:          { label: "Archived",          className: "bg-muted/50 text-muted-foreground/60" },
-};
+import { STATUS_TONES, StatusBadge, type InvoiceStatus } from "@/components/signal/status-badge";
 
+/**
+ * App-facing status badge. Accepts the raw status string from the database and
+ * renders the Signal Amber StatusBadge (dot + label, semantic colours, v1.5-H).
+ * Unknown values fall back to Draft rather than crashing.
+ */
 export function InvoiceStatusBadge({ status, id }: { status: string; id?: string }) {
-  const { label, className } = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
-  return (
-    <span
-      id={id}
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}
-    >
-      {label}
-    </span>
-  );
+  const known = (status in STATUS_TONES ? status : "draft") as InvoiceStatus;
+  return <StatusBadge status={known} id={id} />;
 }

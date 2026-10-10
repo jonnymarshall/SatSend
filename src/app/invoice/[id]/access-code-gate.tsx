@@ -2,6 +2,10 @@
 
 import { useActionState, useState } from "react";
 import { verifyAccessCode, type AccessCodeState } from "./actions";
+import { SatSendLogo } from "@/components/brand/satsend-logo";
+import { Button } from "@/components/signal/button";
+import { Card } from "@/components/signal/card";
+import { Input } from "@/components/signal/input";
 
 interface Props {
   invoiceId: string;
@@ -15,21 +19,22 @@ export function AccessCodeGate({ invoiceId }: Props) {
   const [code, setCode] = useState("");
 
   return (
-    <main id="access-gate--main" className="flex min-h-screen items-center justify-center p-6">
-      <div id="access-gate--card" className="w-full max-w-sm space-y-6">
-        <div className="space-y-1">
-          <h1 id="access-gate--heading" className="text-xl font-semibold">Enter access code</h1>
-          <p id="access-gate--subheading" className="text-sm text-muted-foreground">
+    <main id="access-gate--main" className="flex min-h-dvh flex-1 flex-col items-center justify-center px-6 py-12">
+      <SatSendLogo id="access-gate--logo" style={{ width: 132 }} className="mb-8" />
+      <Card id="access-gate--card" className="w-full max-w-sm">
+        <div id="access-gate--intro" className="mb-6 space-y-1.5">
+          <h1 id="access-gate--heading" className="font-display tracking-heading text-2xl font-bold">Enter access code</h1>
+          <p id="access-gate--subheading" className="text-[15px] text-(--color-text-secondary)">
             This invoice is protected. Enter the code provided by the sender.
           </p>
         </div>
 
-        <form id="access-gate--form" action={formAction} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="access_code" className="text-sm font-medium">
+        <form id="access-gate--form" action={formAction} className="space-y-5">
+          <div id="access-gate--field" className="flex flex-col gap-2">
+            <label id="access-gate--label" htmlFor="access_code" className="text-sm font-medium">
               Access code
             </label>
-            <input
+            <Input
               id="access_code"
               name="access_code"
               type="text"
@@ -37,23 +42,20 @@ export function AccessCodeGate({ invoiceId }: Props) {
               autoFocus
               value={code}
               onChange={(e) => setCode(e.target.value.toLowerCase().slice(0, 16))}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono tracking-widest shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              aria-invalid={state?.error ? true : undefined}
+              aria-describedby={state?.error ? "access-gate--error" : undefined}
+              className="font-mono tracking-widest"
             />
             {state?.error && (
-              <p id="access-gate--error" className="text-sm text-destructive">{state.error}</p>
+              <p id="access-gate--error" className="text-sm text-(--color-danger-text)">{state.error}</p>
             )}
           </div>
 
-          <button
-            id="access-gate--submit"
-            type="submit"
-            disabled={pending}
-            className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
+          <Button id="access-gate--submit" type="submit" disabled={pending} loading={pending} className="w-full">
             {pending ? "Verifying…" : "Continue"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
     </main>
   );
 }

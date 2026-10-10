@@ -23,8 +23,8 @@ export default async function EditInvoicePage({
   if (invoice.status !== "draft") redirect(`/invoices/${id}`);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Edit Invoice</h1>
+    <div id="invoice-form-page" className="space-y-6">
+      <h1 id="invoice-form-page--heading" className="font-display tracking-heading text-[28px] leading-tight font-bold md:text-[32px]">Edit Invoice</h1>
       <InvoiceForm
         invoiceId={id}
         sessionEmail={user!.email}

@@ -2,27 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Dark mode is retired (v1.5-H, light-first). `dark:` never matches. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  --font-sans: var(--font-geist-sans), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --font-heading: var(--font-onest), "Onest", sans-serif;
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -48,75 +36,33 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Light mode — not a priority for v1, kept minimal */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(0.97 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.56 0.2 22);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.55 0.03 112);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.56 0.2 22);
+  /*
+   * v1.5-H: the shadcn variables are aliases of the Signal Amber tokens
+   * (src/styles/signal-amber.css), so components that still use bg-card,
+   * text-muted-foreground etc. render in the new palette. One palette, light only.
+   * The old near-black + red #DE3C4B `.dark` palette is retired.
+   */
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-brand);
+  --primary-foreground: var(--color-ink);
+  --secondary: var(--color-text-secondary);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-neutral-soft);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--color-neutral-soft);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-danger-text);
+  --border: var(--color-border);
+  --input: var(--color-border-strong);
+  /* Focus rings are amber; the old red ring is what made inputs flash red. */
+  --ring: var(--color-brand-strong);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.56 0.2 22);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.56 0.2 22);
-  --chart-1: oklch(0.56 0.2 22);
-  --chart-2: oklch(0.55 0.03 112);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-}
-
-/* Dark — SatSend brand: #0A0A0A bg, #181818 surface, #DE3C4B accent, #7C7F65 muted */
-.dark {
-  --background: oklch(0.06 0 0);
-  --foreground: oklch(1 0 0);
-  --card: oklch(0.13 0 0);
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.13 0 0);
-  --popover-foreground: oklch(1 0 0);
-  --primary: oklch(0.56 0.2 22);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.55 0.03 112);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.55 0.03 112);
-  --accent: oklch(0.18 0 0);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.56 0.2 22);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.56 0.2 22);
-  --sidebar: oklch(0.13 0 0);
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.56 0.2 22);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.18 0 0);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.56 0.2 22);
-  --chart-1: oklch(0.56 0.2 22);
-  --chart-2: oklch(0.55 0.03 112);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
 }
 
 @layer base {

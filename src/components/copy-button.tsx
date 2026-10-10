@@ -17,11 +17,11 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+      className="-my-2 -mr-2 flex min-h-11 cursor-pointer items-center gap-1.5 rounded-(--radius-sm) px-2 text-sm font-medium text-(--color-text-secondary) transition-colors hover:bg-(--color-neutral-soft) hover:text-(--color-ink) md:min-h-9"
       aria-label={title}
       title={title}
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <Check className="h-4 w-4 text-(--color-success-text)" /> : <Copy className="h-4 w-4" />}
       {copied ? "Copied" : "Copy"}
     </button>
   );

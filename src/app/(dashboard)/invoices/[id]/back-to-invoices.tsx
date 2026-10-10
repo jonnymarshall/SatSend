@@ -29,7 +29,7 @@ export function BackToInvoices() {
       id="invoice-detail--back-link"
       type="button"
       onClick={handleClick}
-      className="text-sm text-muted-foreground hover:text-foreground"
+      className="-mx-2 inline-flex min-h-11 items-center rounded-(--radius-sm) px-2 text-sm font-medium text-(--color-text-secondary) hover:bg-(--color-neutral-soft) hover:text-(--color-ink) md:min-h-9"
     >
       ← Invoices
     </button>

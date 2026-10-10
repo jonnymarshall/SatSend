@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/signal/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +46,7 @@ export function MarkAsMenu({
         render={
           <Button
             id={`mark-as-menu--trigger-${invoiceId}`}
-            variant="outline"
+            variant="secondary"
             disabled={busy}
           >
             Mark as

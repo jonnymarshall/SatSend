@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { buttonVariants } from "@/components/signal/button";
+import { Card } from "@/components/signal/card";
 import { InvoiceDataTable } from "./data-table";
 import type { InvoiceRow } from "./columns";
 
@@ -16,28 +18,35 @@ export default async function InvoicesPage() {
 
   return (
     <div id="invoices-page" className="space-y-6">
-      <div id="invoices-page--header" className="flex items-center justify-between">
-        <h1 id="invoices-page--heading" className="text-2xl font-semibold">Invoices</h1>
+      <div id="invoices-page--header" className="flex items-center justify-between gap-4">
+        <h1 id="invoices-page--heading" className="font-display tracking-heading text-[28px] leading-tight font-bold md:text-[32px]">
+          Invoices
+        </h1>
         <Link
           id="invoices-page--new-invoice-link"
           href="/invoices/new"
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className={buttonVariants()}
         >
           New Invoice
         </Link>
       </div>
 
       {!invoices?.length ? (
-        <div id="invoices-page--empty-state" className="rounded-lg border border-border p-12 text-center">
-          <p className="text-sm text-muted-foreground">No invoices yet</p>
+        <Card id="invoices-page--empty-state" className="px-6 py-14 text-center md:py-16">
+          <h2 id="invoices-page--empty-title" className="font-display tracking-heading text-xl font-semibold">
+            No invoices yet
+          </h2>
+          <p id="invoices-page--empty-body" className="mx-auto mt-2 max-w-sm text-[15px] text-(--color-text-secondary)">
+            Create an invoice, send the link, and get paid in bitcoin.
+          </p>
           <Link
             id="invoices-page--create-first-link"
             href="/invoices/new"
-            className="mt-4 inline-block text-sm text-primary hover:underline"
+            className={buttonVariants({ variant: "secondary", className: "mt-6" })}
           >
             Create your first invoice
           </Link>
-        </div>
+        </Card>
       ) : (
         <Suspense fallback={null}>
           <InvoiceDataTable data={(invoices ?? []) as unknown as InvoiceRow[]} userId={user?.id ?? ""} />
