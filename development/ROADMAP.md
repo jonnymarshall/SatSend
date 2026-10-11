@@ -42,7 +42,7 @@
 ## Shipped so far
 
 Completed work is archived verbatim in [`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.md)
-(the whole v1.0 – v1.4.18 build, plus finished items moved 2026-10-11). Recent
+(the whole v1.0 – v1.4.18 build, plus finished items moved 2026-10-10). Recent
 shipments:
 
 | Version | What | PR | Date |
@@ -106,13 +106,13 @@ shipments:
 > **Absorbed items:** the old `⏳ v1.4.19` (Payment Amount Awareness) is folded
 > into **v1.4.19-H (S2)**, and the old `⏳ v1.4.28` (Cron strategy) is folded into
 > **v1.4.28-H (S3)**. Do NOT do those two separately. Their old sections are in
-> `ROADMAP-ARCHIVE.md` (moved 2026-10-11), kept for their detailed spec only.
+> `ROADMAP-ARCHIVE.md` (moved 2026-10-10), kept for their detailed spec only.
 
 ### Phase 0 — Launch blockers (do in this order)
 
 ✅ **All done** (S0 – S4: v1.4.19-H, v1.4.20-H, v1.4.19.1/.2/.3-H, v1.4.28-H,
 v1.4.21-H, including the 2026-10-06 mainnet smoke test). Their sections are in
-[`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.md) under "Archived 2026-10-11".
+[`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.md) under "Archived 2026-10-10".
 
 ### Phase 1 — Correctness & hygiene (before real volume)
 
@@ -589,10 +589,10 @@ subscribe button ships without its required disclosure.
 ### ⏳ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
 
 **Branch:** `fix/realtime-channel-reuse` · package: next patch at merge (`1.5.3` if
-after v1.5-H) · **Not urgent** (Jonny, 2026-10-11): logged for a future branch.
+after v1.5-H) · **Not urgent** (Jonny, 2026-10-10): logged for a future branch.
 Dev shows an error overlay that can be dismissed; production only loses live
 updates after a dropped connection. Independent of the redesign (realtime code is untouched on
-`v1.5/redesign`); found while testing it, 2026-10-11.
+`v1.5/redesign`); found while testing it, 2026-10-10.
 
 **Symptom.** Opening an invoice detail page in dev throws: ``cannot add
 `postgres_changes` callbacks for realtime:invoice:<id> after `subscribe()` ``
@@ -633,13 +633,13 @@ share one channel. Nothing does that today.
 
 ### ✅ v1.5.0.2-H — Emails land in spam (code side)
 
-**Branch:** `fix/email-delivery` · package `1.5.3` · reported 2026-10-11.
+**Branch:** `fix/email-delivery` · package `1.5.3` · reported 2026-10-10.
 
 **Report.** An invoice emailed to Jonny's personal address "never arrived". It had
 gone to **spam**. The dev log shows Resend accepted every send, so sending works;
 the problem is how inboxes judge the email.
 
-**Found (2026-10-11).**
+**Found (2026-10-10).**
 - Sending domain is `mail.satsend.me`: Resend's DKIM (`resend._domainkey.mail`)
   and SPF/MX on `send.mail.satsend.me` are in place.
 - **No DMARC.** `_dmarc.satsend.me` holds `v=spf1 include:amazonses.com ~all`, an
@@ -668,7 +668,7 @@ record; serve the app on `satsend.me` and point `NEXT_PUBLIC_APP_URL` at it.
 
 ### ✅ v1.5.0.3-H — Production links pointed at localhost
 
-**Branch:** `fix/app-url` · package `1.5.4` · found 2026-10-11 while checking
+**Branch:** `fix/app-url` · package `1.5.4` · found 2026-10-10 while checking
 production settings for the email work.
 
 **Bug.** Production (Vercel) set neither `NEXT_PUBLIC_SITE_URL` nor
@@ -688,68 +688,49 @@ would have got a dead link. It also made the emails look broken to spam filters.
 
 ---
 
-### ⏳ v1.5.0.4-H — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
+### ✅ v1.5.1-H — Redesign: emails + PDF
 
-**Branch:** none needed (a DNS change in Namecheap, done by Jonny) · **Date-gated.**
+**Branch:** `v1.5.5/emails-pdf` · package `1.5.5` (branch named for the package
+version, which the version-sync hook checks).
 
-> **If this item comes up before 2026-11-08: do not do it.** Move this whole
-> section further down the queue (below the next item), keep the date, and carry
-> on with the next item. Only do it on or after the date, and only if the checks
-> below pass.
+- [x] **Emails:** all five (invoice sent; payment detected and confirmed, owner and
+      payer) rebuilt on one Signal Amber frame (`src/lib/email/templates/layout.tsx`):
+      logo, white card on canvas, Onest-style heading, amber button with ink text,
+      ink links with an amber underline, inbox preview text. Wording unchanged.
+- [x] **Status colours in emails:** a semantic pill (Payment detected violet, Paid
+      green, Underpaid orange) from one shared map, `statusColors` in
+      `src/lib/brand-colors.ts`, drift-tested against `signal-amber.css`.
+- [x] **PDF redesigned** (`src/lib/invoices/invoice-pdf.tsx`), matching the payer
+      page: outlined wordmark and invoice number, a "Date Created / Date Due"
+      strip, From / Bill to, a calm line-item table, totals (the only place the
+      amount appears), and a "Pay with Bitcoin" panel (QR, address, the payment
+      link written out, ink with an amber underline). Paid invoices show "Paid in
+      bitcoin" with the transaction instead of payment instructions. No status
+      badge: a PDF is a snapshot and the status would go stale (Jonny's review,
+      2026-10-10). Onest + Geist fonts.
+- [x] **Logo files:** font-independent, outlined wordmarks with the decided `.me`
+      spacing, drawn from Onest's real glyph outlines with HarfBuzz kerning
+      (`scripts/brand/build-brand-assets.py`): `public/brand/satsend-logo*.svg`
+      (default, reversed, monochrome) and `satsend-logo-email.png` for emails
+      (`scripts/brand/raster-logo.mjs`). Verified pixel-for-pixel against the live
+      `SatSendLogo` by overlay. The handoff folder stays untouched.
+- [x] PDF fonts: Google Fonts' static files (Onest 700, Geist 400/500/600, Geist
+      Mono 400) with OFL licences in `src/lib/invoices/fonts/`, shipped to the PDF
+      routes via `outputFileTracingIncludes` in `next.config.ts`.
 
-**Why.** `p=none` (set 2026-10-11) asks inboxes to check SPF/DKIM and *report*
-only; it changes nothing about delivery, but publishing a DMARC record at all
-fixes the "DMARC: FAIL" seen in Gmail's "Show original" and is what Gmail and
-Yahoo expect. `p=quarantine` goes further: it tells inboxes to send any email
-that claims to be from `satsend.me` but fails the checks to spam. That protects
-SatSend's name from being forged in phishing emails (an invoice product is an
-obvious target) and is a stronger trust signal. Switching too early is the risk:
-if any legitimate email fails the checks, quarantine sends *your own* invoices to
-spam. Four weeks of passing results is the safety margin.
-
-**Checks before switching.**
-- [ ] The `p=none` record is live (`dig +short TXT _dmarc.satsend.me` returns
-      `v=DMARC1; p=none`), and has been for at least four weeks.
-- [ ] Gmail "Show original" on a recent invoice email from **production** shows
-      SPF PASS, DKIM PASS, DMARC PASS. Same for one sent from local dev.
-- [ ] Resend dashboard: no unexplained failed or bounced sends.
-- [ ] No other service sends email as `@satsend.me` without being set up for it
-      (it would start landing in spam).
-
-**Then.**
-- [ ] In Namecheap, change the `_dmarc` TXT value to `v=DMARC1; p=quarantine;`
-- [ ] Re-check "Show original" on the next invoice email: DMARC PASS, and it lands
-      in the inbox.
-- [ ] Later and optional: `p=reject` once quarantine has run cleanly for a while.
-
----
-
-### ⏳ v1.5.1-H — Redesign: emails + PDF
-
-**Branch:** `v1.5.1/emails-pdf`
-
-- [ ] Restyle the email templates (`src/lib/email/templates/*`) in Signal Amber;
-      the publish email's button is still red `#DE3C4B`.
-- [ ] **Redesign the invoice PDF**, not just its colours. Jonny's feedback
-      (2026-10-11): "I really don't like how the PDF is looking." Treat it as a
-      full layout redesign in Signal Amber (logo, hierarchy, spacing, totals,
-      payment details, status), matching the public payer page. Colours already
-      follow `brand-colors.ts`.
-- [ ] Apply the semantic status colours in emails and PDF.
-- [ ] Logo files: export font-independent, outlined-path versions of the wordmark
-      (default, reversed, monochrome) with the decided `.me` spacing (dx=1.5),
-      from the Onest outlines (extend `scripts/brand/outline-mark.py`). Emails
-      need a PNG of it (most email apps do not show SVG). The handoff folder stays
-      untouched; the new files live in the app.
+**Note for future PDF work:** PDFs rendered inside Vitest (jsdom) draw every letter
+as a dot and drop images, because react-pdf picks its browser build there. Text
+extraction still works, so the tests are valid, but **judge the look from a PDF
+served by the dev server**, not from a test run.
 
 ---
 
 ### ⏳ v1.5.2-H — Redesign: marketing homepage + logo links home
 
 **Branch:** `v1.5.2/marketing` · absorbs the old **v1.4.23 Marketing Landing Page**
-(superseded, archived 2026-10-11).
+(superseded, archived 2026-10-10).
 
-> **Jonny's brief (2026-10-11):** "I really like how that was mocked up in the
+> **Jonny's brief (2026-10-10):** "I really like how that was mocked up in the
 > styleguide. So I want you to just go ahead and give it your best shot." Build
 > from the kit's marketing composition (nav, hero, footer in
 > `src/app/styleguide/_kit`) without stopping for design approval; show him the
@@ -774,7 +755,7 @@ spam. Four weeks of passing results is the safety margin.
 - [ ] Copy audit for anything contradicting bitcoin-only positioning.
 - [ ] Desktop + 390px, 44px targets, contrast pass (same checks as v1.5-H).
 
-**Logo always links home** (Jonny, 2026-10-11)
+**Logo always links home** (Jonny, 2026-10-10)
 - [ ] The SatSend logo is **always a link to `/`**: the signed-in app header
       (today it goes to `/invoices`, which duplicates the "← Invoices" back
       button), the public payer page and the access-code screen (not clickable
@@ -791,6 +772,42 @@ spam. Four weeks of passing results is the safety margin.
       "Go to app"; no redirect).
 - [ ] Every logo instance is a link to `/` (header, payer page, access gate, login).
 - [ ] Metadata snapshot: `title` and `openGraph.title` contain "SatSend".
+
+---
+
+### ⏳ v1.5.0.4-H — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
+
+**Branch:** none needed (a DNS change in Namecheap, done by Jonny) · **Date-gated.**
+
+> **If this item comes up before 2026-11-08: do not do it.** Move this whole
+> section further down the queue (below the next item), keep the date, and carry
+> on with the next item. Only do it on or after the date, and only if the checks
+> below pass.
+
+**Why.** `p=none` (set 2026-10-10) asks inboxes to check SPF/DKIM and *report*
+only; it changes nothing about delivery, but publishing a DMARC record at all
+fixes the "DMARC: FAIL" seen in Gmail's "Show original" and is what Gmail and
+Yahoo expect. `p=quarantine` goes further: it tells inboxes to send any email
+that claims to be from `satsend.me` but fails the checks to spam. That protects
+SatSend's name from being forged in phishing emails (an invoice product is an
+obvious target) and is a stronger trust signal. Switching too early is the risk:
+if any legitimate email fails the checks, quarantine sends *your own* invoices to
+spam. Four weeks of passing results is the safety margin.
+
+**Checks before switching.**
+- [ ] The `p=none` record is live (`dig +short TXT _dmarc.satsend.me` returns
+      `v=DMARC1; p=none`), and has been for at least four weeks.
+- [ ] Gmail "Show original" on a recent invoice email from **production** shows
+      SPF PASS, DKIM PASS, DMARC PASS. Same for one sent from local dev.
+- [ ] Resend dashboard: no unexplained failed or bounced sends.
+- [ ] No other service sends email as `@satsend.me` without being set up for it
+      (it would start landing in spam).
+
+**Then.**
+- [ ] In Namecheap, change the `_dmarc` TXT value to `v=DMARC1; p=quarantine;`
+- [ ] Re-check "Show original" on the next invoice email: DMARC PASS, and it lands
+      in the inbox.
+- [ ] Later and optional: `p=reject` once quarantine has run cleanly for a while.
 
 ---
 

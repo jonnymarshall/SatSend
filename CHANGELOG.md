@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.5 — Emails and PDF redesigned in Signal Amber (roadmap v1.5.1-H).** All
+  five emails share one frame (`src/lib/email/templates/layout.tsx`): logo, white
+  card on canvas, amber button with ink text, inbox preview text, and a status pill
+  in the semantic colours (shared `statusColors`, drift-tested). The invoice PDF is
+  a full redesign matching the payer page: outlined wordmark, dates, parties, line
+  items, totals and a "Pay with Bitcoin" panel; paid invoices show "Paid in
+  bitcoin" with the transaction. No status badge (a PDF goes stale). New font-independent logo
+  files with the decided `.me` spacing (`public/brand/`, built from Onest outlines
+  by `scripts/brand/build-brand-assets.py`), including a PNG for email. PDF fonts
+  (Onest, Geist, Geist Mono; OFL) ship with the PDF routes.
+
 ### Fixed
 
 - **v1.5.4 — Production links pointed at `localhost` (roadmap v1.5.0.3-H).**

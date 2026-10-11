@@ -1,4 +1,4 @@
-import { Html, Head, Body, Container, Heading, Text, Link, Section, Hr } from "@react-email/components";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, StatusPill, TxidLine } from "./layout";
 
 export interface PaymentConfirmedPayerProps {
   invoiceNumber: string | null;
@@ -24,32 +24,33 @@ export function PaymentConfirmedPayerEmail({
   amountReceivedDisplay,
 }: PaymentConfirmedPayerProps) {
   const label = invoiceNumber ? `invoice ${invoiceNumber}` : "the invoice";
+  const heading = underpaid ? "Your partial payment was received" : "Your payment is confirmed";
   return (
-    <Html>
-      <Head />
-      <Body style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#f6f6f6", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
-          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>
-            {underpaid ? "Your partial payment was received" : "Your payment is confirmed"}
-          </Heading>
-          {underpaid && amountReceivedDisplay ? (
-            <Text>We received <strong>{amountReceivedDisplay}</strong> of the <strong>{totalDisplay}</strong> due to {senderName} for {label} — this does not fully cover the invoice. Please reach out to {senderName} about the remaining balance.</Text>
-          ) : (
-            <Text>Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} is now confirmed on-chain. Thanks!</Text>
-          )}
-          {overpaid && amountReceivedDisplay && (
-            <Text>Your payment overpaid the invoice: {amountReceivedDisplay} sent against a {totalDisplay} total.</Text>
-          )}
-          <Section style={{ margin: "20px 0" }}>
-            <Link href={mempoolUrl}>View transaction on mempool.space</Link>
-          </Section>
-          <Text style={{ fontSize: "12px", color: "#666", wordBreak: "break-all" }}>Txid: {txid}</Text>
-          <Hr />
-          <Section>
-            <Link href={invoiceUrl}>View invoice</Link>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+    <EmailLayout preview={heading}>
+      <StatusPill status={underpaid ? "underpaid" : "paid"} />
+      <EmailHeading>{heading}</EmailHeading>
+      {underpaid && amountReceivedDisplay ? (
+        <EmailText>
+          We received <strong>{amountReceivedDisplay}</strong> of the <strong>{totalDisplay}</strong> due to{" "}
+          {senderName} for {label} — this does not fully cover the invoice. Please reach out to {senderName} about
+          the remaining balance.
+        </EmailText>
+      ) : (
+        <EmailText>
+          Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} is now confirmed on-chain.
+          Thanks!
+        </EmailText>
+      )}
+      {overpaid && amountReceivedDisplay && (
+        <EmailText>
+          Your payment overpaid the invoice: {amountReceivedDisplay} sent against a {totalDisplay} total.
+        </EmailText>
+      )}
+      <EmailButton href={invoiceUrl}>View invoice</EmailButton>
+      <EmailText small>
+        <EmailLink href={mempoolUrl}>View transaction on mempool.space</EmailLink>
+      </EmailText>
+      <TxidLine txid={txid} />
+    </EmailLayout>
   );
 }
