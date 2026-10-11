@@ -701,11 +701,13 @@ version, which the version-sync hook checks).
       green, Underpaid orange) from one shared map, `statusColors` in
       `src/lib/brand-colors.ts`, drift-tested against `signal-amber.css`.
 - [x] **PDF redesigned** (`src/lib/invoices/invoice-pdf.tsx`), matching the payer
-      page: outlined wordmark, invoice number and status pill, an "Amount due /
-      Date Created / Date Due" summary strip, From / Bill to, a calm line-item
-      table, totals, and a "Pay with Bitcoin" panel (QR, address, the payment link
-      written out). Paid invoices say "Amount paid" and show "Paid in bitcoin" with
-      the transaction instead of payment instructions. Onest + Geist fonts.
+      page: outlined wordmark and invoice number, a "Date Created / Date Due"
+      strip, From / Bill to, a calm line-item table, totals (the only place the
+      amount appears), and a "Pay with Bitcoin" panel (QR, address, the payment
+      link written out, ink with an amber underline). Paid invoices show "Paid in
+      bitcoin" with the transaction instead of payment instructions. No status
+      badge: a PDF is a snapshot and the status would go stale (Jonny's review,
+      2026-10-10). Onest + Geist fonts.
 - [x] **Logo files:** font-independent, outlined wordmarks with the decided `.me`
       spacing, drawn from Onest's real glyph outlines with HarfBuzz kerning
       (`scripts/brand/build-brand-assets.py`): `public/brand/satsend-logo*.svg`

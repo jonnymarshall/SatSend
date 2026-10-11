@@ -15,7 +15,7 @@ import {
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import type { Invoice } from "@/lib/invoice-public";
-import { brandColors, statusColors, type StatusColorKey } from "@/lib/brand-colors";
+import { brandColors } from "@/lib/brand-colors";
 import { mempoolTxUrl } from "@/lib/btc-network";
 import { WORDMARK_DOMAIN_PATH, WORDMARK_NAME_PATH, WORDMARK_VIEWBOX } from "@/lib/brand/wordmark-paths";
 
@@ -74,16 +74,6 @@ const styles = StyleSheet.create({
   // searched PDF text ("I NVO I C E").
   eyebrow: { fontSize: 9, fontWeight: 500, color: C.textSecondary },
   invoiceNumber: { fontFamily: "Onest", fontWeight: 700, fontSize: 20, letterSpacing: -0.4, marginTop: 2 },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: 999,
-  },
-  pillDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
-  pillText: { fontSize: 9, fontWeight: 500 },
 
   summary: {
     flexDirection: "row",
@@ -96,9 +86,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.canvas,
   },
   summaryCell: { flex: 1 },
-  summaryAmountCell: { flex: 1.4 },
   label: { fontSize: 8.5, fontWeight: 500, color: C.textSecondary },
-  amountDue: { fontFamily: "Onest", fontWeight: 700, fontSize: 22, letterSpacing: -0.4, marginTop: 3 },
   summaryValue: { fontSize: 11, fontWeight: 500, marginTop: 4 },
 
   parties: { flexDirection: "row", marginTop: 26 },
@@ -129,8 +117,8 @@ const styles = StyleSheet.create({
   colTotal: { flex: 1.3, textAlign: "right" },
   cellStrong: { fontWeight: 500 },
 
-  totals: { alignSelf: "flex-end", width: 230, marginTop: 12 },
-  totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, paddingHorizontal: 10 },
+  totals: { alignSelf: "flex-end", width: 230, marginTop: 12, paddingHorizontal: 10 },
+  totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   totalsMuted: { color: C.textSecondary },
   grandTotal: {
     flexDirection: "row",
@@ -138,7 +126,6 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginTop: 6,
     paddingTop: 8,
-    paddingHorizontal: 10,
     borderTopWidth: 1,
     borderColor: C.ink,
   },
@@ -165,7 +152,10 @@ const styles = StyleSheet.create({
   btcInfo: { flex: 1 },
   btcTitle: { fontFamily: "Onest", fontWeight: 700, fontSize: 13, marginBottom: 8 },
   mono: { fontFamily: "GeistMono", fontSize: 9.5, marginTop: 3, marginBottom: 10 },
-  link: { color: C.ink, textDecoration: "underline", textDecorationColor: C.brand },
+  // Signal Amber link: ink text, amber underline. react-pdf ignores
+  // textDecorationColor, so the underline is an amber bottom border.
+  linkWrap: { alignSelf: "flex-start", borderBottomWidth: 1, borderBottomColor: C.brand, paddingBottom: 1 },
+  link: { color: C.ink, textDecoration: "none" },
   note: { fontSize: 8.5, color: C.textSecondary, marginTop: 8, lineHeight: 1.45 },
 
   footer: {
@@ -181,22 +171,6 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 8, color: C.textSecondary },
 });
-
-function StatusPill({ status }: { status: string }) {
-  const tone = statusColors[(status in statusColors ? status : "pending") as StatusColorKey];
-  return (
-    <View
-      style={[
-        styles.pill,
-        { backgroundColor: tone.fill },
-        status === "archived" ? { borderWidth: 1, borderColor: C.border } : {},
-      ]}
-    >
-      <View style={[styles.pillDot, { backgroundColor: tone.dot }]} />
-      <Text style={[styles.pillText, { color: tone.text }]}>{tone.label}</Text>
-    </View>
-  );
-}
 
 function Wordmark() {
   return (
@@ -227,15 +201,10 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
           <View style={styles.headerRight}>
             <Text style={styles.eyebrow}>Invoice</Text>
             {invoice.invoice_number ? <Text style={styles.invoiceNumber}>{invoice.invoice_number}</Text> : null}
-            <StatusPill status={invoice.status} />
           </View>
         </View>
 
         <View style={styles.summary}>
-          <View style={styles.summaryAmountCell}>
-            <Text style={styles.label}>{isPaid ? "Amount paid" : "Amount due"}</Text>
-            <Text style={styles.amountDue}>{fmtCurrency(invoice.total_fiat, cur)}</Text>
-          </View>
           <View style={styles.summaryCell}>
             <Text style={styles.label}>Date Created</Text>
             <Text style={styles.summaryValue}>{fmtDate(invoice.created_at)}</Text>
@@ -308,9 +277,11 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
               {invoice.btc_txid ? (
                 <>
                   <Text style={styles.label}>Transaction</Text>
-                  <Link src={mempoolTxUrl(invoice.btc_txid)} style={[styles.link, styles.mono, { marginBottom: 0 }]}>
-                    {invoice.btc_txid}
-                  </Link>
+                  <View style={[styles.linkWrap, { marginTop: 3 }]}>
+                    <Link src={mempoolTxUrl(invoice.btc_txid)} style={[styles.link, styles.mono, { marginTop: 0, marginBottom: 0 }]}>
+                      {invoice.btc_txid}
+                    </Link>
+                  </View>
                 </>
               ) : null}
             </View>
@@ -327,9 +298,11 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
               <Text style={styles.label}>Bitcoin address</Text>
               <Text style={styles.mono}>{invoice.btc_address}</Text>
               <Text style={styles.label}>View and pay online</Text>
-              <Link src={publicUrl} style={[styles.link, { marginTop: 3 }]}>
-                {publicUrl}
-              </Link>
+              <View style={[styles.linkWrap, { marginTop: 3 }]}>
+                <Link src={publicUrl} style={styles.link}>
+                  {publicUrl}
+                </Link>
+              </View>
               <Text style={styles.note}>
                 The QR code on this invoice does not encode the amount, because the bitcoin amount is set by the
                 exchange rate when you pay. For the exact amount and a QR code that includes it, use the
@@ -340,9 +313,11 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
         ) : (
           <View style={{ marginTop: 24 }} wrap={false}>
             <Text style={styles.label}>View and pay online</Text>
-            <Link src={publicUrl} style={[styles.link, { marginTop: 3 }]}>
-              {publicUrl}
-            </Link>
+            <View style={[styles.linkWrap, { marginTop: 3 }]}>
+              <Link src={publicUrl} style={styles.link}>
+                {publicUrl}
+              </Link>
+            </View>
           </View>
         )}
 

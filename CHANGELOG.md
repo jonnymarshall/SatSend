@@ -13,9 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five emails share one frame (`src/lib/email/templates/layout.tsx`): logo, white
   card on canvas, amber button with ink text, inbox preview text, and a status pill
   in the semantic colours (shared `statusColors`, drift-tested). The invoice PDF is
-  a full redesign matching the payer page: outlined wordmark, status, an amount and
-  dates summary, parties, line items, totals and a "Pay with Bitcoin" panel; paid
-  invoices show "Paid in bitcoin" with the transaction. New font-independent logo
+  a full redesign matching the payer page: outlined wordmark, dates, parties, line
+  items, totals and a "Pay with Bitcoin" panel; paid invoices show "Paid in
+  bitcoin" with the transaction. No status badge (a PDF goes stale). New font-independent logo
   files with the decided `.me` spacing (`public/brand/`, built from Onest outlines
   by `scripts/brand/build-brand-assets.py`), including a PNG for email. PDF fonts
   (Onest, Geist, Geist Mono; OFL) ship with the PDF routes.
