@@ -1701,7 +1701,7 @@ Acceptable while there are zero real paying users; must be resolved before launc
 
 ---
 
-### ⏳ v1.4.23 — Marketing Landing Page
+### ⏳ v1.4.23 — Marketing Landing Page — SUPERSEDED by v1.5.2-H
 
 **Branch:** `v1.4.23/marketing-landing-page`
 
