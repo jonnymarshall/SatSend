@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **Docs: roadmap housekeeping (no version bump, docs only).** Finished and
+  superseded sections moved verbatim from `development/ROADMAP.md` to
+  `ROADMAP-ARCHIVE.md` (163KB → 135KB). Old v1.4.23 (marketing landing page)
+  folded into v1.5.2-H, which now also covers "the logo always links to `/`" and
+  shows the homepage to signed-in users too. New v1.5.0.2-H: emails accepted by
+  Resend but never arriving. v1.5.1-H now calls for a full PDF redesign.
+
 ### Fixed
 
 - **v1.5.1 — Address on the wrong bitcoin network gave a misleading error.** With
