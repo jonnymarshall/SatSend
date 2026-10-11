@@ -126,3 +126,29 @@ describe("renderInvoicePdf", () => {
     expect(text).not.toContain("api.coingecko.com");
   });
 });
+
+describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
+  it("shows the invoice status as a label", async () => {
+    expect(await textFromPdf(baseInvoice)).toContain("Pending");
+    expect(await textFromPdf({ ...baseInvoice, status: "overdue" })).toContain("Overdue");
+  });
+
+  it("a paid invoice says 'Amount paid', shows the transaction, and drops the payment instructions", async () => {
+    const text = await textFromPdf({ ...baseInvoice, status: "paid", btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" });
+    expect(text).toContain("Amount paid");
+    expect(text).toContain("Paid in bitcoin");
+    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
+  it("an unpaid invoice says 'Amount due'", async () => {
+    const text = await textFromPdf(baseInvoice);
+    expect(text).toContain("Amount due");
+    expect(text).not.toContain("Amount paid");
+  });
+
+  it("keeps the payment link on invoices without a bitcoin address", async () => {
+    const text = await textFromPdf({ ...baseInvoice, btc_address: null }, "https://satsend.app");
+    expect(text).toContain("https://satsend.app/invoice/inv-id-1");
+  });
+});

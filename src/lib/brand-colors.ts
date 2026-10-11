@@ -23,3 +23,20 @@ export const brandColors = {
 } as const;
 
 export type BrandColor = keyof typeof brandColors;
+
+/**
+ * Semantic status colours for emails and the PDF (v1.5.5), mirroring
+ * signal-amber.css: `fill` = --color-*-soft, `dot` = --color-*, `text` = the AA
+ * --color-*-text shade. Same mapping as the in-app StatusBadge.
+ */
+export const statusColors = {
+  draft: { label: "Draft", fill: "#F0F1F3", dot: "#7A8190", text: "#676E7D" },
+  pending: { label: "Pending", fill: "#EAF0FF", dot: "#4776E6", text: "#3F68C9" },
+  payment_detected: { label: "Payment detected", fill: "#F3EFFE", dot: "#8B5CF6", text: "#7B53DB" },
+  paid: { label: "Paid", fill: "#E7F6F0", dot: "#2F9A74", text: "#297C63" },
+  underpaid: { label: "Underpaid", fill: "#FFF2DD", dot: "#F0A43B", text: "#906835" },
+  overdue: { label: "Overdue", fill: "#FCE8E8", dot: "#D95F5F", text: "#AA4F53" },
+  archived: { label: "Archived", fill: "#FFFFFF", dot: "#7A8190", text: "#676E7D" },
+} as const;
+
+export type StatusColorKey = keyof typeof statusColors;

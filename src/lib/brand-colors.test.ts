@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { brandColors, type BrandColor } from "./brand-colors";
+import { brandColors, statusColors, type BrandColor } from "./brand-colors";
 
 // Drift guard between the Signal Amber tokens in src/styles/signal-amber.css (the
 // source of truth since v1.5-H) and the hex mirror in brand-colors.ts that the PDF
@@ -34,5 +34,23 @@ describe("brand colours stay in lockstep with signal-amber.css", () => {
 
   it("the old red accent is gone", () => {
     expect(Object.values(brandColors).map((c) => c.toUpperCase())).not.toContain("#D02A3A");
+  });
+});
+
+describe("status colours (emails + PDF) stay in lockstep with signal-amber.css (v1.5.5)", () => {
+  const TOKEN: Record<string, string> = {
+    draft: "neutral",
+    pending: "sent",
+    payment_detected: "detected",
+    paid: "success",
+    underpaid: "warning",
+    overdue: "danger",
+    archived: "neutral",
+  };
+  it.each(Object.entries(statusColors))("%s matches its tokens", (key, c) => {
+    const t = TOKEN[key];
+    if (key !== "archived") expect(c.fill.toUpperCase()).toBe(TOKENS.get(`--color-${t}-soft`));
+    expect(c.dot.toUpperCase()).toBe(TOKENS.get(`--color-${t}`));
+    expect(c.text.toUpperCase()).toBe(TOKENS.get(`--color-${t}-text`));
   });
 });
