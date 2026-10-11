@@ -34,6 +34,9 @@ export function InvoicePublishedEmail({
               View and pay
             </Link>
           </Section>
+          <Text style={{ fontSize: "13px", color: "#555" }}>
+            Or open this link: <Link href={invoiceUrl}>{invoiceUrl}</Link>
+          </Text>
           {accessCode ? (
             <>
               <Hr />

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.3 — Emails more likely to reach the inbox (roadmap v1.5.0.2-H).** A test
+  invoice email landed in spam. Every email now includes a plain-text version
+  alongside the HTML (`message()` in `src/lib/email/send.ts`); client-facing
+  emails set Reply-To to the invoice owner (`your_email`) so replies reach the
+  freelancer; the invoice email shows its link as visible text as well as the
+  button. The rest is domain configuration, tracked in
+  `development/OUTSTANDING-VERIFICATIONS.md`: a missing DMARC record, and email
+  links pointing at a different domain from the sender.
+
 ### Changed
 
 - **Docs: roadmap housekeeping (no version bump, docs only).** Finished and

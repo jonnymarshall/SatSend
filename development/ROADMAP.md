@@ -631,47 +631,38 @@ share one channel. Nothing does that today.
 
 ---
 
-### ⏳ v1.5.0.2-H — Emails accepted by Resend but never arrive
+### ✅ v1.5.0.2-H — Emails land in spam (code side)
 
-**Branch:** `fix/email-delivery` · **Priority: high** (reported 2026-10-11). Do
-before v1.5.1-H restyles the emails, so the restyle can be checked in a real inbox.
+**Branch:** `fix/email-delivery` · package `1.5.3` · reported 2026-10-11.
 
-**Report.** Jonny published an invoice with "Send now via email" to his personal
-address as the client. Nothing arrived, and no copy came to him as the sender.
+**Report.** An invoice emailed to Jonny's personal address "never arrived". It had
+gone to **spam**. The dev log shows Resend accepted every send, so sending works;
+the problem is how inboxes judge the email.
 
-**What is known (2026-10-11).**
-- The app **did** send. The local dev log shows Resend accepted every attempt:
-  `[email] invoice_published sent` (00:29:50), plus `payment_detected sent` and
-  `payment_confirmed sent` from an earlier test payment. "sent" means Resend's API
-  returned success, so the API key and sender were accepted.
-- So the loss is **after** Resend accepted it: spam/junk, a bounce, or Resend
-  suppressing the address (it silently drops sends to addresses that bounced or
-  complained before).
-- Locally the app cannot learn about bounces: Resend's delivery webhook
-  (v1.4.18) cannot reach `localhost`, so `email_events` stays "sent" even when the
-  email bounced. The activity card therefore shows a success it cannot verify.
-- No email to the sender on publish is **expected** today: that is v1.4.27
-  (Owner Notification), still queued. The owner does get the payment detected /
-  confirmed emails.
+**Found (2026-10-11).**
+- Sending domain is `mail.satsend.me`: Resend's DKIM (`resend._domainkey.mail`)
+  and SPF/MX on `send.mail.satsend.me` are in place.
+- **No DMARC.** `_dmarc.satsend.me` holds `v=spf1 include:amazonses.com ~all`, an
+  SPF string put on the DMARC name by mistake, so there is no DMARC policy. Gmail
+  and Yahoo weigh this heavily.
+- **Links don't match the sender.** Emails come from `mail.satsend.me` but link to
+  `satsendofficial.vercel.app` in production (`localhost:3000` in dev), and
+  `satsend.me` serves no website. Link domains that differ from the sender (and
+  shared-hosting domains) are a classic phishing signal, more so on "view and pay"
+  invoice emails.
+- New domain with no sending reputation yet; invoice + payment + bitcoin wording.
+- No email to the sender on publish is expected: that is v1.4.27 (queued).
 
-**Steps.**
-- [ ] Jonny checks the Resend dashboard → Emails for the 2026-10-11 00:29 send:
-      Delivered / Bounced / Suppressed / Complained, and the reason. Also the spam
-      folder. This decides the fix.
-- [ ] Check the sender domain in Resend → Domains: verified, with SPF, DKIM and
-      DMARC records passing. An unverified or partly set-up domain lands in spam.
-- [ ] Check `EMAIL_FROM` matches the verified domain (falls back to
-      `onboarding@resend.dev`, which only delivers to the Resend account owner).
-- [ ] Emails sent from dev contain `http://localhost:3000` links (`getAppUrl`).
-      Some spam filters penalise that; test once with `NEXT_PUBLIC_APP_URL` set to
-      the real site.
-- [ ] If the address is suppressed in Resend, remove it from the suppression list.
-- [ ] Fix whatever the dashboard shows; add a test for any code change. If it is
-      purely configuration, add the check to the `deploy-checklist` skill so
-      production is verified too.
-- [ ] Make the dev experience honest: when the webhook cannot reach the app
-      (local dev), the activity card says "accepted by Resend" rather than implying
-      delivery.
+**Done (code).**
+- [x] Every email carries a plain-text version alongside the HTML.
+- [x] Client-facing emails (invoice, payer payment detected/confirmed) set
+      Reply-To to the invoice owner, so replies reach the freelancer.
+- [x] The invoice email shows its link as visible text, not only behind a button.
+- [x] The activity card already says "awaiting delivery" until Resend's webhook
+      confirms delivery; no change needed.
+
+**Owner actions** (tracked in `OUTSTANDING-VERIFICATIONS.md`): fix the DMARC
+record; serve the app on `satsend.me` and point `NEXT_PUBLIC_APP_URL` at it.
 
 ---
 

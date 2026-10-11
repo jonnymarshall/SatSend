@@ -497,6 +497,8 @@ describe("publishAndSendEmail", () => {
     expect(sendInvoicePublishedEmail).toHaveBeenCalledTimes(1);
     expect(sendInvoicePublishedEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "client@example.com",
+      // v1.5.0.2-H: the client's replies go to the invoice owner.
+      replyTo: "charles@example.com",
       userId: "user-1",
       senderName: "Charles",
       clientName: "Ada",
