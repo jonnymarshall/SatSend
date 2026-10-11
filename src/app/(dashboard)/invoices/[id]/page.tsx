@@ -12,6 +12,7 @@ import { BackToInvoices } from "./back-to-invoices";
 import type { LineItem } from "@/lib/invoices";
 import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
+import { getAppUrl } from "@/lib/app-url";
 
 export default async function InvoiceDetailPage({
   params,
@@ -32,7 +33,7 @@ export default async function InvoiceDetailPage({
   if (!invoice) notFound();
 
   const items: LineItem[] = toInvoice(invoice).line_items;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const shareLink = `${appUrl}/invoice/${invoice.id}`;
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";

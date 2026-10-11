@@ -666,6 +666,64 @@ record; serve the app on `satsend.me` and point `NEXT_PUBLIC_APP_URL` at it.
 
 ---
 
+### ✅ v1.5.0.3-H — Production links pointed at localhost
+
+**Branch:** `fix/app-url` · package `1.5.4` · found 2026-10-11 while checking
+production settings for the email work.
+
+**Bug.** Production (Vercel) set neither `NEXT_PUBLIC_SITE_URL` nor
+`NEXT_PUBLIC_APP_URL`, so the app's fallback `http://localhost:3000` was used for:
+the "View and pay" link in client emails, every other email link, the "Share with
+client" link on the invoice page, and the link printed on PDFs. A real client
+would have got a dead link. It also made the emails look broken to spam filters.
+
+**Fix.**
+- [x] One `getAppUrl()` (`src/lib/app-url.ts`) for emails, PDFs and the share
+      link. After the two explicit settings it uses Vercel's own
+      `VERCEL_PROJECT_PRODUCTION_URL` on production deploys (the project's custom
+      domain, or its vercel.app domain if none), `VERCEL_URL` on previews, and
+      localhost only off Vercel.
+- [x] Once `satsend.me` is connected in Vercel, links switch to it automatically;
+      no setting needed.
+
+---
+
+### ⏳ v1.5.0.4-H — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
+
+**Branch:** none needed (a DNS change in Namecheap, done by Jonny) · **Date-gated.**
+
+> **If this item comes up before 2026-11-08: do not do it.** Move this whole
+> section further down the queue (below the next item), keep the date, and carry
+> on with the next item. Only do it on or after the date, and only if the checks
+> below pass.
+
+**Why.** `p=none` (set 2026-10-11) asks inboxes to check SPF/DKIM and *report*
+only; it changes nothing about delivery, but publishing a DMARC record at all
+fixes the "DMARC: FAIL" seen in Gmail's "Show original" and is what Gmail and
+Yahoo expect. `p=quarantine` goes further: it tells inboxes to send any email
+that claims to be from `satsend.me` but fails the checks to spam. That protects
+SatSend's name from being forged in phishing emails (an invoice product is an
+obvious target) and is a stronger trust signal. Switching too early is the risk:
+if any legitimate email fails the checks, quarantine sends *your own* invoices to
+spam. Four weeks of passing results is the safety margin.
+
+**Checks before switching.**
+- [ ] The `p=none` record is live (`dig +short TXT _dmarc.satsend.me` returns
+      `v=DMARC1; p=none`), and has been for at least four weeks.
+- [ ] Gmail "Show original" on a recent invoice email from **production** shows
+      SPF PASS, DKIM PASS, DMARC PASS. Same for one sent from local dev.
+- [ ] Resend dashboard: no unexplained failed or bounced sends.
+- [ ] No other service sends email as `@satsend.me` without being set up for it
+      (it would start landing in spam).
+
+**Then.**
+- [ ] In Namecheap, change the `_dmarc` TXT value to `v=DMARC1; p=quarantine;`
+- [ ] Re-check "Show original" on the next invoice email: DMARC PASS, and it lands
+      in the inbox.
+- [ ] Later and optional: `p=reject` once quarantine has run cleanly for a while.
+
+---
+
 ### ⏳ v1.5.1-H — Redesign: emails + PDF
 
 **Branch:** `v1.5.1/emails-pdf`

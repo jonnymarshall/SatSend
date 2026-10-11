@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.4 — Production links pointed at `localhost` (roadmap v1.5.0.3-H).**
+  Production set neither `NEXT_PUBLIC_SITE_URL` nor `NEXT_PUBLIC_APP_URL`, so email
+  links, the invoice page's share link and the PDF link all fell back to
+  `http://localhost:3000`. One `getAppUrl()` (`src/lib/app-url.ts`) now serves all
+  of them and, with nothing configured, uses Vercel's production domain
+  (`VERCEL_PROJECT_PRODUCTION_URL`) on production and `VERCEL_URL` on previews.
+  Roadmap: dated item v1.5.0.4-H to tighten DMARC to `p=quarantine`.
+
+### Fixed
+
 - **v1.5.3 — Emails more likely to reach the inbox (roadmap v1.5.0.2-H).** A test
   invoice email landed in spam. Every email now includes a plain-text version
   alongside the HTML (`message()` in `src/lib/email/send.ts`); client-facing

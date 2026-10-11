@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { fetchPublicInvoice } from "@/lib/invoice-public";
 import { renderInvoicePdf } from "@/lib/invoices/invoice-pdf";
 import { buildPdfFilename } from "@/lib/invoices/pdf-filename";
-import { getAppUrl } from "@/lib/email/client";
+import { getAppUrl } from "@/lib/app-url";
 import { isAccessCodeValid, accessCookieName } from "@/lib/access-code";
 
 export async function GET(
