@@ -6,6 +6,8 @@ import { PaymentDetectedPayerEmail } from "./templates/payment-detected-payer";
 import { PaymentConfirmedOwnerEmail } from "./templates/payment-confirmed-owner";
 import { PaymentConfirmedPayerEmail } from "./templates/payment-confirmed-payer";
 import { mempoolTxUrl } from "@/lib/btc-network";
+import { render } from "@react-email/render";
+import type { ReactElement } from "react";
 
 export type EmailType =
   | "invoice_published"
@@ -142,6 +144,28 @@ async function safeSend(
   }
 }
 
+/**
+ * Build a Resend payload (v1.5.0.2-H, deliverability): the HTML from the React
+ * template plus a plain-text version of the same email, which spam filters
+ * expect, and an optional Reply-To. Client-facing emails reply to the invoice
+ * owner, so a client's reply reaches the freelancer instead of SatSend's sender.
+ */
+async function message(m: {
+  to: string;
+  subject: string;
+  react: ReactElement;
+  replyTo?: string | null;
+}) {
+  return {
+    from: getFromAddress(),
+    to: m.to,
+    subject: m.subject,
+    react: m.react,
+    text: await render(m.react, { plainText: true }),
+    ...(m.replyTo ? { replyTo: m.replyTo } : {}),
+  };
+}
+
 export interface SendInvoicePublishedArgs {
   to: string;
   userId: string;
@@ -153,6 +177,8 @@ export interface SendInvoicePublishedArgs {
   currency: string;
   accessCode: string | null;
   dueDateDisplay: string | null;
+  /** The invoice owner's email; the client's replies go here. */
+  replyTo?: string | null;
 }
 
 export async function sendInvoicePublishedEmail(args: SendInvoicePublishedArgs): Promise<EmailOutcome> {
@@ -165,9 +191,9 @@ export async function sendInvoicePublishedEmail(args: SendInvoicePublishedArgs):
     },
     async () => {
       const resend = getResend()!;
-      return await resend.emails.send({
-        from: getFromAddress(),
+      return await resend.emails.send(await message({
         to: args.to,
+        replyTo: args.replyTo,
         subject: args.invoiceNumber
           ? `Invoice ${args.invoiceNumber} from ${args.senderName}`
           : `New invoice from ${args.senderName}`,
@@ -180,7 +206,7 @@ export async function sendInvoicePublishedEmail(args: SendInvoicePublishedArgs):
           accessCode: args.accessCode,
           dueDateDisplay: args.dueDateDisplay,
         }),
-      });
+      }));
     },
   );
 }
@@ -218,8 +244,7 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
     },
     async () => {
       const resend = getResend()!;
-      return await resend.emails.send({
-        from: getFromAddress(),
+      return await resend.emails.send(await message({
         to: args.ownerEmail,
         subject: args.invoiceNumber
           ? `Your client paid invoice ${args.invoiceNumber}`
@@ -232,7 +257,7 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
           mempoolUrl,
           dashboardUrl: `${getAppUrl()}/invoices/${args.invoiceId}`,
         }),
-      });
+      }));
     },
   );
 
@@ -247,9 +272,9 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
     },
     async () => {
       const resend = getResend()!;
-      return await resend.emails.send({
-        from: getFromAddress(),
+      return await resend.emails.send(await message({
         to: args.payerEmail!,
+        replyTo: args.ownerEmail,
         subject: args.invoiceNumber
           ? `Your payment for invoice ${args.invoiceNumber} has been detected`
           : "Your payment has been detected",
@@ -261,7 +286,7 @@ export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Pro
           mempoolUrl,
           invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
         }),
-      });
+      }));
     },
   );
 }
@@ -283,8 +308,7 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
     },
     async () => {
       const resend = getResend()!;
-      return await resend.emails.send({
-        from: getFromAddress(),
+      return await resend.emails.send(await message({
         to: args.ownerEmail,
         subject: underpaid
           ? args.invoiceNumber
@@ -304,7 +328,7 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
           overpaid,
           amountReceivedDisplay,
         }),
-      });
+      }));
     },
   );
 
@@ -319,9 +343,9 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
     },
     async () => {
       const resend = getResend()!;
-      return await resend.emails.send({
-        from: getFromAddress(),
+      return await resend.emails.send(await message({
         to: args.payerEmail!,
+        replyTo: args.ownerEmail,
         subject: underpaid
           ? args.invoiceNumber
             ? `Your partial payment for invoice ${args.invoiceNumber} was received`
@@ -340,7 +364,7 @@ export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Pr
           overpaid,
           amountReceivedDisplay,
         }),
-      });
+      }));
     },
   );
 }

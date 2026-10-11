@@ -327,3 +327,60 @@ describe("sendPaymentConfirmedEmail", () => {
     expect(ownerCall![0].subject).not.toMatch(/partial payment/i);
   });
 });
+
+describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
+  const paymentArgs = {
+    ownerEmail: "owner@example.com",
+    payerEmail: "payer@example.com",
+    userId: "user-1",
+    invoiceId: "inv-1",
+    invoiceNumber: "INV-1",
+    senderName: "Charles",
+    clientName: "Ada",
+    totalFiat: 500,
+    currency: "USD",
+    txid: "tx-abc",
+  };
+
+  it("every email carries a plain-text version alongside the HTML", async () => {
+    await sendInvoicePublishedEmail({ ...baseArgs, replyTo: "charles@example.com" });
+    await sendPaymentDetectedEmail(paymentArgs);
+    await sendPaymentConfirmedEmail(paymentArgs);
+    expect(mockResendSend).toHaveBeenCalledTimes(5);
+    for (const [payload] of mockResendSend.mock.calls) {
+      expect(typeof payload.text).toBe("string");
+      expect(payload.text.length).toBeGreaterThan(40);
+      expect(payload.text).not.toMatch(/<[a-z]/i);
+    }
+  });
+
+  it("the invoice email's plain text includes the invoice link, written out", async () => {
+    await sendInvoicePublishedEmail(baseArgs);
+    expect(mockResendSend.mock.calls[0][0].text).toContain("https://app.test/invoice/inv-1");
+  });
+
+  it("the invoice email shows the invoice link as visible text, not only behind the button", async () => {
+    const { render } = await import("@react-email/render");
+    await sendInvoicePublishedEmail(baseArgs);
+    const html = await render(mockResendSend.mock.calls[0][0].react as React.ReactElement);
+    expect(html).toMatch(/>\s*https:\/\/app\.test\/invoice\/inv-1\s*</);
+  });
+
+  it("client emails reply to the invoice owner, so replies reach the freelancer", async () => {
+    await sendInvoicePublishedEmail({ ...baseArgs, replyTo: "charles@example.com" });
+    expect(mockResendSend.mock.calls[0][0].replyTo).toBe("charles@example.com");
+
+    mockResendSend.mockClear();
+    await sendPaymentDetectedEmail(paymentArgs);
+    await sendPaymentConfirmedEmail(paymentArgs);
+    for (const [payload] of mockResendSend.mock.calls) {
+      if (payload.to === "payer@example.com") expect(payload.replyTo).toBe("owner@example.com");
+      else expect(payload.replyTo).toBeUndefined();
+    }
+  });
+
+  it("sets no Reply-To on the invoice email when the owner's address is unknown", async () => {
+    await sendInvoicePublishedEmail({ ...baseArgs, replyTo: null });
+    expect(mockResendSend.mock.calls[0][0]).not.toHaveProperty("replyTo");
+  });
+});
