@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { renderInvoicePdf } from "@/lib/invoices/invoice-pdf";
 import { buildPdfFilename } from "@/lib/invoices/pdf-filename";
-import { getAppUrl } from "@/lib/email/client";
+import { getAppUrl } from "@/lib/app-url";
 import { toInvoice } from "@/lib/invoice-public";
 
 export async function GET(

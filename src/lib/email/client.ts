@@ -14,10 +14,6 @@ export function getFromAddress(): string {
   return process.env.EMAIL_FROM || "SatSend <onboarding@resend.dev>";
 }
 
-export function getAppUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "http://localhost:3000"
-  );
-}
+// Kept here so email code and its tests keep one import; the logic lives in
+// src/lib/app-url.ts (fix/app-url, v1.5.4).
+export { getAppUrl } from "@/lib/app-url";
