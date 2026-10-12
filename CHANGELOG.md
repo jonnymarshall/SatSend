@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.7 — Wider email column (roadmap v1.5.1.2-H).** The email frame is 720px
+  wide (was 600px) with 28px card padding, so a full txid fits on one line on
+  desktop. Roadmap: new item v1.5.1.3-H for Signal Amber sign-in emails (confirm
+  signup, magic link), queued before the marketing homepage.
+
 - **v1.5.6 — App polish from the v1.5.5 test round (roadmap v1.5.1.1-H).** The
   SatSend logo links to `/` everywhere (app header, payer page, access-code screen,
   login) via one `LogoHomeLink` component; enabled buttons show the hand cursor

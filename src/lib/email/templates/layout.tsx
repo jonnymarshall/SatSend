@@ -48,7 +48,8 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
       <Head />
       <Preview>{preview}</Preview>
       <Body style={{ backgroundColor: EMAIL.canvas, margin: 0, padding: "24px 6px" }}>
-        <Container style={{ maxWidth: "600px", margin: "0 auto" }}>
+        {/* Wide enough that a 64-character txid fits on one line (Jonny, v1.5.7). */}
+        <Container style={{ maxWidth: "720px", margin: "0 auto" }}>
           <Section style={{ padding: "0 4px 20px" }}>
             <Link href={appUrl}>
               <Img
@@ -65,7 +66,7 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
               backgroundColor: EMAIL.surface,
               border: `1px solid ${EMAIL.border}`,
               borderRadius: "16px",
-              padding: "28px 18px",
+              padding: "32px 28px",
             }}
           >
             {children}

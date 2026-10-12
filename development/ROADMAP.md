@@ -747,6 +747,55 @@ branch (separate concerns).
 
 ---
 
+### ✅ v1.5.1.2-H — Wider email column
+
+**Branch:** `v1.5.7/email-layout` · package `1.5.7`.
+
+- [x] Email column 600px → 720px and the card's side padding back to 28px, so a
+      64-character txid fits on one line on desktop instead of wrapping inside a
+      narrow "pillar" (Jonny, 2026-10-12, from a Gmail screenshot). On phones the
+      txid still wraps; nothing that long fits a phone screen.
+
+---
+
+### ⏳ v1.5.1.3-H — Sign-in emails in Signal Amber (confirm signup, magic link)
+
+**Branch:** `v<next package version>/auth-emails`.
+
+**Context (Jonny, 2026-10-12):** the "Confirm your signup" email still uses
+Supabase's plain default. Login is passwordless (`signInWithOtp` in
+`src/app/(auth)/login/page.tsx`), so a new user gets **Confirm signup** and a
+returning user gets **Magic link**. These are the first emails anyone sees from
+SatSend, so they come before the marketing homepage. Supabase sends them, not our
+code, so the templates live in Supabase's settings, not in `src/lib/email`.
+
+- [ ] **One design source:** render the two templates from the same React Email
+      frame (`src/lib/email/templates/layout.tsx`) by a script (e.g.
+      `scripts/email/build-auth-templates.tsx`), with Supabase's placeholders
+      (`{{ .ConfirmationURL }}`) left in, writing `supabase/templates/confirmation.html`
+      and `magic_link.html`. Committed, so the look can't drift from our other
+      emails. Logo from `https://satsend.me/brand/satsend-logo-email.png`.
+- [ ] Copy: heading, one sentence, amber button ("Confirm your email" / "Sign in
+      to SatSend"), the link written out, "If you didn't ask for this, ignore this
+      email." Subjects: "Confirm your SatSend account", "Your SatSend sign-in link".
+- [ ] `supabase/config.toml`: `[auth.email.template.confirmation]` and
+      `[auth.email.template.magic_link]` pointing at the files (local dev).
+- [ ] **Apply to the hosted projects** (test SatSend-dev, then production SatSend):
+      Auth → Email Templates, or the Management API (needs a personal access
+      token from Jonny). Record in `OUTSTANDING-VERIFICATIONS.md`.
+- [ ] **Check who sends them.** Supabase's built-in mailer is rate-limited and
+      meant for testing; it sends from a Supabase address, which hurts trust and
+      spam scoring. If production still uses it, switch Auth → SMTP to Resend
+      (`smtp.resend.com`, sender `SatSend <…@mail.satsend.me>`, so DKIM/SPF/DMARC
+      match the invoice emails). Jonny's dashboard step; Claude writes the values.
+- [ ] Tests: the build script output contains `{{ .ConfirmationURL }}`, the logo
+      URL and no `localhost`; a drift test that the committed HTML equals a fresh
+      build.
+- [ ] Manual: sign up with a new address and sign in with an existing one, on
+      `satsend.me`; check Gmail inbox (not spam) and "Show original" (DMARC PASS).
+
+---
+
 ### ⏳ v1.5.2-H — Redesign: marketing homepage
 
 **Branch:** `v<next package version>/marketing` (the version-sync hook wants the
