@@ -21,6 +21,16 @@ export const EMAIL = {
   mono: "'Geist Mono', ui-monospace, Menlo, Consolas, monospace",
 } as const;
 
+/**
+ * Where the email loads the logo from. Email apps (and Gmail's image proxy)
+ * cannot reach localhost, so emails sent from local dev borrow the live site's
+ * copy of the same file.
+ */
+export function emailLogoUrl(appUrl: string = getAppUrl()): string {
+  const base = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(appUrl) ? "https://satsend.me" : appUrl;
+  return `${base}/brand/satsend-logo-email.png`;
+}
+
 export type EmailStatus = "pending" | "payment_detected" | "paid" | "underpaid";
 
 const text: CSSProperties = {
@@ -37,12 +47,12 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
     <Html lang="en">
       <Head />
       <Preview>{preview}</Preview>
-      <Body style={{ backgroundColor: EMAIL.canvas, margin: 0, padding: "32px 12px" }}>
-        <Container style={{ maxWidth: "560px", margin: "0 auto" }}>
+      <Body style={{ backgroundColor: EMAIL.canvas, margin: 0, padding: "24px 6px" }}>
+        <Container style={{ maxWidth: "600px", margin: "0 auto" }}>
           <Section style={{ padding: "0 4px 20px" }}>
             <Link href={appUrl}>
               <Img
-                src={`${appUrl}/brand/satsend-logo-email.png`}
+                src={emailLogoUrl(appUrl)}
                 width="132"
                 height="38"
                 alt="SatSend"
@@ -55,7 +65,7 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
               backgroundColor: EMAIL.surface,
               border: `1px solid ${EMAIL.border}`,
               borderRadius: "16px",
-              padding: "32px 28px",
+              padding: "28px 18px",
             }}
           >
             {children}

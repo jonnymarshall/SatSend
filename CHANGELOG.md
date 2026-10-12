@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the semantic colours (shared `statusColors`, drift-tested). The invoice PDF is
   a full redesign matching the payer page: outlined wordmark, dates, parties, line
   items, totals and a "Pay with Bitcoin" panel; paid invoices show "Paid in
-  bitcoin" with the transaction. No status badge (a PDF goes stale). New font-independent logo
+  bitcoin" with the transaction ("Paid in bitcoin (unconfirmed)" while a payment
+  is detected), and every PDF links to the invoice on SatSend. No status badge (a
+  PDF goes stale). Emails sent from local dev load the logo from the live site. New font-independent logo
   files with the decided `.me` spacing (`public/brand/`, built from Onest outlines
   by `scripts/brand/build-brand-assets.py`), including a PNG for email. PDF fonts
   (Onest, Geist, Geist Mono; OFL) ship with the PDF routes.

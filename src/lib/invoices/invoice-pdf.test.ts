@@ -147,6 +147,24 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     expect(text).not.toContain("does not encode the amount");
   });
 
+  it("a payment-detected invoice shows the paid panel marked unconfirmed, with the transaction", async () => {
+    const text = await textFromPdf({
+      ...baseInvoice,
+      status: "payment_detected",
+      btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6",
+    });
+    expect(text).toContain("Paid in bitcoin (unconfirmed)");
+    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
+  it("every PDF links to the invoice on SatSend", async () => {
+    for (const status of ["pending", "payment_detected", "paid"] as const) {
+      const text = await textFromPdf({ ...baseInvoice, status, btc_txid: "abc" });
+      expect(text).toContain("View invoice on SatSend");
+    }
+  });
+
   it("keeps the payment link on invoices without a bitcoin address", async () => {
     const text = await textFromPdf({ ...baseInvoice, btc_address: null }, "https://satsend.app");
     expect(text).toContain("https://satsend.app/invoice/inv-id-1");

@@ -705,7 +705,10 @@ version, which the version-sync hook checks).
       strip, From / Bill to, a calm line-item table, totals (the only place the
       amount appears), and a "Pay with Bitcoin" panel (QR, address, the payment
       link written out, ink with an amber underline). Paid invoices show "Paid in
-      bitcoin" with the transaction instead of payment instructions. No status
+      bitcoin" with the transaction instead of payment instructions; a detected
+      but unconfirmed payment shows the same panel as "Paid in bitcoin
+      (unconfirmed)". Every PDF has a "View invoice on SatSend" link under the
+      invoice number (number at panel-title size). No status
       badge: a PDF is a snapshot and the status would go stale (Jonny's review,
       2026-10-10). Onest + Geist fonts.
 - [x] **Logo files:** font-independent, outlined wordmarks with the decided `.me`

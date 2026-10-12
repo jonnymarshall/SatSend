@@ -73,7 +73,9 @@ const styles = StyleSheet.create({
   // No letter-spacing or forced capitals on labels: both garble copied and
   // searched PDF text ("I NVO I C E").
   eyebrow: { fontSize: 9, fontWeight: 500, color: C.textSecondary },
-  invoiceNumber: { fontFamily: "Onest", fontWeight: 700, fontSize: 20, letterSpacing: -0.4, marginTop: 2 },
+  // Same size as the "Pay with Bitcoin" panel title (Jonny's review).
+  invoiceNumber: { fontFamily: "Onest", fontWeight: 700, fontSize: 13, marginTop: 2 },
+  headerLink: { marginTop: 8, fontSize: 9 },
 
   summary: {
     flexDirection: "row",
@@ -191,7 +193,10 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
   const cur = invoice.currency;
   const lineTotal = (li: Invoice["line_items"][number]) => li.quantity * li.unit_price;
   const title = invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice";
+  // A detected (still unconfirmed) payment already has its transaction, so it
+  // gets the paid panel, marked "(unconfirmed)".
   const isPaid = invoice.status === "paid";
+  const isDetected = invoice.status === "payment_detected";
 
   return (
     <Document title={title} author={invoice.your_name ?? undefined} creator="SatSend" producer="SatSend">
@@ -201,6 +206,11 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
           <View style={styles.headerRight}>
             <Text style={styles.eyebrow}>Invoice</Text>
             {invoice.invoice_number ? <Text style={styles.invoiceNumber}>{invoice.invoice_number}</Text> : null}
+            <View style={[styles.linkWrap, styles.headerLink]}>
+              <Link src={publicUrl} style={styles.link}>
+                View invoice on SatSend
+              </Link>
+            </View>
           </View>
         </View>
 
@@ -268,10 +278,10 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
           </View>
         </View>
 
-        {isPaid && invoice.btc_address ? (
+        {(isPaid || isDetected) && invoice.btc_address ? (
           <View style={styles.btc} wrap={false}>
             <View style={styles.btcInfo}>
-              <Text style={styles.btcTitle}>Paid in bitcoin</Text>
+              <Text style={styles.btcTitle}>{isDetected ? "Paid in bitcoin (unconfirmed)" : "Paid in bitcoin"}</Text>
               <Text style={styles.label}>Bitcoin address</Text>
               <Text style={styles.mono}>{invoice.btc_address}</Text>
               {invoice.btc_txid ? (
