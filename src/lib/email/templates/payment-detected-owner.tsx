@@ -1,4 +1,4 @@
-import { Html, Head, Body, Container, Heading, Text, Link, Section, Hr } from "@react-email/components";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, StatusPill, TxidLine } from "./layout";
 
 export interface PaymentDetectedOwnerProps {
   invoiceNumber: string | null;
@@ -17,25 +17,21 @@ export function PaymentDetectedOwnerEmail({
   mempoolUrl,
   dashboardUrl,
 }: PaymentDetectedOwnerProps) {
-  const label = invoiceNumber ? `Invoice ${invoiceNumber}` : "Your invoice";
+  const label = invoiceNumber ? `invoice ${invoiceNumber}` : "your invoice";
   return (
-    <Html>
-      <Head />
-      <Body style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#f6f6f6", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
-          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>Your client paid {label}</Heading>
-          <Text>{clientName} just sent <strong>{totalDisplay}</strong> for {label}. The transaction is broadcast to the Bitcoin network and currently unconfirmed.</Text>
-          <Text>You&apos;ll get another email once it confirms.</Text>
-          <Section style={{ margin: "20px 0" }}>
-            <Link href={mempoolUrl}>View transaction on mempool.space</Link>
-          </Section>
-          <Text style={{ fontSize: "12px", color: "#666", wordBreak: "break-all" }}>Txid: {txid}</Text>
-          <Hr />
-          <Section>
-            <Link href={dashboardUrl}>Open in SatSend</Link>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+    <EmailLayout preview={`${clientName} sent ${totalDisplay} for ${label}. Waiting for confirmation.`}>
+      <StatusPill status="payment_detected" />
+      <EmailHeading>Your client paid {label}</EmailHeading>
+      <EmailText>
+        {clientName} just sent <strong>{totalDisplay}</strong> for {label}. The transaction is broadcast to the
+        Bitcoin network and currently unconfirmed.
+      </EmailText>
+      <EmailText muted>You&apos;ll get another email once it confirms.</EmailText>
+      <EmailButton href={dashboardUrl}>Open in SatSend</EmailButton>
+      <EmailText small>
+        <EmailLink href={mempoolUrl}>View transaction on mempool.space</EmailLink>
+      </EmailText>
+      <TxidLine txid={txid} />
+    </EmailLayout>
   );
 }

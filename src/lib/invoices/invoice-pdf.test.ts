@@ -126,3 +126,47 @@ describe("renderInvoicePdf", () => {
     expect(text).not.toContain("api.coingecko.com");
   });
 });
+
+describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
+  it("prints no status badge (a PDF is a snapshot; the status goes stale)", async () => {
+    const text = await textFromPdf(baseInvoice);
+    expect(text).not.toContain("Pending");
+    expect(await textFromPdf({ ...baseInvoice, status: "overdue" })).not.toContain("Overdue");
+  });
+
+  it("prints the invoice total once, in the totals (no duplicate 'Amount due')", async () => {
+    const text = await textFromPdf(baseInvoice);
+    expect(text.split("$7,200.00").length - 1).toBe(1);
+    expect(text).not.toContain("Amount due");
+  });
+
+  it("a paid invoice shows the transaction and drops the payment instructions", async () => {
+    const text = await textFromPdf({ ...baseInvoice, status: "paid", btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" });
+    expect(text).toContain("Paid in bitcoin");
+    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
+  it("a payment-detected invoice shows the paid panel marked unconfirmed, with the transaction", async () => {
+    const text = await textFromPdf({
+      ...baseInvoice,
+      status: "payment_detected",
+      btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6",
+    });
+    expect(text).toContain("Paid in bitcoin (unconfirmed)");
+    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
+  it("every PDF links to the invoice on SatSend", async () => {
+    for (const status of ["pending", "payment_detected", "paid"] as const) {
+      const text = await textFromPdf({ ...baseInvoice, status, btc_txid: "abc" });
+      expect(text).toContain("View invoice on SatSend");
+    }
+  });
+
+  it("keeps the payment link on invoices without a bitcoin address", async () => {
+    const text = await textFromPdf({ ...baseInvoice, btc_address: null }, "https://satsend.app");
+    expect(text).toContain("https://satsend.app/invoice/inv-id-1");
+  });
+});

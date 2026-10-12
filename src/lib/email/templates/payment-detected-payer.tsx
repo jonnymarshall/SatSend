@@ -1,4 +1,4 @@
-import { Html, Head, Body, Container, Heading, Text, Link, Section, Hr } from "@react-email/components";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, StatusPill, TxidLine } from "./layout";
 
 export interface PaymentDetectedPayerProps {
   invoiceNumber: string | null;
@@ -19,23 +19,21 @@ export function PaymentDetectedPayerEmail({
 }: PaymentDetectedPayerProps) {
   const label = invoiceNumber ? `invoice ${invoiceNumber}` : "the invoice";
   return (
-    <Html>
-      <Head />
-      <Body style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#f6f6f6", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
-          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>Your payment has been detected</Heading>
-          <Text>Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} has been broadcast to the Bitcoin network.</Text>
-          <Text>The transaction is currently unconfirmed. You&apos;ll get another email once it confirms on-chain.</Text>
-          <Section style={{ margin: "20px 0" }}>
-            <Link href={mempoolUrl}>View transaction on mempool.space</Link>
-          </Section>
-          <Text style={{ fontSize: "12px", color: "#666", wordBreak: "break-all" }}>Txid: {txid}</Text>
-          <Hr />
-          <Section>
-            <Link href={invoiceUrl}>View invoice</Link>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+    <EmailLayout preview={`Your payment of ${totalDisplay} to ${senderName} has been detected.`}>
+      <StatusPill status="payment_detected" />
+      <EmailHeading>Your payment has been detected</EmailHeading>
+      <EmailText>
+        Your payment of <strong>{totalDisplay}</strong> to {senderName} for {label} has been broadcast to the Bitcoin
+        network.
+      </EmailText>
+      <EmailText muted>
+        The transaction is currently unconfirmed. You&apos;ll get another email once it confirms on-chain.
+      </EmailText>
+      <EmailButton href={invoiceUrl}>View invoice</EmailButton>
+      <EmailText small>
+        <EmailLink href={mempoolUrl}>View transaction on mempool.space</EmailLink>
+      </EmailText>
+      <TxidLine txid={txid} />
+    </EmailLayout>
   );
 }

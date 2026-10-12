@@ -1371,7 +1371,7 @@ This branch closes the gap. After it lands, the **Activity** card distinguishes 
 
 ---
 
-## Archived 2026-10-11 (moved verbatim from ROADMAP.md)
+## Archived 2026-10-10 (moved verbatim from ROADMAP.md)
 
 > Finished (✅) and superseded sections moved out to keep the live roadmap small.
 > v1.4.23 (Marketing Landing Page) is superseded by v1.5.2-H, which absorbs its

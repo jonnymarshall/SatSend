@@ -1,4 +1,4 @@
-import { Html, Head, Body, Container, Heading, Text, Link, Section, Hr } from "@react-email/components";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, StatusPill, TxidLine } from "./layout";
 
 export interface PaymentConfirmedOwnerProps {
   invoiceNumber: string | null;
@@ -24,32 +24,31 @@ export function PaymentConfirmedOwnerEmail({
   amountReceivedDisplay,
 }: PaymentConfirmedOwnerProps) {
   const label = invoiceNumber ? `Invoice ${invoiceNumber}` : "Your invoice";
+  const heading = underpaid ? `Partial payment received for ${label}` : `Payment confirmed for ${label}`;
   return (
-    <Html>
-      <Head />
-      <Body style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#f6f6f6", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "8px", maxWidth: "560px" }}>
-          <Heading style={{ fontSize: "20px", margin: "0 0 16px" }}>
-            {underpaid ? `Partial payment received for ${label}` : `Payment confirmed for ${label}`}
-          </Heading>
-          {underpaid && amountReceivedDisplay ? (
-            <Text>{clientName} paid <strong>{amountReceivedDisplay}</strong> of the <strong>{totalDisplay}</strong> due on {label} — this does not fully cover the invoice.</Text>
-          ) : (
-            <Text>{clientName}&apos;s payment of <strong>{totalDisplay}</strong> for {label} is now confirmed on-chain.</Text>
-          )}
-          {overpaid && amountReceivedDisplay && (
-            <Text>This payment overpaid the invoice: {amountReceivedDisplay} received against a {totalDisplay} total.</Text>
-          )}
-          <Section style={{ margin: "20px 0" }}>
-            <Link href={mempoolUrl}>View transaction on mempool.space</Link>
-          </Section>
-          <Text style={{ fontSize: "12px", color: "#666", wordBreak: "break-all" }}>Txid: {txid}</Text>
-          <Hr />
-          <Section>
-            <Link href={dashboardUrl}>Open in SatSend</Link>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+    <EmailLayout preview={heading}>
+      <StatusPill status={underpaid ? "underpaid" : "paid"} />
+      <EmailHeading>{heading}</EmailHeading>
+      {underpaid && amountReceivedDisplay ? (
+        <EmailText>
+          {clientName} paid <strong>{amountReceivedDisplay}</strong> of the <strong>{totalDisplay}</strong> due on{" "}
+          {label} — this does not fully cover the invoice.
+        </EmailText>
+      ) : (
+        <EmailText>
+          {clientName}&apos;s payment of <strong>{totalDisplay}</strong> for {label} is now confirmed on-chain.
+        </EmailText>
+      )}
+      {overpaid && amountReceivedDisplay && (
+        <EmailText>
+          This payment overpaid the invoice: {amountReceivedDisplay} received against a {totalDisplay} total.
+        </EmailText>
+      )}
+      <EmailButton href={dashboardUrl}>Open in SatSend</EmailButton>
+      <EmailText small>
+        <EmailLink href={mempoolUrl}>View transaction on mempool.space</EmailLink>
+      </EmailText>
+      <TxidLine txid={txid} />
+    </EmailLayout>
   );
 }
