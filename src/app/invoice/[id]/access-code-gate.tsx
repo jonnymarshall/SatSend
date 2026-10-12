@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { verifyAccessCode, type AccessCodeState } from "./actions";
-import { SatSendLogo } from "@/components/brand/satsend-logo";
+import { LogoHomeLink } from "@/components/brand/logo-home-link";
 import { Button } from "@/components/signal/button";
 import { Card } from "@/components/signal/card";
 import { Input } from "@/components/signal/input";
@@ -20,7 +20,7 @@ export function AccessCodeGate({ invoiceId }: Props) {
 
   return (
     <main id="access-gate--main" className="flex min-h-dvh flex-1 flex-col items-center justify-center px-6 py-12">
-      <SatSendLogo id="access-gate--logo" style={{ width: 132 }} className="mb-8" />
+      <LogoHomeLink id="access-gate--logo" logoStyle={{ width: 132 }} className="mb-8" />
       <Card id="access-gate--card" className="w-full max-w-sm">
         <div id="access-gate--intro" className="mb-6 space-y-1.5">
           <h1 id="access-gate--heading" className="font-display tracking-heading text-2xl font-bold">Enter access code</h1>

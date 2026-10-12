@@ -5,13 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/signal/button";
 import { Card } from "@/components/signal/card";
 import { Field } from "@/components/signal/field";
-import { SatSendLogo } from "@/components/brand/satsend-logo";
+import { LogoHomeLink } from "@/components/brand/logo-home-link";
 
 // Centered single-card layout shared by both login states (v1.5-H).
 function LoginFrame({ children }: { children: React.ReactNode }) {
   return (
     <main id="login--main" className="flex min-h-dvh flex-1 flex-col items-center justify-center px-6 py-12">
-      <SatSendLogo id="login--logo" style={{ width: 148 }} className="mb-8" />
+      <LogoHomeLink id="login--logo" logoStyle={{ width: 148 }} className="mb-8" />
       <Card id="login--card" className="w-full max-w-sm">
         {children}
       </Card>

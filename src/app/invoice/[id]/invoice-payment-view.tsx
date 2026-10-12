@@ -10,7 +10,7 @@ import { PaymentWatcher } from "./payment-watcher";
 import { MarkSentButton } from "./mark-sent-button";
 import { Button, buttonVariants } from "@/components/signal/button";
 import { Card } from "@/components/signal/card";
-import { SatSendLogo } from "@/components/brand/satsend-logo";
+import { LogoHomeLink } from "@/components/brand/logo-home-link";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
@@ -81,7 +81,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   return (
     <main id="invoice-view--main" className="min-h-dvh flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <div id="invoice-view--container" className="mx-auto max-w-3xl space-y-6">
-        <SatSendLogo id="invoice-view--logo" style={{ width: 116 }} />
+        <LogoHomeLink id="invoice-view--logo" logoStyle={{ width: 116 }} />
 
         {/* Header */}
         <Card id="invoice-view--header" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

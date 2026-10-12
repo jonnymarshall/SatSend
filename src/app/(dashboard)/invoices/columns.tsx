@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, Mail, HandHelping, AlertCircle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Mail, Send, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { Button } from "@/components/signal/button";
@@ -188,12 +188,13 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
             <title>Sent via email</title>
           </Mail>
         ) : r.send_method === "manual" ? (
-          <HandHelping
+          // Same icon as "Marked as sent" in the invoice's Activity panel.
+          <Send
             className="h-4 w-4 text-(--color-text-secondary)"
             aria-label="Marked as sent manually"
           >
             <title>Marked as sent manually</title>
-          </HandHelping>
+          </Send>
         ) : null;
         return (
           <div className="flex items-center gap-2">

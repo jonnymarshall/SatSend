@@ -728,9 +728,29 @@ served by the dev server**, not from a test run.
 
 ---
 
-### ⏳ v1.5.2-H — Redesign: marketing homepage + logo links home
+### ✅ v1.5.1.1-H — App polish from the v1.5.5 test round
 
-**Branch:** `v1.5.2/marketing` · absorbs the old **v1.4.23 Marketing Landing Page**
+**Branch:** `v1.5.6/app-fixes` · package `1.5.6`. Kept apart from the emails/PDF
+branch (separate concerns).
+
+- [x] **Logo links home everywhere** (pulled forward from v1.5.2-H): app header,
+      payer page, access-code screen and login all use one component,
+      `src/components/brand/logo-home-link.tsx`, linking to `/`. Until the
+      homepage exists, `/` still redirects to `/dashboard`, so a click lands on
+      the invoices (signed in) or login (signed out).
+- [x] **Hand cursor on buttons:** Tailwind v4 dropped it; a base rule in
+      `globals.css` restores it for every enabled `<button>` and
+      `[role="button"]` (the "← Invoices" back button had the arrow cursor).
+- [x] **"Marked as sent manually" icon on `/invoices`** is now the paper plane
+      (`Send`) used for "Marked as sent" in the invoice's Activity panel, instead
+      of `HandHelping`.
+
+---
+
+### ⏳ v1.5.2-H — Redesign: marketing homepage
+
+**Branch:** `v<next package version>/marketing` (the version-sync hook wants the
+branch name to match package.json) · absorbs the old **v1.4.23 Marketing Landing Page**
 (superseded, archived 2026-10-10).
 
 > **Jonny's brief (2026-10-10):** "I really like how that was mocked up in the
@@ -758,11 +778,8 @@ served by the dev server**, not from a test run.
 - [ ] Copy audit for anything contradicting bitcoin-only positioning.
 - [ ] Desktop + 390px, 44px targets, contrast pass (same checks as v1.5-H).
 
-**Logo always links home** (Jonny, 2026-10-10)
-- [ ] The SatSend logo is **always a link to `/`**: the signed-in app header
-      (today it goes to `/invoices`, which duplicates the "← Invoices" back
-      button), the public payer page and the access-code screen (not clickable
-      today), and the login page.
+**Logo always links home:** done early in v1.5.1.1-H. When `/` becomes the
+homepage, check that each logo click now lands there.
 
 **Also**
 - [ ] Optional follow-up from v1.5-H: on phones, show the invoice table as stacked
@@ -773,7 +790,6 @@ served by the dev server**, not from a test run.
 **Tests**
 - [ ] `/` renders without auth (hero copy present) and with auth (nav shows
       "Go to app"; no redirect).
-- [ ] Every logo instance is a link to `/` (header, payer page, access gate, login).
 - [ ] Metadata snapshot: `title` and `openGraph.title` contain "SatSend".
 
 ---
