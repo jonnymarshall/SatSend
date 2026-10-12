@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.6 — App polish from the v1.5.5 test round (roadmap v1.5.1.1-H).** The
+  SatSend logo links to `/` everywhere (app header, payer page, access-code screen,
+  login) via one `LogoHomeLink` component; enabled buttons show the hand cursor
+  again (a base rule in `globals.css`; Tailwind v4 dropped it); the "Marked as
+  sent manually" icon on `/invoices` matches the Activity panel's paper plane.
+
 - **v1.5.5 — Emails and PDF redesigned in Signal Amber (roadmap v1.5.1-H).** All
   five emails share one frame (`src/lib/email/templates/layout.tsx`): logo, white
   card on canvas, amber button with ink text, inbox preview text, and a status pill

@@ -75,4 +75,10 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 dropped the hand cursor on buttons; restore it everywhere so
+     plain <button>s (e.g. "← Invoices") feel clickable (v1.5.6). */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
