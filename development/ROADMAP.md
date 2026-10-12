@@ -586,6 +586,64 @@ subscribe button ships without its required disclosure.
 
 ---
 
+### ⏳ v1.5.0.5-H — Statuses only update when an invoice is opened (**HIGH PRIORITY, do next**)
+
+**Branch:** `v<next package version>/status-refresh` · **Reported by Jonny,
+2026-10-12:** invoices sat on "Payment detected" in `/invoices` and only flipped
+to Paid (and only then sent the confirmation email) when he opened the invoice.
+"This is an ongoing bug." Do this before v1.5.1.3-H and the marketing homepage.
+
+**Diagnosis (2026-10-12):** three separate gaps, which together mean the only
+thing that reliably moves an invoice forward is someone having its page open.
+1. **Production's background checker barely runs.** `.github/workflows/payment-sweep.yml`
+   asks GitHub for every 5 minutes, but GitHub delays and drops scheduled runs on
+   busy/free runners: the last 12 runs (2026-10-10 → 10-12) were **3–6 hours
+   apart**. So a detected payment can wait hours for its confirmation and email.
+2. **Local dev has no background checker at all**, by design: the scheduler only
+   calls production, and "one writer per database" keeps production's sweep off
+   the test database. Locally, only the open invoice page (`PaymentWatcher` →
+   `/api/invoices/[id]/payment-status`) checks the blockchain.
+3. **`/invoices` never asks for a check.** It only listens (realtime, plus
+   `router.refresh()`) for changes something else makes, so with (1) and (2) it
+   shows stale statuses until someone opens the invoice.
+
+**Plan**
+- [ ] **Reliable production scheduler.** Point a dedicated cron service at
+      `https://satsend.me/api/cron/payment-sweep` every minute with the
+      `Authorization: Bearer $CRON_SECRET` header (recommended: cron-job.org, free;
+      Jonny creates the account, Claude writes the exact settings). Keep the
+      GitHub workflow as a slow backup: the sweep's optimistic-concurrency update
+      (`route.ts`, "another writer" branch) already makes overlapping runs safe;
+      verify no duplicate emails when two sweeps overlap (test below).
+- [ ] **`/invoices` checks what it shows.** While the list is open and visible,
+      every ~60s ask the server to check the user's invoices that are waiting on
+      the blockchain (`payment_detected` first, then `pending`/`overdue` with an
+      address): one batched, owner-scoped, rate-limited endpoint reusing the
+      `payment-status` decision code, so it can't drift from the sweep. Realtime
+      then updates the rows. Pause when the tab is hidden.
+- [ ] **Local dev checker:** `npm run dev:sweep`, a small loop that calls the local
+      sweep every minute, refusing to run unless the database URL is the test
+      project (never production). Document in README; `PAYMENT_SWEEP_ENABLED`
+      stays a local, session-only setting as the environment rules require.
+- [ ] **Know when it stops.** Record the last successful sweep time; show a quiet
+      warning in the app (or fail a health check the cron service alerts on) if it
+      is older than 15 minutes in production.
+
+**Tests**
+- [ ] Batched list check: only the owner's invoices, only waiting statuses,
+      rate-limited, and the status change uses the same decision as the sweep.
+- [ ] Two overlapping sweeps on the same detected invoice: one status change, one
+      confirmation email.
+- [ ] `dev:sweep` refuses to run against a non-test database URL.
+- [ ] Manual: pay a testnet invoice, stay on `/invoices` (don't open it), and see
+      Payment detected → Paid and the email arrive without clicking anything, both
+      locally (with `dev:sweep`) and on `satsend.me`.
+
+**Done when:** an invoice moves from detected to paid, and its email is sent,
+within a few minutes of confirmation on `satsend.me`, with nobody opening it.
+
+---
+
 ### ⏳ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
 
 **Branch:** `fix/realtime-channel-reuse` · package: next patch at merge (`1.5.3` if
