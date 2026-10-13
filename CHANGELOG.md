@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `useInvoiceChannel` now waits for any same-topic channel to be removed before
   opening a new one, retries (with backoff) when connecting throws, and ignores
   the CLOSED status of a channel it has replaced, which could otherwise start a
-  reconnect loop.
+  reconnect loop. A recovered connection logs `reconnected:` as a warning (so it
+  shows in the dev terminal next to the drop), and leaving a page no longer logs
+  its own channel's CLOSED as if it were a drop.
 
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already

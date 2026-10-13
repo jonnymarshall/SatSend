@@ -113,10 +113,18 @@ export function useInvoiceChannel({
       current.subscribe((status, err) => {
         // A replaced channel reports CLOSED when we remove it; that is not a new
         // drop, and reacting to it would start a reconnect loop.
-        if (channel !== current) return;
+        // After unmount, our own removal reports CLOSED too: not a drop.
+        if (cancelled || channel !== current) return;
         if (status === "SUBSCRIBED") {
+          const recovered = attempts > 0;
           attempts = 0;
-          console.info(`[invoice-realtime] subscribed: ${channelName}`);
+          if (recovered) {
+            // warn, not info, so the recovery shows next to the drop warning
+            // (Next forwards only warn/error to the dev terminal by default).
+            console.warn(`[invoice-realtime] reconnected: ${channelName}`);
+          } else {
+            console.info(`[invoice-realtime] subscribed: ${channelName}`);
+          }
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           console.warn(`[invoice-realtime] ${status} on ${channelName}`, err);
           scheduleReconnect();

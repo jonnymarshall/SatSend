@@ -188,6 +188,30 @@ describe("useInvoiceChannel: re-opening a channel (v1.5.10)", () => {
     expect(registry).toEqual([created[1]]);
   });
 
+  it("logs the recovery as a warning once the replacement channel subscribes", async () => {
+    vi.useFakeTimers();
+    mount();
+    await flush();
+    act(() => created[0].subscribeCb!("SUBSCRIBED"));
+    expect(console.warn).not.toHaveBeenCalled();
+
+    act(() => created[0].subscribeCb!("CHANNEL_ERROR", new Error("socket closed")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    await flush();
+    act(() => created[1].subscribeCb!("SUBSCRIBED"));
+    expect(console.warn).toHaveBeenLastCalledWith("[invoice-realtime] reconnected: invoice:inv-1");
+  });
+
+  it("unmounting does not log the channel's own CLOSED as a drop", async () => {
+    const view = mount();
+    await flush();
+    view.unmount();
+    act(() => created[0].subscribeCb!("CLOSED"));
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
   it("an error while connecting schedules a retry instead of an unhandled rejection", async () => {
     vi.useFakeTimers();
     let calls = 0;
