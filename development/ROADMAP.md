@@ -663,6 +663,32 @@ within a few minutes of confirmation on `satsend.me`, with nobody opening it.
 
 ---
 
+### 🔄 v1.5.0.6-H — "Send now via email" fails after "Publish only"
+
+**Branch:** `v1.5.9/send-after-publish` · package `1.5.9` · **Reported by Jonny,
+2026-10-13:** duplicated an invoice, gave it a fresh address, chose "Publish
+only", then "Send now via email" said "This bitcoin address has already been
+used on another invoice". The address was unique: the check was finding the
+invoice itself.
+
+**Diagnosis:** the three send actions (`publishAndSendEmail`,
+`publishAndMarkSent`, and the download variant) always re-ran the full publish
+path, even on an invoice that was already published. Since v1.4.31-H the
+address check also asks the cross-account RPC `is_address_registered`, which
+counts every non-draft invoice and cannot exclude the caller's own row. So any
+send after "Publish only" failed. Re-publishing was also wrong on its own: it
+reset `status`, `published_at` and the payment schedule.
+
+- [x] Send actions run the publish checks and publish patch only for drafts. On
+      a published invoice they write just the send fields (`sent_at`,
+      `send_method`, `email_attempted_at`); a failed email attempt keeps an
+      earlier manual "sent" mark.
+- [x] Tests: published invoice whose own row the RPC reports; payment_detected
+      status untouched; no-recipient makes no write; mark-as-sent.
+- [ ] Manual tests: `manual-tests/v1.5.9-send-after-publish.md`.
+
+---
+
 ### ⏳ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
 
 **Branch:** `fix/realtime-channel-reuse` · package: next patch at merge (`1.5.3` if

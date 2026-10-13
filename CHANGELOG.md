@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
+  v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already
+  published re-ran the publish checks, and the cross-account address check
+  (v1.4.31-H) found the invoice's own row: "This bitcoin address has already
+  been used on another invoice". The send actions now only re-publish drafts. On
+  a published invoice they record the send and leave the status and payment
+  schedule alone, so sending also can no longer reset a "Payment detected"
+  invoice to Pending.
+
 - **v1.5.8 — Statuses only updated when an invoice was opened (roadmap
   v1.5.0.5-H).** The `/invoices` list now checks its waiting invoices about once
   a minute while visible (`POST /api/invoices/check-payments`, owner-only, at
