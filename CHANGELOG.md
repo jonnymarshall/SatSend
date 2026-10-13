@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a published invoice they record the send and leave the status and payment
   schedule alone, so sending also can no longer reset a "Payment detected"
   invoice to Pending.
+- **v1.5.9 — Hydration warning on the invoice form.** The line-item drag
+  handles got a different `aria-describedby` id on the server and in the
+  browser (dnd-kit's internal counter). The drag-and-drop area now gets a
+  stable id from React's `useId`.
 
 - **v1.5.8 — Statuses only updated when an invoice was opened (roadmap
   v1.5.0.5-H).** The `/invoices` list now checks its waiting invoices about once
