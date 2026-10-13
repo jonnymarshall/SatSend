@@ -586,7 +586,7 @@ subscribe button ships without its required disclosure.
 
 ---
 
-### 🔄 v1.5.0.5-H — Statuses only update when an invoice is opened (**HIGH PRIORITY**)
+### ✅ v1.5.0.5-H — Statuses only update when an invoice is opened (**HIGH PRIORITY**)
 
 **Branch:** `v1.5.8/status-refresh` · package `1.5.8` · **Reported by Jonny,
 2026-10-12:** invoices sat on "Payment detected" in `/invoices` and only flipped
@@ -635,7 +635,7 @@ thing that reliably moves an invoice forward is someone having its page open.
       so the cron service's failure alerts fire.
 
 **Jonny's steps (at merge)**
-- [ ] **cron-job.org job** (free account): URL
+- [x] **cron-job.org job** (free account): URL
       `https://satsend.me/api/cron/payment-sweep`, every minute, GET, header
       `Authorization: Bearer <CRON_SECRET>` (the production value in Vercel), 30s
       timeout, email notification on failure. Recorded in
@@ -654,7 +654,7 @@ thing that reliably moves an invoice forward is someone having its page open.
 - [x] Pre-payment watch keeps going (every 30 min, days later); stopped watches
       are rescheduled; 503 on a database read failure.
 - [x] `dev:sweep` guard refuses any database but the test project.
-- [ ] Manual (`manual-tests/v1.5.8-status-refresh.md`): pay a testnet invoice,
+- [x] Manual (`manual-tests/v1.5.8-status-refresh.md`): pay a testnet invoice,
       stay on `/invoices`, and see Payment detected → Paid and the email arrive
       without opening it, locally (`npm run dev:sweep`) and on `satsend.me`.
 
@@ -663,7 +663,7 @@ within a few minutes of confirmation on `satsend.me`, with nobody opening it.
 
 ---
 
-### 🔄 v1.5.0.6-H — "Send now via email" fails after "Publish only"
+### ✅ v1.5.0.6-H — "Send now via email" fails after "Publish only"
 
 **Branch:** `v1.5.9/send-after-publish` · package `1.5.9` · **Reported by Jonny,
 2026-10-13:** duplicated an invoice, gave it a fresh address, chose "Publish
@@ -685,14 +685,15 @@ reset `status`, `published_at` and the payment schedule.
       earlier manual "sent" mark.
 - [x] Tests: published invoice whose own row the RPC reports; payment_detected
       status untouched; no-recipient makes no write; mark-as-sent.
-- [ ] Manual tests: `manual-tests/v1.5.9-send-after-publish.md`.
+- [x] Manual tests: `manual-tests/v1.5.9-send-after-publish.md` (Jonny,
+      2026-10-13: Publish only, then Send now via email, sent and arrived).
 
 ---
 
-### ⏳ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
+### ✅ v1.5.0.1-H — Realtime: crash when a live-update channel is re-opened
 
-**Branch:** `fix/realtime-channel-reuse` · package: next patch at merge (`1.5.3` if
-after v1.5-H) · **Not urgent** (Jonny, 2026-10-10): logged for a future branch.
+**Branch:** `v1.5.10/realtime-channel-reuse` · package `1.5.10` (was
+`fix/realtime-channel-reuse`) · **Not urgent** (Jonny, 2026-10-10): logged for a future branch.
 Dev shows an error overlay that can be dismissed; production only loses live
 updates after a dropped connection. Independent of the redesign (realtime code is untouched on
 `v1.5/redesign`); found while testing it, 2026-10-10.
@@ -716,17 +717,21 @@ Three ways to hit it:
    hook).
 
 **Fix** (all in `src/lib/realtime/use-invoice-channel.ts`):
-- [ ] In `connect()`, before `supabase.channel(name)`, find any registered channel
+- [x] In `connect()`, before `supabase.channel(name)`, find any registered channel
       with topic `realtime:${name}` (`supabase.getChannels()`) and
       `await supabase.removeChannel(...)` it.
-- [ ] In `scheduleReconnect()`, `await` the removal before calling `connect()`.
-- [ ] Wrap `connect()`'s body in try/catch: log and `scheduleReconnect()` instead of
+- [x] In `scheduleReconnect()`, `await` the removal before calling `connect()`.
+- [x] Wrap `connect()`'s body in try/catch: log and `scheduleReconnect()` instead of
       leaving an unhandled rejection.
-- [ ] Tests (fake Supabase client): a stale same-topic channel is removed before
+- [x] Tests (fake Supabase client): a stale same-topic channel is removed before
       the new one is set up; a Strict-Mode style mount → unmount → mount does not
       throw; the reconnect path awaits removal; an error in `connect()` schedules a
       retry.
-- [ ] Manual: open an invoice detail page in dev (no error overlay); publish or
+- [x] Found while building: a channel reports `CLOSED` when we remove it, and the
+      hook treated that as a new drop, so each reconnect could schedule another
+      (a churn loop). Status callbacks from a replaced channel are now ignored.
+      If a removal does not clear the topic, `connect()` throws and retries.
+- [ ] Manual (`manual-tests/v1.5.10-realtime-channel-reuse.md`): open an invoice detail page in dev (no error overlay); publish or
       mark paid in another tab and see the detail page update by itself.
 
 **Not in scope:** two components subscribing to the same topic at once would still

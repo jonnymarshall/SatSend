@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.10 — Live updates stopped after a dropped connection (roadmap
+  v1.5.0.1-H).** `supabase.channel(name)` returns a channel still registered
+  under the same topic, and `removeChannel()` only drops it once the server
+  acknowledges. Re-opening before then (leaving a page and returning, React
+  Strict Mode in dev, or a reconnect) reused the old subscribed channel and threw
+  "cannot add `postgres_changes` callbacks … after `subscribe()`". In production
+  the reconnect swallowed that error and live updates stopped until a reload.
+  `useInvoiceChannel` now waits for any same-topic channel to be removed before
+  opening a new one, retries (with backoff) when connecting throws, and ignores
+  the CLOSED status of a channel it has replaced, which could otherwise start a
+  reconnect loop.
+
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already
   published re-ran the publish checks, and the cross-account address check

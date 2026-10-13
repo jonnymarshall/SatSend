@@ -60,7 +60,30 @@ export function useInvoiceChannel({
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // v1.5.10 (v1.5.0.1-H): supabase.channel(name) hands back a channel that is
+    // still registered under the same topic, and removeChannel() only drops it
+    // once the server acknowledges the unsubscribe. Re-opening before then (leave
+    // and return, Strict Mode, or a reconnect) got the old, already-subscribed
+    // channel, and setup's .on() threw. Wait until no channel holds the topic.
+    async function removeSameTopicChannels() {
+      const topic = `realtime:${channelName}`;
+      const stale = supabase.getChannels().filter((c) => c.topic === topic);
+      await Promise.all(stale.map((c) => supabase.removeChannel(c)));
+      if (supabase.getChannels().some((c) => c.topic === topic)) {
+        throw new Error(`channel ${topic} is still registered after removal`);
+      }
+    }
+
     async function connect() {
+      try {
+        await openChannel();
+      } catch (err) {
+        console.error(`[invoice-realtime] connect failed on ${channelName}`, err);
+        scheduleReconnect();
+      }
+    }
+
+    async function openChannel() {
       if (cancelled) return;
 
       if (auth === "session") {
@@ -78,12 +101,19 @@ export function useInvoiceChannel({
       }
       if (cancelled) return;
 
+      await removeSameTopicChannels();
+      if (cancelled) return;
+
       const ch = supabase.channel(
         channelName!,
         isPrivate ? { config: { private: true } } : undefined
       );
-      channel = setupRef.current(ch, router);
-      channel.subscribe((status, err) => {
+      const current = setupRef.current(ch, router);
+      channel = current;
+      current.subscribe((status, err) => {
+        // A replaced channel reports CLOSED when we remove it; that is not a new
+        // drop, and reacting to it would start a reconnect loop.
+        if (channel !== current) return;
         if (status === "SUBSCRIBED") {
           attempts = 0;
           console.info(`[invoice-realtime] subscribed: ${channelName}`);
@@ -104,15 +134,13 @@ export function useInvoiceChannel({
       attempts += 1;
       retryTimer = setTimeout(() => {
         retryTimer = null;
-        if (channel) {
-          supabase.removeChannel(channel);
-          channel = null;
-        }
-        connect();
+        // connect() removes the dropped channel (and waits for it) first.
+        channel = null;
+        void connect();
       }, delay);
     }
 
-    connect();
+    void connect();
 
     return () => {
       cancelled = true;
