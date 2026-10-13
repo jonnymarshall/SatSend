@@ -596,6 +596,76 @@ describe("publishAndMarkSent", () => {
   });
 });
 
+// v1.5.9 (v1.5.0.6-H): "Publish only", then "Send now via email" (or "Mark as
+// sent") failed with "This bitcoin address has already been used on another
+// invoice": the send re-ran the publish checks, and the global address RPC found
+// the invoice's own (already published) row. Sending a published invoice must
+// not re-publish it: no address checks, no status or payment-schedule reset.
+describe("send actions on an already-published invoice (v1.5.9)", () => {
+  const PUBLISHED = {
+    ...PUBLISHABLE_INVOICE,
+    status: "pending",
+    published_at: "2026-05-31T12:00:00.000Z",
+    next_check_at: "2026-05-31T12:30:00.000Z",
+  };
+  const PUBLISH_FIELDS = ["status", "published_at", "next_check_at", "stage_attempt", "mempool_seen_at"];
+
+  it("publishAndSendEmail sends even though the address RPC sees the invoice's own row", async () => {
+    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "sent" });
+    const { updateChain, updateEq } = makeSupabase({ fetchData: PUBLISHED, rpcResult: true });
+    const result = await publishAndSendEmail("inv-1");
+
+    expect(result).toEqual({ ok: true, data: { emailStatus: "sent" } });
+    expect(sendInvoicePublishedEmail).toHaveBeenCalledTimes(1);
+    expect(addressHasHistory).not.toHaveBeenCalled();
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    for (const field of PUBLISH_FIELDS) expect(payload).not.toHaveProperty(field);
+    expect(payload.send_method).toBe("email");
+    expect(payload.sent_at).toBeTruthy();
+    expect(payload.email_attempted_at).toBeTruthy();
+    expect(updateEq).toHaveBeenCalledWith("id", "inv-1");
+  });
+
+  it("publishAndSendEmail leaves a payment_detected invoice's status alone", async () => {
+    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "sent" });
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHED, status: "payment_detected" },
+      rpcResult: true,
+    });
+    await publishAndSendEmail("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("status");
+  });
+
+  it("publishAndSendEmail with no valid client email: no send, no write", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHED, client_email: null },
+      rpcResult: true,
+    });
+    const result = await publishAndSendEmail("inv-1");
+    expect(result).toEqual({ ok: true, data: { emailStatus: "no_recipient" } });
+    expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
+    expect(updateChain).not.toHaveBeenCalled();
+  });
+
+  it("publishAndMarkSent marks it sent without re-publishing", async () => {
+    const { updateChain } = makeSupabase({ fetchData: PUBLISHED, rpcResult: true });
+    const result = await publishAndMarkSent("inv-1");
+
+    expect(result).toEqual({ ok: true, data: {} });
+    expect(addressHasHistory).not.toHaveBeenCalled();
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    for (const field of PUBLISH_FIELDS) expect(payload).not.toHaveProperty(field);
+    expect(payload.send_method).toBe("manual");
+    expect(payload.sent_at).toBeTruthy();
+    expect(logInvoiceEvent).toHaveBeenCalledWith({
+      invoiceId: "inv-1",
+      userId: "user-1",
+      eventType: "marked_as_sent",
+    });
+  });
+});
+
 describe("deleteDraft", () => {
   it("deletes an invoice when it is a draft", async () => {
     const { deleteEq } = makeSupabase({

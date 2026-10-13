@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/signal/button";
 import { Card } from "@/components/signal/card";
@@ -130,6 +130,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   const [items, setItems] = useState<LineItemState[]>(initialItems);
   const initialItemsRef = useRef(JSON.stringify(initialItems));
 
+  const dndContextId = useId();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -430,6 +431,10 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
         </div>
 
         <DndContext
+          // dnd-kit numbers its aria-describedby id from a module counter unless
+          // given one, so the server and browser render different ids (hydration
+          // mismatch warning in dev). useId is the same on both.
+          id={dndContextId}
           sensors={sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}

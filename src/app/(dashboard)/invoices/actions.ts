@@ -20,6 +20,7 @@ import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 import { addressHasHistory } from "@/lib/mempool";
 import { addressNetworkError } from "@/lib/btc-network";
+import type { Database } from "@/lib/database.types";
 
 async function addressFreshnessError(address: string, contextId?: string): Promise<FieldError | null> {
   // An address for the other network can never be looked up (mempool.space returns
@@ -351,6 +352,22 @@ async function applyPublishUpdate(
   revalidatePath(`/invoices/${invoice.id}`);
 }
 
+// v1.5.9 (v1.5.0.6-H): the send actions also run on an invoice that was already
+// published ("Publish only", then "Send now via email" / "Mark as sent"). That
+// must not re-publish it: the publish checks would find the invoice's own row in
+// the global address RPC ("already used on another invoice"), and the publish
+// patch would reset its status and payment schedule. Record the send only.
+async function applySendUpdate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  invoice: Invoice,
+  sendFields: Database["public"]["Tables"]["invoices"]["Update"],
+) {
+  const { error } = await supabase.from("invoices").update(sendFields).eq("id", invoice.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath(`/invoices/${invoice.id}`);
+}
+
 export async function publishInvoice(invoiceId: string): Promise<ActionResult<undefined>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
   const fieldError = await publishFieldError(supabase, invoice, invoiceId);
@@ -367,13 +384,16 @@ export async function publishAndSendEmail(
   }>
 > {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
-  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
-  if (fieldError) return fieldError;
+  const isDraft = invoice.status === "draft";
+  if (isDraft) {
+    const fieldError = await publishFieldError(supabase, invoice, invoiceId);
+    if (fieldError) return fieldError;
+  }
 
   // v1.4.26-H: skip quietly for a missing OR malformed address (old drafts may
   // carry bad ones) — publish-only, no send attempt.
   if (!invoice.client_email || !isValidEmail(invoice.client_email)) {
-    await applyPublishUpdate(supabase, invoice, {});
+    if (isDraft) await applyPublishUpdate(supabase, invoice, {});
     return { ok: true, data: { emailStatus: "no_recipient" } };
   }
 
@@ -395,11 +415,19 @@ export async function publishAndSendEmail(
   });
 
   const succeeded = outcome.status === "sent";
-  await applyPublishUpdate(supabase, invoice, {
+  const sendFields = {
     sent_at: succeeded ? attemptAt : null,
-    send_method: succeeded ? "email" : null,
+    send_method: succeeded ? ("email" as const) : null,
     email_attempted_at: attemptAt,
-  });
+  };
+  if (isDraft) {
+    await applyPublishUpdate(supabase, invoice, sendFields);
+  } else if (succeeded) {
+    await applySendUpdate(supabase, invoice, sendFields);
+  } else {
+    // Keep an earlier manual "sent" mark if this email attempt failed.
+    await applySendUpdate(supabase, invoice, { email_attempted_at: attemptAt });
+  }
 
   return { ok: true, data: { emailStatus: outcome.status } };
 }
@@ -409,13 +437,14 @@ export async function publishAndMarkSent(
   opts: { withDownload?: boolean } = {},
 ): Promise<ActionResult<{ downloadUrl?: string }>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
-  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
-  if (fieldError) return fieldError;
-
-  await applyPublishUpdate(supabase, invoice, {
-    sent_at: new Date().toISOString(),
-    send_method: "manual",
-  });
+  const sendFields = { sent_at: new Date().toISOString(), send_method: "manual" as const };
+  if (invoice.status === "draft") {
+    const fieldError = await publishFieldError(supabase, invoice, invoiceId);
+    if (fieldError) return fieldError;
+    await applyPublishUpdate(supabase, invoice, sendFields);
+  } else {
+    await applySendUpdate(supabase, invoice, sendFields);
+  }
 
   await logInvoiceEvent({
     invoiceId,
