@@ -212,6 +212,35 @@ describe("useInvoiceChannel: re-opening a channel (v1.5.10)", () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it("while the browser is offline it waits instead of burning retries, then reconnects when back online", async () => {
+    vi.useFakeTimers();
+    let online = true;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    mount();
+    await flush();
+
+    online = false;
+    act(() => created[0].subscribeCb!("CHANNEL_ERROR", new Error("offline")));
+    // Far longer than the whole backoff (1+2+4+8+16+30s): nothing is retried.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    expect(created).toHaveLength(1);
+    expect(console.warn).not.toHaveBeenCalledWith(expect.stringContaining("gave up"));
+    expect(console.warn).toHaveBeenCalledWith(
+      "[invoice-realtime] offline; will reconnect invoice:inv-1 when back online"
+    );
+
+    online = true;
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await flush();
+    expect(created).toHaveLength(2);
+    act(() => created[1].subscribeCb!("SUBSCRIBED"));
+    expect(console.warn).toHaveBeenLastCalledWith("[invoice-realtime] reconnected: invoice:inv-1");
+  });
+
   it("an error while connecting schedules a retry instead of an unhandled rejection", async () => {
     vi.useFakeTimers();
     let calls = 0;

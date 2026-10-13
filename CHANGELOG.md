@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the CLOSED status of a channel it has replaced, which could otherwise start a
   reconnect loop. A recovered connection logs `reconnected:` as a warning (so it
   shows in the dev terminal next to the drop), and leaving a page no longer logs
-  its own channel's CLOSED as if it were a drop.
+  its own channel's CLOSED as if it were a drop. While the browser is offline the hook
+  waits for the `online` event instead of spending its retries (it used to give
+  up after ~30 seconds offline), then reconnects with a fresh set.
 
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already

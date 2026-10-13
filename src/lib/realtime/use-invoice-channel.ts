@@ -60,6 +60,22 @@ export function useInvoiceChannel({
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // v1.5.10: while the browser is offline every attempt fails at once, so the
+    // whole backoff (~30s) was spent and the hook gave up before the network
+    // came back. Offline, wait for the "online" event instead, then reconnect
+    // with a fresh set of attempts.
+    let waitingForOnline = false;
+    // Set on a drop, cleared on the next subscribe: that subscribe is a recovery.
+    let dropped = false;
+    const handleOnline = () => {
+      if (!waitingForOnline || cancelled) return;
+      waitingForOnline = false;
+      attempts = 0;
+      channel = null;
+      void connect();
+    };
+    window.addEventListener("online", handleOnline);
+
     // v1.5.10 (v1.5.0.1-H): supabase.channel(name) hands back a channel that is
     // still registered under the same topic, and removeChannel() only drops it
     // once the server acknowledges the unsubscribe. Re-opening before then (leave
@@ -116,7 +132,10 @@ export function useInvoiceChannel({
         // After unmount, our own removal reports CLOSED too: not a drop.
         if (cancelled || channel !== current) return;
         if (status === "SUBSCRIBED") {
-          const recovered = attempts > 0;
+          const recovered = dropped;
+          dropped = false;
+          // Recovered by itself (realtime-js rejoins on reconnect): nothing to redo online.
+          waitingForOnline = false;
           attempts = 0;
           if (recovered) {
             // warn, not info, so the recovery shows next to the drop warning
@@ -127,6 +146,7 @@ export function useInvoiceChannel({
           }
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           console.warn(`[invoice-realtime] ${status} on ${channelName}`, err);
+          dropped = true;
           scheduleReconnect();
         }
       });
@@ -134,6 +154,13 @@ export function useInvoiceChannel({
 
     function scheduleReconnect() {
       if (cancelled) return;
+      if (navigator.onLine === false) {
+        if (!waitingForOnline) {
+          console.warn(`[invoice-realtime] offline; will reconnect ${channelName} when back online`);
+        }
+        waitingForOnline = true;
+        return;
+      }
       if (attempts >= RECONNECT_MAX) {
         console.warn(`[invoice-realtime] gave up reconnecting ${channelName}`);
         return;
@@ -154,6 +181,7 @@ export function useInvoiceChannel({
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
       if (channel) supabase.removeChannel(channel);
     };
   }, [channelName, auth, isPrivate, router]);
