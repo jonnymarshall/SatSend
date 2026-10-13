@@ -586,9 +586,9 @@ subscribe button ships without its required disclosure.
 
 ---
 
-### ⏳ v1.5.0.5-H — Statuses only update when an invoice is opened (**HIGH PRIORITY, do next**)
+### 🔄 v1.5.0.5-H — Statuses only update when an invoice is opened (**HIGH PRIORITY**)
 
-**Branch:** `v<next package version>/status-refresh` · **Reported by Jonny,
+**Branch:** `v1.5.8/status-refresh` · package `1.5.8` · **Reported by Jonny,
 2026-10-12:** invoices sat on "Payment detected" in `/invoices` and only flipped
 to Paid (and only then sent the confirmation email) when he opened the invoice.
 "This is an ongoing bug." Do this before v1.5.1.3-H and the marketing homepage.
@@ -607,37 +607,56 @@ thing that reliably moves an invoice forward is someone having its page open.
    `router.refresh()`) for changes something else makes, so with (1) and (2) it
    shows stale statuses until someone opens the invoice.
 
-**Plan**
-- [ ] **Reliable production scheduler.** Point a dedicated cron service at
-      `https://satsend.me/api/cron/payment-sweep` every minute with the
-      `Authorization: Bearer $CRON_SECRET` header (recommended: cron-job.org, free;
-      Jonny creates the account, Claude writes the exact settings). Keep the
-      GitHub workflow as a slow backup: the sweep's optimistic-concurrency update
-      (`route.ts`, "another writer" branch) already makes overlapping runs safe;
-      verify no duplicate emails when two sweeps overlap (test below).
-- [ ] **`/invoices` checks what it shows.** While the list is open and visible,
-      every ~60s ask the server to check the user's invoices that are waiting on
-      the blockchain (`payment_detected` first, then `pending`/`overdue` with an
-      address): one batched, owner-scoped, rate-limited endpoint reusing the
-      `payment-status` decision code, so it can't drift from the sweep. Realtime
-      then updates the rows. Pause when the tab is hidden.
-- [ ] **Local dev checker:** `npm run dev:sweep`, a small loop that calls the local
-      sweep every minute, refusing to run unless the database URL is the test
-      project (never production). Document in README; `PAYMENT_SWEEP_ENABLED`
-      stays a local, session-only setting as the environment rules require.
-- [ ] **Know when it stops.** Record the last successful sweep time; show a quiet
-      warning in the app (or fail a health check the cron service alerts on) if it
-      is older than 15 minutes in production.
+4. **(Found while fixing)** the pre-payment watch **stopped ~48 minutes after
+   publish** (`PRE_MEMPOOL_DELAYS_MS` "then stop"), leaving `next_check_at` null,
+   so the sweep never looked at an invoice paid later than that, however often
+   it ran.
+
+**Done on the branch (code)**
+- [x] **One per-invoice check** (`src/lib/invoices/check-invoice-payment.ts`),
+      moved out of the sweep: same decision, same optimistic-concurrency write,
+      same emails. The sweep and the list check both call it.
+- [x] **`/invoices` checks what it shows:** `POST /api/invoices/check-payments`
+      (owner-only; up to 10 waiting invoices per call, payment detected first;
+      30s per-owner cooldown; writes only on a status change so it never nudges
+      the sweep's schedule or fires needless realtime events), called by
+      `use-check-waiting-payments.ts` 2s after opening, then every 60s while the
+      tab is visible, and on returning to the tab.
+- [x] **The watch never ends while unpaid:** after the fast stages the
+      pre-payment check repeats every 30 minutes. The sweep also puts any
+      invoice whose watch had already stopped back on the schedule (one-off in
+      practice; no migration needed).
+- [x] **Local checker:** `npm run dev:sweep` (`scripts/dev/sweep.mjs`) starts
+      `next dev` with `PAYMENT_SWEEP_ENABLED=true` and a throwaway `CRON_SECRET`
+      for that process only, calls the sweep every minute, and refuses to start
+      unless the app points at the test project (`scripts/dev/sweep-guard.mjs`,
+      an allowlist).
+- [x] **Fails loudly:** the sweep returns 503 when it cannot read the database,
+      so the cron service's failure alerts fire.
+
+**Jonny's steps (at merge)**
+- [ ] **cron-job.org job** (free account): URL
+      `https://satsend.me/api/cron/payment-sweep`, every minute, GET, header
+      `Authorization: Bearer <CRON_SECRET>` (the production value in Vercel), 30s
+      timeout, email notification on failure. Recorded in
+      `OUTSTANDING-VERIFICATIONS.md`. GitHub's workflow stays as the backup.
+
+**Deferred**
+- An in-app "last sweep" warning needs a new table (a migration); the cron
+  service's failure emails plus the GitHub backup cover it for now.
 
 **Tests**
-- [ ] Batched list check: only the owner's invoices, only waiting statuses,
-      rate-limited, and the status change uses the same decision as the sweep.
-- [ ] Two overlapping sweeps on the same detected invoice: one status change, one
-      confirmation email.
-- [ ] `dev:sweep` refuses to run against a non-test database URL.
-- [ ] Manual: pay a testnet invoice, stay on `/invoices` (don't open it), and see
-      Payment detected → Paid and the email arrive without clicking anything, both
-      locally (with `dev:sweep`) and on `satsend.me`.
+- [x] List check: owner-only, waiting statuses only, payment detected first, at
+      most 10, write-only-on-change, throttled per owner
+      (`check-payments.test.ts`).
+- [x] Two overlapping checks of one confirmed payment: one status change, one
+      confirmation email (`check-invoice-payment.test.ts`).
+- [x] Pre-payment watch keeps going (every 30 min, days later); stopped watches
+      are rescheduled; 503 on a database read failure.
+- [x] `dev:sweep` guard refuses any database but the test project.
+- [ ] Manual (`manual-tests/v1.5.8-status-refresh.md`): pay a testnet invoice,
+      stay on `/invoices`, and see Payment detected → Paid and the email arrive
+      without opening it, locally (`npm run dev:sweep`) and on `satsend.me`.
 
 **Done when:** an invoice moves from detected to paid, and its email is sent,
 within a few minutes of confirmation on `satsend.me`, with nobody opening it.

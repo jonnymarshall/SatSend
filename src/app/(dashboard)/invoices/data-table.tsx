@@ -52,6 +52,7 @@ import {
 } from "./actions";
 import { buildColumns, InvoiceRow } from "./columns";
 import { useInvoiceRealtime } from "./use-invoice-realtime";
+import { useCheckWaitingPayments } from "./use-check-waiting-payments";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -62,6 +63,9 @@ function parsePageParam(raw: string | null): number {
   if (!Number.isFinite(n) || n < 1) return 0;
   return n - 1;
 }
+
+// Statuses that can still move on when a payment arrives or confirms.
+const WAITING_STATUSES = new Set<string>(["pending", "payment_detected", "overdue"]);
 
 const COLUMN_LABELS: Record<string, string> = {
   invoice_number: "Invoice",
@@ -82,6 +86,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   useInvoiceRealtime(userId);
+  useCheckWaitingPayments(data.some((r) => WAITING_STATUSES.has(r.status)));
   // Pagination is URL-driven: ?page=N is the single source of truth. Reading it from
   // useSearchParams every render avoids the state/URL desync that caused v1.4.17's
   // first attempt to revert to page 1 after every navigation (router.replace was

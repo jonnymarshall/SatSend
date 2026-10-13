@@ -101,6 +101,9 @@ function makeUpdateBuilder(
         return chainable;
       });
     chainable.eq = chain("eq");
+    chainable.in = chain("in");
+    chainable.is = chain("is");
+    chainable.not = chain("not");
     chainable.select = chain("select");
     chainable.then = (onFulfilled: (v: unknown) => unknown) => {
       calls.push({ payload, filters });
@@ -109,6 +112,11 @@ function makeUpdateBuilder(
     return chainable;
   });
   return { factory, calls };
+}
+
+/** Per-invoice status writes, excluding the stopped-watch reschedule (v1.5.8). */
+function statusUpdates<T extends { payload: unknown }>(calls: T[]): T[] {
+  return calls.filter((c) => "status" in (c.payload as object));
 }
 
 describe("GET /api/cron/payment-sweep — auth", () => {
@@ -224,7 +232,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     const body = await res.json();
     expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
 
-    expect(update.calls).toHaveLength(1);
+    expect(statusUpdates(update.calls)).toHaveLength(1);
     expect(update.calls[0].payload).toMatchObject({
       status: "payment_detected",
       btc_txid: "tx-seen",
@@ -337,7 +345,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     const body = await res.json();
     expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
 
-    expect(update.calls).toHaveLength(1);
+    expect(statusUpdates(update.calls)).toHaveLength(1);
     expect(update.calls[0].payload).toMatchObject({
       stage_attempt: 1,
     });
@@ -387,7 +395,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     const res = await getRequest(authHeaders());
     const body = await res.json();
     expect(body).toEqual({ processed: 1, transitions: 0, errors: 1, overdueFlips: 0 });
-    expect(update.calls).toHaveLength(0);
+    expect(statusUpdates(update.calls)).toHaveLength(0);
     expect(mockSendDetected).not.toHaveBeenCalled();
   });
 });
@@ -517,5 +525,39 @@ describe("GET /api/cron/payment-sweep — overdue auto-flip (case #1)", () => {
     const res = await getRequest(authHeaders());
     const body = await res.json();
     expect(body).toEqual({ processed: 0, transitions: 0, errors: 0, overdueFlips: 0 });
+  });
+});
+
+describe("GET /api/cron/payment-sweep — stopped watches (v1.5.8)", () => {
+  it("puts unpaid invoices whose watch had stopped back on the schedule, due now", async () => {
+    const { builder } = makeSelectBuilder([]);
+    const update = makeUpdateBuilder({ error: null }, [{ id: "old-1" }, { id: "old-2" }]);
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+
+    await getRequest(authHeaders());
+
+    const reschedule = update.calls.find((c) => !("status" in (c.payload as object)));
+    expect(reschedule).toBeDefined();
+    expect(Object.keys(reschedule!.payload as object)).toEqual(["next_check_at"]);
+    expect(reschedule!.filters).toEqual(
+      expect.arrayContaining([
+        { method: "in", args: ["status", ["pending", "overdue"]] },
+        { method: "is", args: ["next_check_at", null] },
+        { method: "not", args: ["btc_address", "is", null] },
+      ])
+    );
+  });
+});
+
+describe("GET /api/cron/payment-sweep — health (v1.5.8)", () => {
+  it("returns 503 when it cannot read the due invoices, so the scheduler alerts", async () => {
+    const builder: Record<string, unknown> = {};
+    for (const m of ["select", "in", "lte", "order", "limit", "eq", "lt", "not"]) builder[m] = () => builder;
+    builder.then = (ok: (v: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: { message: "db down" } }).then(ok);
+    mockFrom.mockReturnValue(builder);
+
+    const res = await getRequest(authHeaders());
+    expect(res.status).toBe(503);
   });
 });

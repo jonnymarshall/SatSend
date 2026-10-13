@@ -25,7 +25,7 @@ Both pages need to update **as soon as the status changes**, no matter who trigg
 | **Confirmation** | A miner has put the tx into a block. 0 confirmations = "broadcast, in mempool, not yet in a block". 1+ confirmations = "in a block on the chain". |
 | **WebSocket** | A long-lived connection between your browser and a server that lets the server push messages **whenever something happens**. No need for the browser to keep asking. We use one to mempool.space and one to Supabase. |
 | **Polling** | The opposite of a WebSocket. The browser (or server) repeatedly asks "anything new?" on a timer. Slower and chattier than a push, but works as a fallback when sockets aren't available. |
-| **Cron** | A scheduled job that runs in the background with no browser involved. An external scheduler (a GitHub Actions workflow) hits ours about every 5 minutes. Think of it as a server-side alarm clock that wakes up, checks the mempool for every active invoice, and goes back to sleep. |
+| **Cron** | A scheduled job that runs in the background with no browser involved. An external cron service (cron-job.org) hits ours every minute, with a GitHub Actions workflow as a slower backup. Think of it as a server-side alarm clock that wakes up, checks the mempool for every active invoice, and goes back to sleep. |
 | **Realtime (Supabase)** | A separate WebSocket from the browser to Supabase that delivers **database changes** as they happen. Anything that updates an invoice row anywhere in the system shows up on the page within ~1 second. |
 
 ### How a payment gets noticed (the three watchers)
@@ -48,16 +48,16 @@ The moment a wallet broadcasts a payment to that address, mempool.space pushes a
 
 > **You do not need to click the "Pay now in Bitcoin" button for this to work.** That button only reveals the QR code; the watcher runs in the background regardless. Closing the tab stops the watcher.
 
-#### 2. The cron sweep (system-wide every ~5 minutes, but each invoice on its own schedule)
+#### 2. The cron sweep (system-wide every minute, but each invoice on its own schedule)
 
 There are **two clocks** here, and it's worth keeping them straight:
 
-- **System clock** — an external scheduler hits `/api/cron/payment-sweep` about every 5 minutes (GitHub Actions' minimum interval), forever, regardless of how many invoices exist. This is what "no browser needed" refers to. Vercel's own cron is capped at once a day on the Hobby plan, so it is not the trigger.
+- **System clock** — an external cron service (cron-job.org) hits `/api/cron/payment-sweep` every minute, forever, regardless of how many invoices exist. This is what "no browser needed" refers to. A GitHub Actions workflow also calls it as a backup, but GitHub delays scheduled runs badly (in October 2026 its `*/5` schedule actually ran every 3–6 hours), so it can't be the main clock (v1.5.8). Vercel's own cron is capped at once a day on the Hobby plan.
 - **Per-invoice clock** — each invoice has its own scheduled next check (`next_check_at`). When the system clock fires, the endpoint **only checks invoices whose own scheduled time has come up** — typically a small handful per tick, not every outstanding invoice.
 
 Each invoice's schedule is **front-loaded**, then tapers off:
 
-- **Right after publish, no tx in mempool yet** — checks at **+15 s, +30 s, +60 s, +2 min, +5 min, +10 min, +30 min**, then **stops**. The invoice hibernates if nothing arrives in the first ~48 minutes. (The +15 s first-check is v1.4.13; the dense early retries are v1.4.13.5 — they replace the previous v1.4.13 schedule of `[15s, 5min, 10min, 30min]`, which left a 5-minute gap after the first cron miss.)
+- **Right after publish, no tx in mempool yet** — checks at **+15 s, +30 s, +60 s, +2 min, +5 min, +10 min, +30 min**, then **every 30 minutes for as long as the invoice is unpaid** (v1.5.8; before that the watch stopped after ~48 minutes, so a client paying hours later was only noticed when someone opened the invoice). (The +15 s first-check is v1.4.13; the dense early retries are v1.4.13.5 — they replace the previous v1.4.13 schedule of `[15s, 5min, 10min, 30min]`, which left a 5-minute gap after the first cron miss.)
 - **Once a tx hits the mempool** — schedule speeds back up: every 10 min × 3, then every 1 h × 6, then every 4 h × 12, then every 8 h × 24, over a total window of ~11 days.
 - **A confirmed tx at any point** promotes the invoice straight to **Paid** and the schedule stops.
 
@@ -153,11 +153,12 @@ For the implementation specifics — file paths, exact intervals, code reference
 | (A1) Payer on `/invoice/[id]`, has **not** clicked "Pay now in Bitcoin" | Mempool WebSocket only | Real-time push; no client REST polling | < 1 second (push) |
 | (A2) Payer clicked "Pay now in Bitcoin", has **not** clicked "Mark as Sent" | Mempool WebSocket + phased active alongside-WS poll | Real-time push; phased poll: 5s×12, 10s×6, 15s×4, 30s×2, 60s×1 = 25 polls / 5 min then stops (v1.4.13.4) | < 1 second (push) or ≤ 5 s (alongside poll) |
 | (B) Payer on `/invoice/[id]`, **clicks** "Mark as Payment Sent"    | Tiered active polling for 60 seconds     | 5×2s + 5×3s + 3×5s + 2×10s = 15 polls in 60s  | 2–10 seconds                 |
-| (C) Nobody has a page open                                         | Vercel Cron (background poll)            | Every minute, per-invoice back-off schedule   | 1–30 minutes pre-mempool; 10 min – 8 h post-mempool |
+| (C) Nobody has a page open                                         | Cron sweep (background poll)             | Every minute, per-invoice back-off schedule   | 1–30 minutes pre-mempool; 10 min – 8 h post-mempool |
+| (C2) Owner on `/invoices`                                          | List check (`POST /api/invoices/check-payments`) | About every 60 s while the tab is visible; up to 10 waiting invoices, payment detected first | ≤ ~1 minute |
 | (D) Owner on `/invoices` or `/invoices/[id]`                       | Supabase Realtime subscription           | Pushed as soon as any other path updates DB   | < 1 second after DB update   |
 | (E) Payer on public `/invoice/[id]`                                | Supabase Realtime subscription (anon)    | Pushed as soon as any other path updates DB   | < 1 second after DB update   |
 
-(A), (B), (C) are detection paths — they spot the on-chain payment. (D), (E) are display paths — they push the resulting database change to whatever page is open.
+(A), (B), (C), (C2) are detection paths — they spot the on-chain payment. (D), (E) are display paths — they push the resulting database change to whatever page is open.
 
 ---
 
@@ -212,7 +213,11 @@ The detected dialog also **auto-pops** on any `pending/overdue → payment_detec
 
 Files: `src/app/api/cron/payment-sweep/route.ts` + `src/lib/invoices/payment-schedule.ts` + `vercel.json`.
 
-An external scheduler (`.github/workflows/payment-sweep.yml`, a GitHub Actions workflow) hits `/api/cron/payment-sweep` **about every 5 minutes** (`*/5 * * * *`). **Note: the scheduler only runs against deployed environments — locally (`npm run dev`), the route exists but nothing calls it automatically.** For local manual testing, run the curl loop documented in `manual-tests/v1.4.13-payment-detection-latency.md` (Setup → Cron requirement). The endpoint:
+Files also: `src/lib/invoices/check-invoice-payment.ts` (the per-invoice check, shared with the `/invoices` list check so the two cannot drift).
+
+A cron service (cron-job.org) hits `/api/cron/payment-sweep` **every minute** in production; `.github/workflows/payment-sweep.yml` (GitHub Actions, `*/5 * * * *`, in practice hours apart) is a backup. Overlapping runs are safe: each write only applies if the invoice's status is still the one that was read, and only the run whose write lands sends emails.
+
+**Locally**, plain `npm run dev` has no background checker (the schedulers only call production, and production's sweep must never touch the test database). Use **`npm run dev:sweep`** instead: it starts the dev server with the sweep switched on for that process only (`PAYMENT_SWEEP_ENABLED=true` and a throwaway `CRON_SECRET`, gone when you stop it) and calls the sweep every minute. It refuses to start unless `NEXT_PUBLIC_SUPABASE_URL` is the test project (`scripts/dev/sweep-guard.mjs`). The endpoint:
 
 1. Bearer-auths the incoming request against `CRON_SECRET`.
 2. Fetches up to **50 invoices** where `next_check_at <= now()` AND `status IN ('pending', 'payment_detected', 'overdue')`, oldest `next_check_at` first, then loops to drain the due queue (up to 500 per run).

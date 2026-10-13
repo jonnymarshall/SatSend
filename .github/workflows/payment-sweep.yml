@@ -6,6 +6,12 @@ name: payment-sweep
 # time. This workflow hits the production sweep endpoint every 5 minutes
 # (GitHub's minimum effective schedule interval).
 #
+# v1.5.8 (v1.5.0.5-H): this is now the BACKUP. GitHub delays scheduled runs
+# heavily (Oct 2026: the */5 schedule ran 3-6 hours apart), so the main clock
+# is a cron service (cron-job.org) calling the same endpoint every minute.
+# Overlapping runs are safe (optimistic-concurrency writes; see
+# src/lib/invoices/check-invoice-payment.ts).
+#
 # Requires the repository secret CRON_SECRET to equal the CRON_SECRET env var on
 # the production deployment. To point at a different host, set a repository
 # variable SATSEND_BASE_URL (Settings → Secrets and variables → Actions →

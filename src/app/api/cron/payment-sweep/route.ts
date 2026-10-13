@@ -14,15 +14,16 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchAddressTxs, fetchTipHeight } from "@/lib/mempool";
-import { fetchBtcPrice } from "@/lib/btc-price";
-import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
+import { fetchTipHeight } from "@/lib/mempool";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
-import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
+import {
+  CHECKABLE_COLUMNS,
+  CHECKABLE_STATUSES,
+  checkInvoicePayment,
+  type CheckableInvoice,
+} from "@/lib/invoices/check-invoice-payment";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { timingSafeStringEqual } from "@/lib/timing-safe";
-import type { Invoice } from "@/lib/invoice-public";
-import type { Database } from "@/lib/database.types";
 
 // Hobby allows up to 60s for a Node function. The loop below drains the due
 // queue within this budget.
@@ -32,28 +33,6 @@ const BATCH_SIZE = 50;
 // Upper bound on batches per invocation (50 × 10 = 500 invoices). Prevents an
 // endless loop if a row ever fails to advance its next_check_at.
 const MAX_BATCHES = 10;
-
-// The sweep only ever loads payable invoices, so status is narrowed and
-// btc_address is guaranteed non-null (the DB CHECK: status='draft' or
-// btc_address is not null). Derived from Invoice so it cannot drift.
-type SweepInvoice = Pick<
-  Invoice,
-  | "id"
-  | "user_id"
-  | "btc_address"
-  | "mempool_seen_at"
-  | "published_at"
-  | "stage_attempt"
-  | "invoice_number"
-  | "client_name"
-  | "client_email"
-  | "total_fiat"
-  | "currency"
-  | "btc_txid"
-  | "your_name"
-  | "your_company"
-  | "your_email"
-> & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -88,141 +67,72 @@ export async function GET(request: NextRequest) {
 
     const { data: rows, error: fetchError } = await supabase
       .from("invoices")
-      .select(
-        "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email"
-      )
-      .in("status", ["pending", "payment_detected", "overdue"])
+      .select(CHECKABLE_COLUMNS)
+      .in("status", [...CHECKABLE_STATUSES])
       .lte("next_check_at", now.toISOString())
       .order("next_check_at", { ascending: true })
       .limit(BATCH_SIZE);
 
     if (fetchError) {
+      // Fail loudly (503) so the scheduler's failure alerts fire (v1.5.8):
+      // a sweep that cannot read the database is not a quiet "nothing to do".
       console.error("[cron/payment-sweep] fetch failed", fetchError);
-      errors += 1;
-      break;
+      return NextResponse.json({ error: "Could not load due invoices" }, { status: 503 });
     }
 
-    const invoices = (rows ?? []) as SweepInvoice[];
+    const invoices = (rows ?? []) as CheckableInvoice[];
     if (invoices.length === 0) break;
     processed += invoices.length;
 
     for (const inv of invoices) {
-      try {
-        const txs = await fetchAddressTxs(inv.btc_address);
-        if (txs === null) {
-          // mempool.space was unreachable — NOT the same as "no payment yet".
-          // Skip this invoice without touching its schedule, so an outage does
-          // not burn an attempt or stop the watch. (v1.4.22-H / M-MONEY-2)
-          errors += 1;
-          console.warn("[cron/payment-sweep] mempool unreachable, deferring", inv.id);
-          continue;
-        }
-
-        let btcPrice: number | null = null;
-        try {
-          btcPrice = (await fetchBtcPrice(inv.currency)).price;
-        } catch {
-          // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
-        }
-
-        const decision = decidePaymentSchedule(
-          {
-            status: inv.status,
-            btc_address: inv.btc_address,
-            mempool_seen_at: inv.mempool_seen_at,
-            published_at: inv.published_at,
-            stage_attempt: inv.stage_attempt,
-            total_fiat: inv.total_fiat,
-          },
-          txs,
-          now,
-          { btcPrice, tipHeight }
-        );
-
-        const update: Database["public"]["Tables"]["invoices"]["Update"] = {
-          status: decision.newStatus,
-          mempool_seen_at: decision.newMempoolSeenAt,
-          stage_attempt: decision.newStageAttempt,
-          next_check_at: decision.newNextCheckAt,
-          amount_received_sats: decision.amountReceivedSats,
-          btc_price_at_detection: decision.btcPriceAtDetection,
-          amount_received_fiat: decision.amountReceivedFiat,
-          overpaid: decision.overpaid,
-        };
-        if (decision.detectedTxid) {
-          update.btc_txid = decision.detectedTxid;
-        }
-        if (decision.revertToPending) {
-          // The previously-seen payment vanished. Clear the stale txid and
-          // re-anchor the time-based schedule so the fresh pre-mempool watch
-          // starts from now rather than an old published_at. (M-MONEY-4)
-          update.btc_txid = null;
-          update.published_at = now.toISOString();
-        }
-
-        const { data: updatedRows, error: updateError } = await supabase
-          .from("invoices")
-          .update(update)
-          .eq("id", inv.id)
-          .eq("status", inv.status)
-          .select("id");
-
-        if (updateError) {
-          errors += 1;
-          console.error("[cron/payment-sweep] update failed", inv.id, updateError);
-          continue;
-        }
-
-        if (!updatedRows || updatedRows.length === 0) {
-          // The optimistic-concurrency filter matched nothing: another writer
-          // (the payer's fast-path route) already moved this row on. Skip the
-          // email side effects so we don't double-send. (v1.4.22-H / M-DB-1)
-          continue;
-        }
-
-        if (decision.newStatus !== inv.status && decision.detectedTxid) {
-          transitions += 1;
-          const { data: userRecord } = await supabase.auth.admin.getUserById(inv.user_id);
-          const ownerEmail = userRecord?.user?.email;
-          if (ownerEmail) {
-            const emailArgs = {
-              ownerEmail,
-              payerEmail: inv.client_email || null,
-              userId: inv.user_id,
-              invoiceId: inv.id,
-              invoiceNumber: inv.invoice_number,
-              senderName: inv.your_name || inv.your_company || inv.your_email || "SatSend user",
-              clientName: inv.client_name || "your client",
-              totalFiat: inv.total_fiat,
-              currency: inv.currency,
-              txid: decision.detectedTxid,
-            };
-            if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
-              await sendPaymentConfirmedEmail({
-                ...emailArgs,
-                status: decision.newStatus,
-                amountReceivedFiat: decision.amountReceivedFiat,
-                overpaid: decision.overpaid,
-              });
-            } else {
-              await sendPaymentDetectedEmail(emailArgs);
-            }
-          }
-        }
-      } catch (err) {
-        errors += 1;
-        console.error("[cron/payment-sweep] invoice failed", inv.id, err);
-      }
+      const outcome = await checkInvoicePayment(supabase, inv, tipHeight, now, {
+        logPrefix: "[cron/payment-sweep]",
+      });
+      if (outcome === "transitioned") transitions += 1;
+      if (outcome === "error" || outcome === "mempool_unreachable") errors += 1;
     }
 
     if (invoices.length < BATCH_SIZE) break;
   }
 
   const overdueFlips = await sweepOverdue(supabase, new Date());
+  const rescheduled = await rescheduleStoppedWatches(supabase, new Date());
+  if (rescheduled > 0) console.info("[cron/payment-sweep] rescheduled stopped watches", rescheduled);
 
   const summary = { processed, transitions, errors, overdueFlips };
   console.log("[cron/payment-sweep]", summary);
   return NextResponse.json(summary);
+}
+
+/**
+ * v1.5.8 (v1.5.0.5-H): before this release the pre-payment watch stopped ~48
+ * minutes after publish, leaving next_check_at null on unpaid invoices, which
+ * the due query above never matches. Put any such invoice back on the schedule
+ * (due now); its next check then follows the repeating 30-minute grid. After
+ * the first run nothing matches, since the schedule no longer ends while an
+ * invoice is payable.
+ */
+async function rescheduleStoppedWatches(
+  supabase: ReturnType<typeof createAdminClient>,
+  now: Date
+): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from("invoices")
+      .update({ next_check_at: now.toISOString() })
+      .in("status", ["pending", "overdue"])
+      .is("next_check_at", null)
+      .not("btc_address", "is", null)
+      .select("id");
+    if (error) {
+      console.error("[cron/payment-sweep] reschedule failed", error);
+      return 0;
+    }
+    return data?.length ?? 0;
+  } catch (err) {
+    console.error("[cron/payment-sweep] reschedule failed", err);
+    return 0;
+  }
 }
 
 interface OverdueScanRow {
