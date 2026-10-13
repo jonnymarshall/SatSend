@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.8 — Statuses only updated when an invoice was opened (roadmap
+  v1.5.0.5-H).** The `/invoices` list now checks its waiting invoices about once
+  a minute while visible (`POST /api/invoices/check-payments`, owner-only, at
+  most 10 per call, throttled). The pre-payment watch no longer stops ~48 minutes
+  after publish; it repeats every 30 minutes while unpaid, and the sweep
+  reschedules invoices whose watch had stopped. The sweep and the list share one
+  per-invoice check (`src/lib/invoices/check-invoice-payment.ts`). New
+  `npm run dev:sweep` runs a background checker locally (test database only).
+  The sweep returns 503 when it cannot read the database. Production's main
+  clock moves to a cron service calling every minute (GitHub's `*/5` schedule ran
+  3–6 hours apart); the GitHub workflow stays as a backup.
+
 ### Changed
 
 - **v1.5.7 — Wider email column (roadmap v1.5.1.2-H).** The email frame is 720px

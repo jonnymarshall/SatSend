@@ -107,7 +107,7 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
     expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 525_000).toISOString());
   });
 
-  it("stops polling once the final pre-mempool boundary is in the past", () => {
+  it("keeps polling every 30 min after the final pre-mempool boundary (v1.5.8)", () => {
     const decision = decidePaymentSchedule(
       {
         status: "pending",
@@ -123,8 +123,30 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
     );
 
     expect(decision.newStatus).toBe("pending");
-    expect(decision.newNextCheckAt).toBeNull();
+    // Table total 15s+30s+1m+2m+5m+10m+30m = 48m45s; then every 30 min:
+    // 60 min elapsed → next boundary at 78m45s after publish = 18m45s from now.
+    expect(decision.newNextCheckAt).toBe(new Date(NOW.getTime() + 18 * 60_000 + 45_000).toISOString());
     expect(decision.detectedTxid).toBeNull();
+  });
+
+  it("still polls an invoice published days ago (the watch never ends while payable)", () => {
+    const decision = decidePaymentSchedule(
+      {
+        status: "overdue",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: null,
+        published_at: new Date(NOW.getTime() - 3 * 24 * 60 * 60_000).toISOString(),
+        stage_attempt: 40,
+        total_fiat: TOTAL_FIAT,
+      },
+      [],
+      NOW,
+      PRICE_FINALIZED
+    );
+    expect(decision.newNextCheckAt).not.toBeNull();
+    const inMs = new Date(decision.newNextCheckAt!).getTime() - NOW.getTime();
+    expect(inMs).toBeGreaterThan(0);
+    expect(inMs).toBeLessThanOrEqual(30 * 60_000);
   });
 
   it("an overdue invoice rests as overdue while it keeps polling", () => {

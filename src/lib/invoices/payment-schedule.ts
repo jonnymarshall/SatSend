@@ -17,8 +17,12 @@ export const PRE_MEMPOOL_DELAYS_MS: readonly number[] = [
   2 * 60_000,    // third miss → retry in 2min
   5 * 60_000,    // fourth miss → retry in 5min
   10 * 60_000,   // fifth miss → retry in 10min
-  30 * 60_000,   // sixth miss → retry in 30min, then stop
+  30 * 60_000,   // sixth miss → retry in 30min, and every 30min after that
 ];
+// v1.5.8 (v1.5.0.5-H): the pre-mempool watch no longer stops after the table
+// (~48 min after publish). Clients pay hours or days later; with the watch
+// stopped, only an open invoice page could notice. The last interval repeats
+// for as long as the invoice is payable.
 
 export const POST_MEMPOOL_STAGES: ReadonlyArray<{ count: number; intervalMs: number }> = [
   { count: 3, intervalMs: 10 * 60_000 },
@@ -145,13 +149,20 @@ function pickPayingTx(
  * the schedule time-based: a tick that arrives late (or is missed entirely)
  * lands on the correct boundary rather than advancing one step.
  */
-function nextBoundaryAfterMs(intervals: readonly number[], elapsedMs: number): number | null {
+function nextBoundaryAfterMs(
+  intervals: readonly number[],
+  elapsedMs: number,
+  { repeatLast = false }: { repeatLast?: boolean } = {}
+): number | null {
   let cumulative = 0;
   for (const interval of intervals) {
     cumulative += interval;
     if (cumulative > elapsedMs) return cumulative;
   }
-  return null;
+  if (!repeatLast || intervals.length === 0 || !Number.isFinite(elapsedMs)) return null;
+  // Past the table: keep going on the last interval's grid.
+  const last = intervals[intervals.length - 1];
+  return cumulative + (Math.floor((elapsedMs - cumulative) / last) + 1) * last;
 }
 
 function addIso(from: Date, ms: number): string {
@@ -242,7 +253,8 @@ export function decidePaymentSchedule(
     const anchorDate = new Date(anchor);
     const boundary = nextBoundaryAfterMs(
       PRE_MEMPOOL_DELAYS_MS,
-      now.getTime() - anchorDate.getTime()
+      now.getTime() - anchorDate.getTime(),
+      { repeatLast: true }
     );
     return {
       newStatus: restingStatus,

@@ -1,0 +1,178 @@
+import { fetchAddressTxs } from "@/lib/mempool";
+import { fetchBtcPrice } from "@/lib/btc-price";
+import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
+import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
+import type { createAdminClient } from "@/lib/supabase/admin";
+import type { Invoice } from "@/lib/invoice-public";
+import type { Database } from "@/lib/database.types";
+
+/*
+ * One blockchain check for one invoice (v1.5.8, roadmap v1.5.0.5-H). Shared by
+ * the background sweep (/api/cron/payment-sweep) and the /invoices list check
+ * (/api/invoices/check-payments) so the two cannot drift: same decision
+ * (decidePaymentSchedule), same optimistic-concurrency write, same emails.
+ */
+
+// Payable invoices only, so status is narrowed and btc_address is non-null
+// (the DB CHECK: status='draft' or btc_address is not null).
+export type CheckableInvoice = Pick<
+  Invoice,
+  | "id"
+  | "user_id"
+  | "btc_address"
+  | "mempool_seen_at"
+  | "published_at"
+  | "stage_attempt"
+  | "invoice_number"
+  | "client_name"
+  | "client_email"
+  | "total_fiat"
+  | "currency"
+  | "btc_txid"
+  | "your_name"
+  | "your_company"
+  | "your_email"
+> & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
+
+export const CHECKABLE_COLUMNS =
+  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email";
+
+export const CHECKABLE_STATUSES = ["pending", "payment_detected", "overdue"] as const;
+
+export type CheckOutcome =
+  | "transitioned" // a payment moved the status on (emails sent)
+  | "unchanged" // checked, nothing new
+  | "lost_race" // another writer moved the row first; no emails
+  | "mempool_unreachable" // deferred, schedule untouched
+  | "error";
+
+export interface CheckOptions {
+  /**
+   * Write the row only when the status changes. The list check sets this: its
+   * extra look must not push the sweep's schedule around, and every write fires
+   * a realtime event that refreshes the list.
+   */
+  writeOnlyOnStatusChange?: boolean;
+  logPrefix?: string;
+}
+
+export async function checkInvoicePayment(
+  supabase: ReturnType<typeof createAdminClient>,
+  inv: CheckableInvoice,
+  tipHeight: number | null,
+  now: Date,
+  { writeOnlyOnStatusChange = false, logPrefix = "[payment-check]" }: CheckOptions = {}
+): Promise<CheckOutcome> {
+  try {
+    const txs = await fetchAddressTxs(inv.btc_address);
+    if (txs === null) {
+      // mempool.space was unreachable — NOT the same as "no payment yet".
+      // Skip this invoice without touching its schedule, so an outage does
+      // not burn an attempt or stop the watch. (v1.4.22-H / M-MONEY-2)
+      console.warn(`${logPrefix} mempool unreachable, deferring`, inv.id);
+      return "mempool_unreachable";
+    }
+
+    let btcPrice: number | null = null;
+    try {
+      btcPrice = (await fetchBtcPrice(inv.currency)).price;
+    } catch {
+      // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
+    }
+
+    const decision = decidePaymentSchedule(
+      {
+        status: inv.status,
+        btc_address: inv.btc_address,
+        mempool_seen_at: inv.mempool_seen_at,
+        published_at: inv.published_at,
+        stage_attempt: inv.stage_attempt,
+        total_fiat: inv.total_fiat,
+      },
+      txs,
+      now,
+      { btcPrice, tipHeight }
+    );
+
+    const statusChanges = decision.newStatus !== inv.status;
+    if (writeOnlyOnStatusChange && !statusChanges) return "unchanged";
+
+    const update: Database["public"]["Tables"]["invoices"]["Update"] = {
+      status: decision.newStatus,
+      mempool_seen_at: decision.newMempoolSeenAt,
+      stage_attempt: decision.newStageAttempt,
+      next_check_at: decision.newNextCheckAt,
+      amount_received_sats: decision.amountReceivedSats,
+      btc_price_at_detection: decision.btcPriceAtDetection,
+      amount_received_fiat: decision.amountReceivedFiat,
+      overpaid: decision.overpaid,
+    };
+    if (decision.detectedTxid) {
+      update.btc_txid = decision.detectedTxid;
+    }
+    if (decision.revertToPending) {
+      // The previously-seen payment vanished. Clear the stale txid and
+      // re-anchor the time-based schedule so the fresh pre-mempool watch
+      // starts from now rather than an old published_at. (M-MONEY-4)
+      update.btc_txid = null;
+      update.published_at = now.toISOString();
+    }
+
+    const { data: updatedRows, error: updateError } = await supabase
+      .from("invoices")
+      .update(update)
+      .eq("id", inv.id)
+      .eq("status", inv.status)
+      .select("id");
+
+    if (updateError) {
+      console.error(`${logPrefix} update failed`, inv.id, updateError);
+      return "error";
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      // The optimistic-concurrency filter matched nothing: another writer
+      // (the sweep, the list check, or the payer's fast-path route) already
+      // moved this row on. Skip the email side effects so we don't double-send.
+      // (v1.4.22-H / M-DB-1)
+      return "lost_race";
+    }
+
+    if (statusChanges && decision.detectedTxid) {
+      const { data: userRecord } = await supabase.auth.admin.getUserById(inv.user_id);
+      const ownerEmail = userRecord?.user?.email;
+      if (ownerEmail) {
+        const emailArgs = {
+          ownerEmail,
+          payerEmail: inv.client_email || null,
+          userId: inv.user_id,
+          invoiceId: inv.id,
+          invoiceNumber: inv.invoice_number,
+          senderName: inv.your_name || inv.your_company || inv.your_email || "SatSend user",
+          clientName: inv.client_name || "your client",
+          totalFiat: inv.total_fiat,
+          currency: inv.currency,
+          txid: decision.detectedTxid,
+        };
+        if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
+          await sendPaymentConfirmedEmail({
+            ...emailArgs,
+            status: decision.newStatus,
+            amountReceivedFiat: decision.amountReceivedFiat,
+            overpaid: decision.overpaid,
+          });
+        } else {
+          await sendPaymentDetectedEmail(emailArgs);
+        }
+      }
+      return "transitioned";
+    }
+
+    // A revert to pending (payment vanished) changes status without a txid; it
+    // is not counted as a transition and sends no email (as before).
+    return "unchanged";
+  } catch (err) {
+    console.error(`${logPrefix} invoice failed`, inv.id, err);
+    return "error";
+  }
+}

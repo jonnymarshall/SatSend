@@ -1,9 +1,10 @@
 {
   "name": "satsend",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:sweep": "node scripts/dev/sweep.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
