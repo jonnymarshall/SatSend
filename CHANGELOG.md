@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.10 — Live updates stopped after a dropped connection (roadmap
+  v1.5.0.1-H).** `supabase.channel(name)` returns a channel still registered
+  under the same topic, and `removeChannel()` only drops it once the server
+  acknowledges. Re-opening before then (leaving a page and returning, React
+  Strict Mode in dev, or a reconnect) reused the old subscribed channel and threw
+  "cannot add `postgres_changes` callbacks … after `subscribe()`". In production
+  the reconnect swallowed that error and live updates stopped until a reload.
+  `useInvoiceChannel` now waits for any same-topic channel to be removed before
+  opening a new one, retries (with backoff) when connecting throws, and ignores
+  the CLOSED status of a channel it has replaced, which could otherwise start a
+  reconnect loop. A recovered connection logs `reconnected:` as a warning (so it
+  shows in the dev terminal next to the drop), and leaving a page no longer logs
+  its own channel's CLOSED as if it were a drop. While the browser is offline the hook
+  waits for the `online` event instead of spending its retries (it used to give
+  up after ~30 seconds offline), then reconnects with a fresh set. Removing the
+  page's last channel makes realtime-js close the socket without waiting, and
+  that close event used to error the replacement channel as soon as it joined:
+  an endless `reconnected:` / `CHANNEL_ERROR` loop. The hook now waits for the
+  socket to finish closing before opening the new channel, and cancels a pending
+  rebuild when realtime-js rejoins the channel by itself. Returning to the tab
+  while offline no longer refreshes the page (the failed fetch made Next load the
+  whole page, which showed the browser's offline screen); instead the page
+  refreshes once after reconnecting, picking up changes missed while offline.
+
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already
   published re-ran the publish checks, and the cross-account address check

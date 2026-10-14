@@ -56,11 +56,64 @@ export function useInvoiceChannel({
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") router.refresh();
+      // v1.5.10: offline, refresh() cannot fetch, so Next falls back to a full
+      // page load and the tab lands on the browser's offline page. Skip it; the
+      // reconnect below refreshes once the network is back.
+      if (document.visibilityState === "visible" && navigator.onLine !== false) router.refresh();
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // v1.5.10: while the browser is offline every attempt fails at once, so the
+    // whole backoff (~30s) was spent and the hook gave up before the network
+    // came back. Offline, wait for the "online" event instead, then reconnect
+    // with a fresh set of attempts.
+    let waitingForOnline = false;
+    // Set on a drop, cleared on the next subscribe: that subscribe is a recovery.
+    let dropped = false;
+    const handleOnline = () => {
+      if (!waitingForOnline || cancelled) return;
+      waitingForOnline = false;
+      attempts = 0;
+      channel = null;
+      void connect();
+    };
+    window.addEventListener("online", handleOnline);
+
+    // v1.5.10 (v1.5.0.1-H): supabase.channel(name) hands back a channel that is
+    // still registered under the same topic, and removeChannel() only drops it
+    // once the server acknowledges the unsubscribe. Re-opening before then (leave
+    // and return, Strict Mode, or a reconnect) got the old, already-subscribed
+    // channel, and setup's .on() threw. Wait until no channel holds the topic.
+    async function removeSameTopicChannels() {
+      const topic = `realtime:${channelName}`;
+      const stale = supabase.getChannels().filter((c) => c.topic === topic);
+      await Promise.all(stale.map((c) => supabase.removeChannel(c)));
+      if (supabase.getChannels().some((c) => c.topic === topic)) {
+        throw new Error(`channel ${topic} is still registered after removal`);
+      }
+    }
+
+    // Removing the last channel makes realtime-js close the socket, without
+    // waiting. That old socket's close event, arriving after our new channel
+    // had joined, errored the new channel too: a reconnected → CHANNEL_ERROR
+    // loop that never ended. Wait for the close to finish (it takes up to ~3s).
+    async function waitForSocketClosed() {
+      for (let waited = 0; supabase.realtime.isDisconnecting() && waited < 5_000; waited += 100) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (cancelled) return;
+      }
+    }
+
     async function connect() {
+      try {
+        await openChannel();
+      } catch (err) {
+        console.error(`[invoice-realtime] connect failed on ${channelName}`, err);
+        scheduleReconnect();
+      }
+    }
+
+    async function openChannel() {
       if (cancelled) return;
 
       if (auth === "session") {
@@ -78,17 +131,46 @@ export function useInvoiceChannel({
       }
       if (cancelled) return;
 
+      await removeSameTopicChannels();
+      if (cancelled) return;
+      await waitForSocketClosed();
+      if (cancelled) return;
+
       const ch = supabase.channel(
         channelName!,
         isPrivate ? { config: { private: true } } : undefined
       );
-      channel = setupRef.current(ch, router);
-      channel.subscribe((status, err) => {
+      const current = setupRef.current(ch, router);
+      channel = current;
+      current.subscribe((status, err) => {
+        // A replaced channel reports CLOSED when we remove it; that is not a new
+        // drop, and reacting to it would start a reconnect loop.
+        // After unmount, our own removal reports CLOSED too: not a drop.
+        if (cancelled || channel !== current) return;
         if (status === "SUBSCRIBED") {
+          const recovered = dropped;
+          dropped = false;
+          // Recovered by itself (realtime-js rejoins on reconnect): nothing to
+          // redo, and a pending rebuild would only tear down a healthy channel.
+          waitingForOnline = false;
+          if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+          }
           attempts = 0;
-          console.info(`[invoice-realtime] subscribed: ${channelName}`);
+          if (recovered) {
+            // Changes made while we were disconnected were never delivered:
+            // fetch them now.
+            router.refresh();
+            // warn, not info, so the recovery shows next to the drop warning
+            // (Next forwards only warn/error to the dev terminal by default).
+            console.warn(`[invoice-realtime] reconnected: ${channelName}`);
+          } else {
+            console.info(`[invoice-realtime] subscribed: ${channelName}`);
+          }
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           console.warn(`[invoice-realtime] ${status} on ${channelName}`, err);
+          dropped = true;
           scheduleReconnect();
         }
       });
@@ -96,6 +178,13 @@ export function useInvoiceChannel({
 
     function scheduleReconnect() {
       if (cancelled) return;
+      if (navigator.onLine === false) {
+        if (!waitingForOnline) {
+          console.warn(`[invoice-realtime] offline; will reconnect ${channelName} when back online`);
+        }
+        waitingForOnline = true;
+        return;
+      }
       if (attempts >= RECONNECT_MAX) {
         console.warn(`[invoice-realtime] gave up reconnecting ${channelName}`);
         return;
@@ -104,20 +193,19 @@ export function useInvoiceChannel({
       attempts += 1;
       retryTimer = setTimeout(() => {
         retryTimer = null;
-        if (channel) {
-          supabase.removeChannel(channel);
-          channel = null;
-        }
-        connect();
+        // connect() removes the dropped channel (and waits for it) first.
+        channel = null;
+        void connect();
       }, delay);
     }
 
-    connect();
+    void connect();
 
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
       if (channel) supabase.removeChannel(channel);
     };
   }, [channelName, auth, isPrivate, router]);

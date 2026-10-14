@@ -48,8 +48,11 @@ vi.mock("@/lib/supabase/client", () => ({
       return makeMockChannel();
     },
     removeChannel: (ch: unknown) => removeChannelSpy(ch),
+    // No channel left over from an earlier mount (v1.5.10).
+    getChannels: () => [],
     realtime: {
       setAuth: setAuthSpy,
+      isDisconnecting: () => false,
     },
   }),
 }));
