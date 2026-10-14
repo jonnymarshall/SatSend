@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useInvoiceChannel } from "./use-invoice-channel";
 
+const { refreshSpy } = vi.hoisted(() => ({ refreshSpy: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: refreshSpy }),
 }));
 
 /*
@@ -104,6 +105,7 @@ beforeEach(() => {
   autoAckRemovals = true;
   setAuthImpl = () => Promise.resolve();
   socketClosing = false;
+  refreshSpy.mockClear();
   fakeClient.removeChannel.mockClear();
   fakeClient.realtime.setAuth.mockClear();
   vi.spyOn(console, "info").mockImplementation(() => {});
@@ -303,5 +305,36 @@ describe("useInvoiceChannel: re-opening a channel (v1.5.10)", () => {
     await flush();
     expect(fakeClient.removeChannel).not.toHaveBeenCalled();
     expect(created).toHaveLength(1);
+  });
+
+  it("returning to the tab while offline does not refresh (that would load the browser's offline page)", async () => {
+    let online = false;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    mount();
+    await flush();
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(refreshSpy).not.toHaveBeenCalled();
+
+    online = true;
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(refreshSpy).toHaveBeenCalledOnce();
+  });
+
+  it("after reconnecting it refreshes once, to show changes missed while disconnected", async () => {
+    vi.useFakeTimers();
+    mount();
+    await flush();
+    act(() => created[0].subscribeCb!("SUBSCRIBED"));
+    expect(refreshSpy).not.toHaveBeenCalled();
+
+    act(() => created[0].subscribeCb!("CHANNEL_ERROR"));
+    act(() => created[0].subscribeCb!("SUBSCRIBED"));
+    expect(refreshSpy).toHaveBeenCalledOnce();
   });
 });

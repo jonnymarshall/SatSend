@@ -28,7 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that close event used to error the replacement channel as soon as it joined:
   an endless `reconnected:` / `CHANNEL_ERROR` loop. The hook now waits for the
   socket to finish closing before opening the new channel, and cancels a pending
-  rebuild when realtime-js rejoins the channel by itself.
+  rebuild when realtime-js rejoins the channel by itself. Returning to the tab
+  while offline no longer refreshes the page (the failed fetch made Next load the
+  whole page, which showed the browser's offline screen); instead the page
+  refreshes once after reconnecting, picking up changes missed while offline.
 
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already

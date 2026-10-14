@@ -56,7 +56,10 @@ export function useInvoiceChannel({
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") router.refresh();
+      // v1.5.10: offline, refresh() cannot fetch, so Next falls back to a full
+      // page load and the tab lands on the browser's offline page. Skip it; the
+      // reconnect below refreshes once the network is back.
+      if (document.visibilityState === "visible" && navigator.onLine !== false) router.refresh();
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -156,6 +159,9 @@ export function useInvoiceChannel({
           }
           attempts = 0;
           if (recovered) {
+            // Changes made while we were disconnected were never delivered:
+            // fetch them now.
+            router.refresh();
             // warn, not info, so the recovery shows next to the drop warning
             // (Next forwards only warn/error to the dev terminal by default).
             console.warn(`[invoice-realtime] reconnected: ${channelName}`);
