@@ -90,6 +90,17 @@ export function useInvoiceChannel({
       }
     }
 
+    // Removing the last channel makes realtime-js close the socket, without
+    // waiting. That old socket's close event, arriving after our new channel
+    // had joined, errored the new channel too: a reconnected → CHANNEL_ERROR
+    // loop that never ended. Wait for the close to finish (it takes up to ~3s).
+    async function waitForSocketClosed() {
+      for (let waited = 0; supabase.realtime.isDisconnecting() && waited < 5_000; waited += 100) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (cancelled) return;
+      }
+    }
+
     async function connect() {
       try {
         await openChannel();
@@ -119,6 +130,8 @@ export function useInvoiceChannel({
 
       await removeSameTopicChannels();
       if (cancelled) return;
+      await waitForSocketClosed();
+      if (cancelled) return;
 
       const ch = supabase.channel(
         channelName!,
@@ -134,8 +147,13 @@ export function useInvoiceChannel({
         if (status === "SUBSCRIBED") {
           const recovered = dropped;
           dropped = false;
-          // Recovered by itself (realtime-js rejoins on reconnect): nothing to redo online.
+          // Recovered by itself (realtime-js rejoins on reconnect): nothing to
+          // redo, and a pending rebuild would only tear down a healthy channel.
           waitingForOnline = false;
+          if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+          }
           attempts = 0;
           if (recovered) {
             // warn, not info, so the recovery shows next to the drop warning

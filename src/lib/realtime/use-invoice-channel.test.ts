@@ -30,6 +30,9 @@ let created: FakeChannel[] = [];
 let pendingRemovals: Array<() => void> = [];
 let autoAckRemovals = true;
 let setAuthImpl: () => Promise<void> = () => Promise.resolve();
+// realtime-js closes the socket when its last channel is removed; true while
+// that close is still in progress.
+let socketClosing = false;
 
 function makeChannel(topic: string): FakeChannel {
   const ch: FakeChannel = {
@@ -76,7 +79,7 @@ const fakeClient = {
   auth: {
     getSession: () => Promise.resolve({ data: { session: { access_token: "tok" } } }),
   },
-  realtime: { setAuth: vi.fn(() => setAuthImpl()) },
+  realtime: { setAuth: vi.fn(() => setAuthImpl()), isDisconnecting: () => socketClosing },
 };
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => fakeClient }));
@@ -100,6 +103,7 @@ beforeEach(() => {
   pendingRemovals = [];
   autoAckRemovals = true;
   setAuthImpl = () => Promise.resolve();
+  socketClosing = false;
   fakeClient.removeChannel.mockClear();
   fakeClient.realtime.setAuth.mockClear();
   vi.spyOn(console, "info").mockImplementation(() => {});
@@ -260,5 +264,44 @@ describe("useInvoiceChannel: re-opening a channel (v1.5.10)", () => {
     await flush();
     expect(created).toHaveLength(1);
     expect(created[0].subscribed).toBe(true);
+  });
+
+  it("waits for the old socket to finish closing before opening the new channel", async () => {
+    vi.useFakeTimers();
+    mount();
+    await flush();
+
+    // Removing the only channel starts closing the socket. A channel joined
+    // before the close lands is errored by it: the reconnected → CHANNEL_ERROR loop.
+    socketClosing = true;
+    act(() => created[0].subscribeCb!("CHANNEL_ERROR"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    await flush();
+    expect(fakeClient.removeChannel).toHaveBeenCalledWith(created[0]);
+    expect(created).toHaveLength(1);
+
+    socketClosing = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    await flush();
+    expect(created).toHaveLength(2);
+    expect(created[1].subscribed).toBe(true);
+  });
+
+  it("if realtime-js rejoins by itself first, the pending rebuild is cancelled", async () => {
+    vi.useFakeTimers();
+    mount();
+    await flush();
+    act(() => created[0].subscribeCb!("CHANNEL_ERROR"));
+    act(() => created[0].subscribeCb!("SUBSCRIBED"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    await flush();
+    expect(fakeClient.removeChannel).not.toHaveBeenCalled();
+    expect(created).toHaveLength(1);
   });
 });

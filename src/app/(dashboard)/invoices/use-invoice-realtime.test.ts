@@ -49,6 +49,7 @@ vi.mock("@/lib/supabase/client", () => ({
     },
     realtime: {
       setAuth: setAuthSpy,
+      isDisconnecting: () => false,
     },
   }),
 }));

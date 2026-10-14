@@ -23,7 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows in the dev terminal next to the drop), and leaving a page no longer logs
   its own channel's CLOSED as if it were a drop. While the browser is offline the hook
   waits for the `online` event instead of spending its retries (it used to give
-  up after ~30 seconds offline), then reconnects with a fresh set.
+  up after ~30 seconds offline), then reconnects with a fresh set. Removing the
+  page's last channel makes realtime-js close the socket without waiting, and
+  that close event used to error the replacement channel as soon as it joined:
+  an endless `reconnected:` / `CHANNEL_ERROR` loop. The hook now waits for the
+  socket to finish closing before opening the new channel, and cancels a pending
+  rebuild when realtime-js rejoins the channel by itself.
 
 - **v1.5.9 — "Send now via email" failed after "Publish only" (roadmap
   v1.5.0.6-H).** Sending (or marking as sent) an invoice that was already

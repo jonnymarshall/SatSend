@@ -52,6 +52,7 @@ vi.mock("@/lib/supabase/client", () => ({
     getChannels: () => [],
     realtime: {
       setAuth: setAuthSpy,
+      isDisconnecting: () => false,
     },
   }),
 }));
