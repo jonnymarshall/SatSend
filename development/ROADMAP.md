@@ -731,7 +731,7 @@ Three ways to hit it:
       hook treated that as a new drop, so each reconnect could schedule another
       (a churn loop). Status callbacks from a replaced channel are now ignored.
       If a removal does not clear the topic, `connect()` throws and retries.
-- [ ] Manual (`manual-tests/v1.5.10-realtime-channel-reuse.md`): open an invoice detail page in dev (no error overlay); publish or
+- [x] Manual (`manual-tests/v1.5.10-realtime-channel-reuse.md`): open an invoice detail page in dev (no error overlay); publish or
       mark paid in another tab and see the detail page update by itself.
 
 **Not in scope:** two components subscribing to the same topic at once would still
@@ -868,7 +868,7 @@ branch (separate concerns).
 
 ### ⏳ v1.5.1.3-H — Sign-in emails in Signal Amber (confirm signup, magic link)
 
-**Branch:** `v<next package version>/auth-emails`.
+**Branch:** `v1.5.11/auth-emails` · package `1.5.11`.
 
 **Context (Jonny, 2026-10-12):** the "Confirm your signup" email still uses
 Supabase's plain default. Login is passwordless (`signInWithOtp` in
@@ -877,16 +877,16 @@ returning user gets **Magic link**. These are the first emails anyone sees from
 SatSend, so they come before the marketing homepage. Supabase sends them, not our
 code, so the templates live in Supabase's settings, not in `src/lib/email`.
 
-- [ ] **One design source:** render the two templates from the same React Email
+- [x] **One design source:** render the two templates from the same React Email
       frame (`src/lib/email/templates/layout.tsx`) by a script (e.g.
       `scripts/email/build-auth-templates.tsx`), with Supabase's placeholders
       (`{{ .ConfirmationURL }}`) left in, writing `supabase/templates/confirmation.html`
       and `magic_link.html`. Committed, so the look can't drift from our other
       emails. Logo from `https://satsend.me/brand/satsend-logo-email.png`.
-- [ ] Copy: heading, one sentence, amber button ("Confirm your email" / "Sign in
+- [x] Copy: heading, one sentence, amber button ("Confirm your email" / "Sign in
       to SatSend"), the link written out, "If you didn't ask for this, ignore this
       email." Subjects: "Confirm your SatSend account", "Your SatSend sign-in link".
-- [ ] `supabase/config.toml`: `[auth.email.template.confirmation]` and
+- [x] `supabase/config.toml`: `[auth.email.template.confirmation]` and
       `[auth.email.template.magic_link]` pointing at the files (local dev).
 - [ ] **Apply to the hosted projects** (test SatSend-dev, then production SatSend):
       Auth → Email Templates, or the Management API (needs a personal access
@@ -896,7 +896,7 @@ code, so the templates live in Supabase's settings, not in `src/lib/email`.
       spam scoring. If production still uses it, switch Auth → SMTP to Resend
       (`smtp.resend.com`, sender `SatSend <…@mail.satsend.me>`, so DKIM/SPF/DMARC
       match the invoice emails). Jonny's dashboard step; Claude writes the values.
-- [ ] Tests: the build script output contains `{{ .ConfirmationURL }}`, the logo
+- [x] Tests: the build script output contains `{{ .ConfirmationURL }}`, the logo
       URL and no `localhost`; a drift test that the committed HTML equals a fresh
       build.
 - [ ] Manual: sign up with a new address and sign in with an existing one, on
