@@ -888,10 +888,10 @@ code, so the templates live in Supabase's settings, not in `src/lib/email`.
       email." Subjects: "Confirm your SatSend account", "Your SatSend sign-in link".
 - [x] `supabase/config.toml`: `[auth.email.template.confirmation]` and
       `[auth.email.template.magic_link]` pointing at the files (local dev).
-- [ ] **Apply to the hosted projects** (test SatSend-dev, then production SatSend):
+- [x] **Apply to the hosted projects** (test SatSend-dev, then production SatSend):
       Auth → Email Templates, or the Management API (needs a personal access
       token from Jonny). Record in `OUTSTANDING-VERIFICATIONS.md`.
-- [ ] **Check who sends them.** Supabase's built-in mailer is rate-limited and
+- [x] **Check who sends them.** Supabase's built-in mailer is rate-limited and
       meant for testing; it sends from a Supabase address, which hurts trust and
       spam scoring. If production still uses it, switch Auth → SMTP to Resend
       (`smtp.resend.com`, sender `SatSend <…@mail.satsend.me>`, so DKIM/SPF/DMARC
@@ -899,8 +899,91 @@ code, so the templates live in Supabase's settings, not in `src/lib/email`.
 - [x] Tests: the build script output contains `{{ .ConfirmationURL }}`, the logo
       URL and no `localhost`; a drift test that the committed HTML equals a fresh
       build.
-- [ ] Manual: sign up with a new address and sign in with an existing one, on
+- [x] Manual: sign up with a new address and sign in with an existing one, on
       `satsend.me`; check Gmail inbox (not spam) and "Show original" (DMARC PASS).
+      Passed 2026-10-15. On SatSend-dev the first sign-up still got Supabase's default
+      (the Confirm sign up template hadn't been saved); fixed and re-tested.
+
+---
+
+### ⏳ v1.5.0.7-H — Sweep: wrong-network addresses re-checked every minute (cron timeouts)
+
+**Branch:** `v<next package version>/sweep-invalid-address`.
+
+**Report (Jonny, 2026-10-15).** cron-job.org sent two "Cronjob failed:
+payment-sweep · Last status: Timeout" emails (e.g. 2026-10-14 04:06 GMT), each
+followed a minute later by "executed successfully". cron-job.org gives up after
+30 s; the route itself may run 60 s (`maxDuration`).
+
+**Found (production, 2026-10-15).** 5 `pending` invoices have had
+`next_check_at = 2026-10-13 17:49:02` for two days (all set at once by v1.5.8's
+`rescheduleStoppedWatches`). Four have **mainnet** `bc1q…` addresses from April
+and May; one has the address `fsgdfb…` (9 characters, from the first day of
+testing). Production watches **testnet**, so mempool.space answers 400 for each.
+`fetchAddressTxs` turns any non-OK response into `null`, the sweep reads that
+as "mempool unreachable" and leaves the schedule alone (correct for an outage,
+wrong here). So all 5 are due again on every run: 5 wasted lookups a minute,
+forever, each with a 10 s timeout. On a slow mempool.space minute those plus the
+real checks run past cron-job.org's 30 s. Overlapping runs are safe, so no data
+is at risk; it is noise and wasted calls.
+
+- [ ] `fetchAddressTxs`: tell "this address is invalid" (400) apart from
+      "unreachable" (network error, timeout, 429, 5xx). Only the latter defers.
+- [ ] An invalid address stops the watch (`next_check_at = null`) and logs it
+      once, instead of being re-checked every minute. `rescheduleStoppedWatches`
+      must not put it back.
+- [ ] Time budget: stop starting new checks after ~20 s and return 200 with what
+      was done, so a slow minute finishes inside cron-job.org's 30 s. The rest
+      wait for the next run. Give `fetchTipHeight` / `fetchTx` a timeout too.
+- [ ] Data: the 5 existing rows (mainnet / junk addresses on a testnet
+      deployment) are dealt with by the change above; no manual edits.
+- [ ] Tests (TDD): 400 → stop the watch; 5xx/429/timeout → defer as now; budget
+      reached → 200 and the remaining invoices left due.
+- [ ] Manual: after deploy, the 5 invoices have `next_check_at` null and cron-job.org
+      shows no timeouts for a few days.
+
+---
+
+### ⏳ v1.5.1.4-H — Separate "Log in" and "Create account"
+
+**Branch:** `v<next package version>/login-signup`.
+
+**Request (Jonny, 2026-10-15).** Today `/login` is one form for everyone:
+`signInWithOtp` creates an account for any unknown email. Someone who forgets
+which address they used thinks they are signing in, gets "Confirm your SatSend
+account", and lands in an empty new account with no invoices. Reference: a
+login screen with "Welcome / Log in to …", one email field, **Continue**, and
+"No account? Create one" underneath. Keep magic links for both; the user must
+choose to switch between logging in and creating an account.
+
+- [ ] Two modes, each with its own address: `/login` ("Log in to SatSend",
+      "No account? Create one") and `/signup` ("Create your SatSend account",
+      "Already have an account? Log in"). The switch link carries the typed email
+      across. Same Signal Amber card as today; apply `ui-element-ids`.
+- [ ] **Log in with an unknown email:** call `signInWithOtp` with
+      `shouldCreateUser: false`, so no account is created and no email is sent.
+      Show "There's no SatSend account for that email" with a **Create an
+      account** button (to `/signup`, email filled in).
+- [ ] **Create account with a known email:** check on the server (service role,
+      e.g. a security-definer function callable only by `service_role`) before
+      sending. If it exists, send nothing and show "You already have an account
+      with that email" with a **Log in instead** button.
+- [ ] Check-your-inbox screens say which email is coming ("We've sent a sign-in
+      link" / "We've sent a link to confirm your account").
+- [ ] Links into auth (homepage CTAs in v1.5.2-H, the logged-out redirect) go to
+      the right mode; `/login` stays the default.
+- [ ] Tests (TDD): each mode sends the right call; unknown-email and known-email
+      paths show the prompt and send nothing; the switch keeps the email.
+- [ ] Manual: log in with an unknown address (prompt, no email, no new user in
+      Supabase → Users); sign up with an existing address (prompt, no email);
+      both happy paths still get the v1.5.11 emails.
+
+**Trade-off to accept:** both prompts reveal whether an email has an account
+(account enumeration). Common for this kind of product and what was asked for;
+keep Supabase's per-IP rate limits on, and limit the server-side check the same
+way so it can't be used to test lists of addresses.
+
+**Later (not this branch):** collect more on sign-up (e.g. name) if wanted.
 
 ---
 
