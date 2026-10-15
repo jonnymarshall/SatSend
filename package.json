@@ -1,6 +1,6 @@
 {
   "name": "satsend",
-  "version": "1.5.10",
+  "version": "1.5.11",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -64,6 +64,7 @@
     "jsdom": "^29.0.2",
     "pdf-parse": "^2.4.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^4.1.4"
   }

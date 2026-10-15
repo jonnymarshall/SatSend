@@ -18,3 +18,13 @@ site_url = "http://localhost:3000"
 additional_redirect_urls = []
 jwt_expiry = 3600
 enable_signup = true
+
+# Sign-up and sign-in emails (v1.5.11). Built by scripts/email/build-auth-templates.tsx;
+# the hosted projects get the same files via Auth → Email Templates.
+[auth.email.template.confirmation]
+subject = "Confirm your SatSend account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your SatSend sign-in link"
+content_path = "./supabase/templates/magic_link.html"

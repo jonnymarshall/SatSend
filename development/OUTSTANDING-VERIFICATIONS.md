@@ -18,5 +18,6 @@ the `pre-merge-verification` skill, not here.)
 | Supabase production (SatSend) Auth URLs: Site URL `https://satsend.me`, redirect `https://satsend.me/**`; Resend webhook → `https://satsend.me/api/webhooks/resend` | Done by Jonny (2026-10-10); re-check a magic-link login on `satsend.me` once it is primary | Login and bounce tracking on the new domain |
 | Delete the internal UI kit (`src/app/styleguide/`, `SHOW_UI_KIT`) | Not done — do at the end of v1.5.2-H (moved from v1.5-H, 2026-10-10) | Launch (throwaway code must not ship) |
 | Payment sweep: cron-job.org job every minute → `https://satsend.me/api/cron/payment-sweep` with `Authorization: Bearer <CRON_SECRET>`, failure emails on (v1.5.8) | Pending (Jonny, at merge of v1.5.8) | Statuses and payment emails update within minutes with nobody on the site; GitHub's schedule ran hours apart |
+| v1.5.11 sign-up / sign-in email templates (`supabase/templates/`) applied to SatSend-dev and SatSend (Auth → Email Templates, both subjects), and production auth email sent through Resend SMTP (`mail.satsend.me`) | Not done (at merge of v1.5.11) | Branded first emails; Supabase's built-in sender is rate-limited and hurts spam scoring |
 
 Per-version verification records live in `manual-tests/` — see its `README.md`.

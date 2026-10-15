@@ -41,8 +41,16 @@ const text: CSSProperties = {
   margin: "0 0 16px",
 };
 
-export function EmailLayout({ preview, children }: { preview: string; children: ReactNode }) {
-  const appUrl = getAppUrl();
+export function EmailLayout({
+  preview,
+  children,
+  appUrl = getAppUrl(),
+}: {
+  preview: string;
+  children: ReactNode;
+  /** Fixed site for emails built ahead of time (the Supabase auth templates). */
+  appUrl?: string;
+}) {
   return (
     <Html lang="en">
       <Head />

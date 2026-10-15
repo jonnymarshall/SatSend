@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.11 — Sign-up and sign-in emails in Signal Amber (roadmap v1.5.1.3-H).**
+  Supabase sends the "Confirm signup" and "Magic link" emails itself, so they
+  used its plain default. `scripts/email/build-auth-templates.tsx` now builds both
+  from the invoice emails' frame (`src/lib/email/templates/auth-emails.tsx` →
+  `supabase/templates/confirmation.html`, `magic_link.html`), with Supabase's
+  `{{ .ConfirmationURL }}` placeholder left in and the logo loaded from
+  `satsend.me`. Subjects: "Confirm your SatSend account" and "Your SatSend
+  sign-in link". `supabase/config.toml` points a local Supabase at the files; the
+  hosted projects get them through Auth → Email Templates. A test fails if the
+  committed HTML no longer matches a fresh build. `EmailLayout` takes an optional
+  fixed `appUrl` for emails built ahead of time. Adds `tsx` (dev) to run the script.
+
 ### Fixed
 
 - **v1.5.10 — Live updates stopped after a dropped connection (roadmap
