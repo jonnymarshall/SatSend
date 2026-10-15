@@ -866,7 +866,7 @@ branch (separate concerns).
 
 ---
 
-### ⏳ v1.5.1.3-H — Sign-in emails in Signal Amber (confirm signup, magic link)
+### ✅ v1.5.1.3-H — Sign-in emails in Signal Amber (confirm signup, magic link)
 
 **Branch:** `v1.5.11/auth-emails` · package `1.5.11`.
 
