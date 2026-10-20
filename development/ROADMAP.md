@@ -928,41 +928,45 @@ was allowed. So the file reached Proton; Proton refused to show it.
 
 ---
 
-### ⏳ v1.5.0.7-H — Sweep: wrong-network addresses re-checked every minute (cron timeouts)
+### ✅ v1.5.0.7-H — Sweep: wrong-network addresses re-checked every minute (cron timeouts)
 
-**Branch:** `v<next package version>/sweep-invalid-address`.
+**Branch:** `v1.5.13/sweep-invalid-address` · package `1.5.13`.
 
 **Report (Jonny, 2026-10-15).** cron-job.org sent two "Cronjob failed:
 payment-sweep · Last status: Timeout" emails (e.g. 2026-10-14 04:06 GMT), each
 followed a minute later by "executed successfully". cron-job.org gives up after
 30 s; the route itself may run 60 s (`maxDuration`).
 
-**Found (production, 2026-10-15).** 5 `pending` invoices have had
-`next_check_at = 2026-10-13 17:49:02` for two days (all set at once by v1.5.8's
-`rescheduleStoppedWatches`). Four have **mainnet** `bc1q…` addresses from April
-and May; one has the address `fsgdfb…` (9 characters, from the first day of
-testing). Production watches **testnet**, so mempool.space answers 400 for each.
-`fetchAddressTxs` turns any non-OK response into `null`, the sweep reads that
-as "mempool unreachable" and leaves the schedule alone (correct for an outage,
-wrong here). So all 5 are due again on every run: 5 wasted lookups a minute,
-forever, each with a 10 s timeout. On a slow mempool.space minute those plus the
-real checks run past cron-job.org's 30 s. Overlapping runs are safe, so no data
-is at risk; it is noise and wasted calls.
+**Found (production, 2026-10-15).** 5 `pending` invoices had been due since
+2026-10-13 17:49 and were re-checked on every run: four with **mainnet**
+addresses while production watched **testnet**, one with the junk address
+`fsgdfbngf`. mempool.space answers 400 for each, `fetchAddressTxs` turned that
+into `null`, and the sweep read it as "mempool unreachable", so the schedule never
+moved. On a slow mempool.space minute those plus the real checks ran past 30 s.
 
-- [ ] `fetchAddressTxs`: tell "this address is invalid" (400) apart from
-      "unreachable" (network error, timeout, 429, 5xx). Only the latter defers.
-- [ ] An invalid address stops the watch (`next_check_at = null`) and logs it
-      once, instead of being re-checked every minute. `rescheduleStoppedWatches`
-      must not put it back.
-- [ ] Time budget: stop starting new checks after ~20 s and return 200 with what
-      was done, so a slow minute finishes inside cron-job.org's 30 s. The rest
-      wait for the next run. Give `fetchTipHeight` / `fetchTx` a timeout too.
-- [ ] Data: the 5 existing rows (mainnet / junk addresses on a testnet
-      deployment) are dealt with by the change above; no manual edits.
-- [ ] Tests (TDD): 400 → stop the watch; 5xx/429/timeout → defer as now; budget
-      reached → 200 and the remaining invoices left due.
-- [ ] Manual: after deploy, the 5 invoices have `next_check_at` null and cron-job.org
-      shows no timeouts for a few days.
+**Since then (2026-10-20).** Production switched to mainnet for good (testing
+stays on testnet4). The four mainnet invoices were found really paid and marked
+paid; `fsgdfbngf` and the 13 testnet invoices were archived. Nothing is stuck.
+
+**Decided (Jonny, 2026-10-20).** Check the address against the running network
+*before* looking it up, rather than interpreting mempool.space's 400. Log only,
+no activity-feed entry (publishing already refuses such addresses). No "skip old
+payment emails" rule: late payment emails are true, the flood came from flipping
+networks, and production no longer flips.
+
+- [x] `checkInvoicePayment`: a malformed or other-network address stops the
+      watch (`next_check_at = null`), logs once, never contacts mempool.space,
+      sends nothing (`invalid_address`). The list check only reports it.
+- [x] `rescheduleStoppedWatches` leaves those stopped (moved, with the due-queue
+      loop, to `src/lib/invoices/sweep-due.ts`).
+- [x] Time budget: no new checks start after 15 s from the request
+      (`SWEEP_BUDGET_MS`); the rest stay due for the next run. The summary
+      reports `invalid` and `budgetReached`.
+- [x] `fetchTipHeight` / `fetchTx` time out after 10 s like `fetchAddressTxs`.
+- [x] Tests (TDD): wrong network and junk stop the watch without a lookup; the
+      list check writes nothing; budget spent stops new checks; reschedule skips
+      uncheckable addresses; timeouts present.
+- [ ] Manual (`manual-tests/v1.5.13-sweep-invalid-address.md`).
 
 ---
 

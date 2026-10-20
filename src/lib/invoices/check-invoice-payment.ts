@@ -1,4 +1,6 @@
 import { fetchAddressTxs } from "@/lib/mempool";
+import { addressNetworkError } from "@/lib/btc-network";
+import { isValidBtcAddress } from "@/lib/invoices";
 import { fetchBtcPrice } from "@/lib/btc-price";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
@@ -44,6 +46,7 @@ export type CheckOutcome =
   | "unchanged" // checked, nothing new
   | "lost_race" // another writer moved the row first; no emails
   | "mempool_unreachable" // deferred, schedule untouched
+  | "invalid_address" // malformed or other-network address: watch stopped, never looked up
   | "error";
 
 export interface CheckOptions {
@@ -64,6 +67,23 @@ export async function checkInvoicePayment(
   { writeOnlyOnStatusChange = false, logPrefix = "[payment-check]" }: CheckOptions = {}
 ): Promise<CheckOutcome> {
   try {
+    if (!isValidBtcAddress(inv.btc_address) || addressNetworkError(inv.btc_address)) {
+      // mempool.space can never answer for this address (v1.5.13, roadmap
+      // v1.5.0.7-H): wrong network, or junk from before publish validated it.
+      // Stop the watch instead of re-checking it every minute; the list check
+      // only reports it. Publishing refuses such addresses, so only old rows hit this.
+      if (writeOnlyOnStatusChange) return "invalid_address";
+      console.warn(`${logPrefix} address can't be checked on this network, stopping its watch`, inv.id);
+      const { error } = await supabase
+        .from("invoices")
+        .update({ next_check_at: null })
+        .eq("id", inv.id)
+        .eq("status", inv.status)
+        .select("id");
+      if (error) console.error(`${logPrefix} stopping watch failed`, inv.id, error);
+      return "invalid_address";
+    }
+
     const txs = await fetchAddressTxs(inv.btc_address);
     if (txs === null) {
       // mempool.space was unreachable — NOT the same as "no payment yet".

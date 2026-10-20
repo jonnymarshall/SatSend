@@ -82,6 +82,7 @@ function makeSelectBuilder(rows: unknown[]) {
   builder.limit = chain("limit");
   builder.order = chain("order");
   builder.not = chain("not");
+  builder.is = chain("is");
   builder.then = (onFulfilled: (v: unknown) => unknown) =>
     Promise.resolve({ data: rows, error: null }).then(onFulfilled);
   return { builder, calls };
@@ -182,7 +183,7 @@ describe("GET /api/cron/payment-sweep — scope", () => {
     const res = await getRequest(authHeaders());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ processed: 0, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 0, transitions: 0, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
   });
 });
 
@@ -190,7 +191,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
   const pending = {
     id: "inv-1",
     user_id: "owner-1",
-    btc_address: "tb1qaddr",
+    btc_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
     status: "pending" as const,
     mempool_seen_at: null,
     stage_attempt: 0,
@@ -207,14 +208,14 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
   const unconfirmed = {
     txid: "tx-seen",
     status: { confirmed: false },
-    vout: [{ scriptpubkey_address: "tb1qaddr", value: 50_000 }],
+    vout: [{ scriptpubkey_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", value: 50_000 }],
   };
 
   // 500,000 sats @ $50,000/BTC = $250 — matches `pending.total_fiat` exactly.
   const confirmed = {
     txid: "tx-paid",
     status: { confirmed: true, block_height: 900_000 },
-    vout: [{ scriptpubkey_address: "tb1qaddr", value: 500_000 }],
+    vout: [{ scriptpubkey_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", value: 500_000 }],
   };
 
   it("updates an invoice and dispatches payment_detected email when an unconfirmed tx is seen", async () => {
@@ -230,7 +231,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     const res = await getRequest(authHeaders());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
 
     expect(statusUpdates(update.calls)).toHaveLength(1);
     expect(update.calls[0].payload).toMatchObject({
@@ -286,7 +287,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
 
     expect(mockSendConfirmed).toHaveBeenCalledTimes(1);
     expect(mockSendDetected).not.toHaveBeenCalled();
@@ -305,13 +306,13 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
     mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
     // 50,000 sats @ $50,000/BTC = $25 — 10% of the $250 total.
     mockFetchAddressTxs.mockResolvedValue([
-      { txid: "tx-under", status: { confirmed: true, block_height: 900_000 }, vout: [{ scriptpubkey_address: "tb1qaddr", value: 50_000 }] },
+      { txid: "tx-under", status: { confirmed: true, block_height: 900_000 }, vout: [{ scriptpubkey_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", value: 50_000 }] },
     ]);
     mockGetUserById.mockResolvedValue({ data: { user: { id: "owner-1", email: "owner@example.com" } } });
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 1, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
 
     expect(update.calls[0].payload).toMatchObject({ status: "underpaid", amount_received_sats: 50_000 });
     expect(mockSendConfirmed).toHaveBeenCalledTimes(1);
@@ -328,7 +329,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
 
     expect(update.calls[0].payload).toMatchObject({ status: "payment_detected" });
     expect(mockSendConfirmed).not.toHaveBeenCalled();
@@ -343,7 +344,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
 
     expect(statusUpdates(update.calls)).toHaveLength(1);
     expect(update.calls[0].payload).toMatchObject({
@@ -381,7 +382,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
     expect(mockSendDetected).not.toHaveBeenCalled();
     expect(mockSendConfirmed).not.toHaveBeenCalled();
   });
@@ -394,7 +395,7 @@ describe("GET /api/cron/payment-sweep — per-invoice processing", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 1, transitions: 0, errors: 1, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 1, transitions: 0, errors: 1, invalid: 0, budgetReached: false, overdueFlips: 0 });
     expect(statusUpdates(update.calls)).toHaveLength(0);
     expect(mockSendDetected).not.toHaveBeenCalled();
   });
@@ -524,15 +525,17 @@ describe("GET /api/cron/payment-sweep — overdue auto-flip (case #1)", () => {
 
     const res = await getRequest(authHeaders());
     const body = await res.json();
-    expect(body).toEqual({ processed: 0, transitions: 0, errors: 0, overdueFlips: 0 });
+    expect(body).toEqual({ processed: 0, transitions: 0, errors: 0, invalid: 0, budgetReached: false, overdueFlips: 0 });
   });
 });
 
 describe("GET /api/cron/payment-sweep — stopped watches (v1.5.8)", () => {
   it("puts unpaid invoices whose watch had stopped back on the schedule, due now", async () => {
-    const { builder } = makeSelectBuilder([]);
-    const update = makeUpdateBuilder({ error: null }, [{ id: "old-1" }, { id: "old-2" }]);
+    // Rules for which stopped watches restart: src/lib/invoices/sweep-due.test.ts.
+    const { builder } = makeSelectBuilder([{ id: "old-1", btc_address: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq" }]);
+    const update = makeUpdateBuilder({ error: null }, [{ id: "old-1" }]);
     mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+    mockFetchAddressTxs.mockResolvedValue([]);
 
     await getRequest(authHeaders());
 
@@ -541,11 +544,26 @@ describe("GET /api/cron/payment-sweep — stopped watches (v1.5.8)", () => {
     expect(Object.keys(reschedule!.payload as object)).toEqual(["next_check_at"]);
     expect(reschedule!.filters).toEqual(
       expect.arrayContaining([
-        { method: "in", args: ["status", ["pending", "overdue"]] },
+        { method: "in", args: ["id", ["old-1"]] },
         { method: "is", args: ["next_check_at", null] },
-        { method: "not", args: ["btc_address", "is", null] },
       ])
     );
+  });
+
+  it("stops watching an address for the other network without looking it up (v1.5.13)", async () => {
+    const { builder } = makeSelectBuilder([
+      { id: "inv-tn", user_id: "owner-1", status: "pending", btc_address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx" },
+    ]);
+    const update = makeUpdateBuilder();
+    mockFrom.mockImplementation(() => ({ ...builder, update: update.factory }));
+
+    const res = await getRequest(authHeaders());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ processed: 1, invalid: 1, errors: 0, budgetReached: false });
+    expect(mockFetchAddressTxs).not.toHaveBeenCalled();
+    expect(update.calls.map((c) => c.payload)).toContainEqual({ next_check_at: null });
   });
 });
 

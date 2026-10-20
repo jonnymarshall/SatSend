@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.13 — Payment sweep timeouts (roadmap v1.5.0.7-H).** cron-job.org
+  reported occasional "Timeout" failures: invoices whose address the running
+  network can't look up (mainnet addresses on testnet, a junk address) were
+  re-checked every minute, because mempool.space's "invalid address" reply was
+  read as "unreachable". The payment check now tests the address against the
+  running network first: a malformed or other-network address stops that
+  invoice's watch, is logged once and is never sent to mempool.space, and the
+  stopped-watch reschedule leaves it alone. The sweep stops starting new checks
+  after 15 seconds (the rest wait for the next run), so it answers within
+  cron-job.org's 30, and `fetchTipHeight` / `fetchTx` now time out after 10
+  seconds. The sweep's response adds `invalid` and `budgetReached`. The due-queue
+  loop moved to `src/lib/invoices/sweep-due.ts`.
+
+### Fixed
+
 - **v1.5.12 — Email logo missing in Proton Mail (roadmap v1.5.0.8-H).** The
   first mainnet invoice email showed a broken image where the logo should be in
   Proton Mail. Proton's servers did fetch `satsend.me/brand/satsend-logo-email.png`

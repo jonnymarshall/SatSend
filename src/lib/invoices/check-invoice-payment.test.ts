@@ -16,7 +16,8 @@ vi.mock("@/lib/email/send", () => ({
 import { checkInvoicePayment, type CheckableInvoice } from "./check-invoice-payment";
 
 const NOW = new Date("2026-10-13T12:00:00Z");
-const ADDR = "tb1qaddr";
+// A real mainnet address: tests run with NEXT_PUBLIC_BTC_NETWORK unset (mainnet).
+const ADDR = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
 
 const detected: CheckableInvoice = {
   id: "inv-1",
@@ -109,5 +110,31 @@ describe("checkInvoicePayment", () => {
     const db = fakeDb("payment_detected");
     expect(await checkInvoicePayment(db.client, detected, 900_002, NOW)).toBe("mempool_unreachable");
     expect(db.updates).toHaveLength(0);
+  });
+
+  describe("address the running network can't look up (v1.5.13)", () => {
+    const testnet = { ...detected, status: "pending" as const, btc_address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx" };
+    const junk = { ...detected, status: "pending" as const, btc_address: "fsgdfbngf" };
+
+    it.each([
+      ["a testnet address on mainnet", testnet],
+      ["a malformed address", junk],
+    ])("stops the watch for %s without contacting mempool.space", async (_label, inv) => {
+      const db = fakeDb("pending");
+      expect(await checkInvoicePayment(db.client, inv, 900_002, NOW)).toBe("invalid_address");
+      expect(mockFetchAddressTxs).not.toHaveBeenCalled();
+      expect(db.updates).toEqual([{ next_check_at: null }]);
+      expect(mockSendDetected).not.toHaveBeenCalled();
+      expect(mockSendConfirmed).not.toHaveBeenCalled();
+    });
+
+    it("with writeOnlyOnStatusChange (the list check), reports it but writes nothing", async () => {
+      const db = fakeDb("pending");
+      expect(await checkInvoicePayment(db.client, junk, 900_002, NOW, { writeOnlyOnStatusChange: true })).toBe(
+        "invalid_address",
+      );
+      expect(mockFetchAddressTxs).not.toHaveBeenCalled();
+      expect(db.updates).toHaveLength(0);
+    });
   });
 });
