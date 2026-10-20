@@ -261,6 +261,24 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_check_attempts: {
+        Row: {
+          client_key: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
+      }
       webhook_deliveries: {
         Row: {
           event_type: string
@@ -336,6 +354,14 @@ export type Database = {
       is_address_registered: { Args: { addr: string }; Returns: boolean }
       is_email_registered: { Args: { p_email: string }; Returns: boolean }
       line_items_valid: { Args: { items: Json }; Returns: boolean }
+      take_signup_check: {
+        Args: {
+          p_client_key: string
+          p_limit: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       email_event_status:

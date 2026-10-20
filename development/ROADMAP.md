@@ -983,8 +983,8 @@ login screen with "Welcome / Log in to …", one email field, **Continue**, and
 choose to switch between logging in and creating an account.
 
 **Decided (Jonny, 2026-10-20).** Buttons "Send sign-in link" / "Create account".
-Sign-up check rate limited by a Vercel firewall rule, **5 an hour per IP** (the
-firewall allows windows up to 3600 s). Fold in two fixes to the same page: show
+Sign-up check limited to **5 an hour per IP** (planned as a firewall rule; done in
+the app by v1.5.1.5-H, see below). Fold in two fixes to the same page: show
 send errors instead of "Check your email", and explain expired/used links.
 
 - [x] Two modes, each with its own address: `/login` ("Log in to SatSend",
@@ -1007,17 +1007,46 @@ send errors instead of "Check your email", and explain expired/used links.
 - [x] Tests (TDD): each mode sends the right call; unknown and known email show
       the prompt and send nothing; the switch keeps the email; 429 and failures
       explained; route validates input and fails loudly.
-- [ ] **At merge:** apply 0033 to production (Supabase MCP `apply_migration`,
-      then check the grants); add and publish the Vercel firewall rule
-      `signup-check rate limit` (POST `/api/auth/signup-check`, 5 per 3600 s per
-      IP, 429 beyond).
+- [x] **At merge (2026-10-20):** 0033 applied to production, grants checked.
+      The planned firewall rule was refused: Hobby allows one rate-limit rule,
+      already used by `rate-limit-public-invoice-routes`. `/api/auth/signup-check`
+      was added to that rule instead (30/min, outer layer) and the 5-an-hour limit
+      moved to v1.5.1.5-H.
 - [ ] Manual (`manual-tests/v1.5.14-login-signup.md`).
 
 **Trade-off accepted:** both prompts reveal whether an email has an account
 (account enumeration). The log-in side is limited by Supabase's own rate limits;
-the sign-up check by the firewall rule above.
+the sign-up check by v1.5.1.5-H.
 
 **Later (not this branch):** collect more on sign-up (e.g. name) if wanted.
+
+---
+
+### ✅ v1.5.1.5-H — Sign-up check: 5 an hour per connection
+
+**Branch:** `v1.5.15/signup-rate-limit` · package `1.5.15` · migration `0034`.
+
+**Why.** v1.5.14's `POST /api/auth/signup-check` reveals whether an email has an
+account, so it needs a tight limit (Jonny: 5 an hour per connection, allowing a
+mistake or two). Vercel Hobby allows one firewall rate-limit rule, already used by
+`rate-limit-public-invoice-routes` (30/min); the path was added there as an outer
+layer (2026-10-20), and the 5-an-hour limit is counted in the app.
+
+- [x] Migration 0034: `signup_check_attempts` (RLS on, no policies, no app-role
+      grants) and `take_signup_check(key, limit, window)`: security definer,
+      `service_role` only; one advisory-locked step that clears rows older than
+      the window, counts the key's rows, and records the attempt only if under
+      the limit (a refused attempt isn't recorded).
+- [x] Route: key = HMAC-SHA256 of the client IP (`x-forwarded-for` first entry)
+      with a server-only secret, never the raw IP; 5 per 3600 s; over the limit
+      → 429 without looking the email up; limit check failing → 503 (fail
+      closed). Invalid input is rejected before it counts.
+- [x] Tests: limit asked before the lookup; 429 skips the lookup; same IP same
+      key, different IP different key, key isn't the IP; fail closed. Database
+      checked on SatSend-dev: 5 allowed then refused, another key unaffected,
+      allowed again after the window, old rows cleared.
+- [ ] **At merge:** apply 0034 to production (MCP `apply_migration`), check grants.
+- [ ] Manual (`manual-tests/v1.5.15-signup-rate-limit.md`).
 
 ---
 
