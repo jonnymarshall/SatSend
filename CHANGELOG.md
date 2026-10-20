@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.14 — Separate "Log in" and "Create account" (roadmap v1.5.1.4-H).**
+  `/login` used to create an account for any unknown email, so someone who
+  mistyped or forgot their address landed in an empty new account. Log in
+  (`/login`) and Create account (`/signup`) are now separate pages with a link to
+  switch that keeps the typed email. Log in never creates an account
+  (`shouldCreateUser: false`): an unknown email gets "There's no SatSend account
+  for that email." and a Create an account button. Create account first asks
+  `POST /api/auth/signup-check` (new `public.is_email_registered`, migration
+  0033, callable by `service_role` only; Vercel firewall limit 5 an hour per IP):
+  an existing email gets "You already have an account with that email." and Log
+  in instead. Nothing is sent in either case.
+
+### Fixed
+
+- **v1.5.14 — Login page errors.** The page said "Check your email" even when
+  the link wasn't sent (e.g. Supabase's one-a-minute limit); it now says why. A
+  used or expired sign-in link now explains itself on `/login` instead of
+  silently returning there.
+
 ### Fixed
 
 - **v1.5.13 — Payment sweep timeouts (roadmap v1.5.0.7-H).** cron-job.org
