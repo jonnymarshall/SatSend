@@ -334,6 +334,7 @@ export type Database = {
     }
     Functions: {
       is_address_registered: { Args: { addr: string }; Returns: boolean }
+      is_email_registered: { Args: { p_email: string }; Returns: boolean }
       line_items_valid: { Args: { items: Json }; Returns: boolean }
     }
     Enums: {

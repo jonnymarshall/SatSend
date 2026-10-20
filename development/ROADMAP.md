@@ -970,9 +970,9 @@ networks, and production no longer flips.
 
 ---
 
-### ⏳ v1.5.1.4-H — Separate "Log in" and "Create account"
+### ✅ v1.5.1.4-H — Separate "Log in" and "Create account"
 
-**Branch:** `v<next package version>/login-signup`.
+**Branch:** `v1.5.14/login-signup` · package `1.5.14` · migration `0033`.
 
 **Request (Jonny, 2026-10-15).** Today `/login` is one form for everyone:
 `signInWithOtp` creates an account for any unknown email. Someone who forgets
@@ -982,32 +982,40 @@ login screen with "Welcome / Log in to …", one email field, **Continue**, and
 "No account? Create one" underneath. Keep magic links for both; the user must
 choose to switch between logging in and creating an account.
 
-- [ ] Two modes, each with its own address: `/login` ("Log in to SatSend",
+**Decided (Jonny, 2026-10-20).** Buttons "Send sign-in link" / "Create account".
+Sign-up check rate limited by a Vercel firewall rule, **5 an hour per IP** (the
+firewall allows windows up to 3600 s). Fold in two fixes to the same page: show
+send errors instead of "Check your email", and explain expired/used links.
+
+- [x] Two modes, each with its own address: `/login` ("Log in to SatSend",
       "No account? Create one") and `/signup` ("Create your SatSend account",
       "Already have an account? Log in"). The switch link carries the typed email
-      across. Same Signal Amber card as today; apply `ui-element-ids`.
-- [ ] **Log in with an unknown email:** call `signInWithOtp` with
-      `shouldCreateUser: false`, so no account is created and no email is sent.
-      Show "There's no SatSend account for that email" with a **Create an
-      account** button (to `/signup`, email filled in).
-- [ ] **Create account with a known email:** check on the server (service role,
-      e.g. a security-definer function callable only by `service_role`) before
-      sending. If it exists, send nothing and show "You already have an account
-      with that email" with a **Log in instead** button.
-- [ ] Check-your-inbox screens say which email is coming ("We've sent a sign-in
-      link" / "We've sent a link to confirm your account").
-- [ ] Links into auth (homepage CTAs in v1.5.2-H, the logged-out redirect) go to
-      the right mode; `/login` stays the default.
-- [ ] Tests (TDD): each mode sends the right call; unknown-email and known-email
-      paths show the prompt and send nothing; the switch keeps the email.
-- [ ] Manual: log in with an unknown address (prompt, no email, no new user in
-      Supabase → Users); sign up with an existing address (prompt, no email);
-      both happy paths still get the v1.5.11 emails.
+      across (`?email=`). Shared `src/components/auth/auth-form.tsx`.
+- [x] **Log in with an unknown email:** `signInWithOtp` with
+      `shouldCreateUser: false`; Supabase answers `otp_disabled` (422) with no
+      account created and no email sent. Shows "There's no SatSend account for
+      that email." with a **Create an account** button.
+- [x] **Create account with a known email:** `POST /api/auth/signup-check` asks
+      `public.is_email_registered` (migration 0033, security definer, EXECUTE for
+      `service_role` only). If it exists, nothing is sent: "You already have an
+      account with that email." with **Log in instead**.
+- [x] Check-your-inbox screens say which email is coming.
+- [x] Send errors are shown (e.g. "Please wait a minute before asking for
+      another link"); `/login?error=auth` explains an expired or used link.
+- [x] The logged-out redirect and sign-out still go to `/login` (the default).
+      Homepage CTAs (v1.5.2-H) should link `/signup` and `/login`.
+- [x] Tests (TDD): each mode sends the right call; unknown and known email show
+      the prompt and send nothing; the switch keeps the email; 429 and failures
+      explained; route validates input and fails loudly.
+- [ ] **At merge:** apply 0033 to production (Supabase MCP `apply_migration`,
+      then check the grants); add and publish the Vercel firewall rule
+      `signup-check rate limit` (POST `/api/auth/signup-check`, 5 per 3600 s per
+      IP, 429 beyond).
+- [ ] Manual (`manual-tests/v1.5.14-login-signup.md`).
 
-**Trade-off to accept:** both prompts reveal whether an email has an account
-(account enumeration). Common for this kind of product and what was asked for;
-keep Supabase's per-IP rate limits on, and limit the server-side check the same
-way so it can't be used to test lists of addresses.
+**Trade-off accepted:** both prompts reveal whether an email has an account
+(account enumeration). The log-in side is limited by Supabase's own rate limits;
+the sign-up check by the firewall rule above.
 
 **Later (not this branch):** collect more on sign-up (e.g. name) if wanted.
 
