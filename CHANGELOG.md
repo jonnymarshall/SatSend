@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Security
+
+- **v1.5.15 — Create account's email check limited to 5 an hour per
+  connection (roadmap v1.5.1.5-H).** `POST /api/auth/signup-check` reveals
+  whether an email has an account, so it can't be left open to testing lists of
+  addresses. Vercel's Hobby plan allows a single firewall rate-limit rule
+  (already in use, now also covering this path at 30/min), so the stricter limit
+  is counted in the database: migration 0034 adds `signup_check_attempts` and
+  `take_signup_check` (service role only; counts and records in one locked
+  step). The route keys on an HMAC of the caller's IP, never the IP itself,
+  answers 429 over the limit, and fails closed if the limit can't be checked.
+  The Create account page already shows "Too many sign-up attempts from your
+  connection. Please try again in an hour."
+
 ### Added
 
 - **v1.5.14 — Separate "Log in" and "Create account" (roadmap v1.5.1.4-H).**
