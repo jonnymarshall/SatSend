@@ -384,3 +384,40 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
     expect(mockResendSend.mock.calls[0][0]).not.toHaveProperty("replyTo");
   });
 });
+
+describe("logo embedded in the email (v1.5.12)", () => {
+  // Proton Mail fetched the logo from satsend.me and still showed a broken
+  // image, so emails we send carry the logo inline instead of linking to it.
+  const paymentArgs = {
+    ownerEmail: "owner@example.com",
+    payerEmail: "payer@example.com",
+    userId: "user-1",
+    invoiceId: "inv-1",
+    invoiceNumber: "INV-1",
+    senderName: "Charles",
+    clientName: "Ada",
+    totalFiat: 250,
+    currency: "USD",
+    txid: "tx-abc",
+  };
+
+  it("attaches the logo inline and the HTML points at it, not at a web address", async () => {
+    const { render } = await import("@react-email/render");
+    const { readFileSync } = await import("node:fs");
+    const png = readFileSync("public/brand/satsend-logo-email.png").toString("base64");
+
+    await sendInvoicePublishedEmail(baseArgs);
+    await sendPaymentDetectedEmail(paymentArgs);
+    await sendPaymentConfirmedEmail({ ...paymentArgs, status: "paid", amountReceivedFiat: 250, overpaid: false });
+
+    expect(mockResendSend.mock.calls.length).toBeGreaterThanOrEqual(5);
+    for (const [payload] of mockResendSend.mock.calls) {
+      expect(payload.attachments).toEqual([
+        { filename: "satsend-logo.png", content: png, contentType: "image/png", contentId: "satsend-logo" },
+      ]);
+      const html = await render(payload.react);
+      expect(html).toContain('src="cid:satsend-logo"');
+      expect(html).not.toContain("/brand/satsend-logo-email.png");
+    }
+  });
+});

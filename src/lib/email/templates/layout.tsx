@@ -2,6 +2,7 @@ import { Body, Container, Head, Html, Img, Link, Preview, Section, Text } from "
 import type { CSSProperties, ReactNode } from "react";
 import { getAppUrl } from "@/lib/app-url";
 import { statusColors } from "@/lib/brand-colors";
+import { LOGO_CONTENT_ID } from "../logo-inline";
 
 /**
  * Signal Amber email frame (v1.5.5, roadmap v1.5.1-H). Email apps ignore
@@ -22,9 +23,9 @@ export const EMAIL = {
 } as const;
 
 /**
- * Where the email loads the logo from. Email apps (and Gmail's image proxy)
- * cannot reach localhost, so emails sent from local dev borrow the live site's
- * copy of the same file.
+ * Where an email that can't carry the inline logo (the Supabase auth templates)
+ * loads it from. Email apps (and Gmail's image proxy) cannot reach localhost, so
+ * local dev borrows the live site's copy of the same file.
  */
 export function emailLogoUrl(appUrl: string = getAppUrl()): string {
   const base = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(appUrl) ? "https://satsend.me" : appUrl;
@@ -45,11 +46,17 @@ export function EmailLayout({
   preview,
   children,
   appUrl = getAppUrl(),
+  logoSrc = `cid:${LOGO_CONTENT_ID}`,
 }: {
   preview: string;
   children: ReactNode;
   /** Fixed site for emails built ahead of time (the Supabase auth templates). */
   appUrl?: string;
+  /**
+   * Defaults to the logo attached inline by send.ts (v1.5.12). Emails sent by
+   * someone else (Supabase) can't carry the attachment and pass a web address.
+   */
+  logoSrc?: string;
 }) {
   return (
     <Html lang="en">
@@ -61,7 +68,7 @@ export function EmailLayout({
           <Section style={{ padding: "0 4px 20px" }}>
             <Link href={appUrl}>
               <Img
-                src={emailLogoUrl(appUrl)}
+                src={logoSrc}
                 width="132"
                 height="38"
                 alt="SatSend"
