@@ -1045,8 +1045,13 @@ layer (2026-10-20), and the 5-an-hour limit is counted in the app.
       key, different IP different key, key isn't the IP; fail closed. Database
       checked on SatSend-dev: 5 allowed then refused, another key unaffected,
       allowed again after the window, old rows cleared.
-- [ ] **At merge:** apply 0034 to production (MCP `apply_migration`), check grants.
-- [ ] Manual (`manual-tests/v1.5.15-signup-rate-limit.md`).
+- [x] **At merge (2026-10-20):** 0034 applied to production. The MCP
+      `apply_migration` call came back "cancelled" three times with no prompt
+      (likely the connector's own confirmation for SQL containing `delete`), so
+      Jonny ran the file in the SQL Editor and 0034 was recorded in
+      `supabase_migrations.schema_migrations` by hand (`20261020230000`).
+      Grants checked: anon/authenticated false, service_role true.
+- [x] Manual (`manual-tests/v1.5.15-signup-rate-limit.md`): TESTS 1–3 pass.
 
 ---
 
