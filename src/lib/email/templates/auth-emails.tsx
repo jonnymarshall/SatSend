@@ -1,5 +1,5 @@
 import { render } from "@react-email/render";
-import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText } from "./layout";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, emailLogoUrl } from "./layout";
 
 /**
  * Sign-up and sign-in emails (v1.5.11, roadmap v1.5.1.3-H). Supabase sends
@@ -42,7 +42,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
 
 export function AuthEmail({ template }: { template: AuthTemplate }) {
   return (
-    <EmailLayout preview={template.body} appUrl={SITE_URL}>
+    <EmailLayout preview={template.body} appUrl={SITE_URL} logoSrc={emailLogoUrl(SITE_URL)}>
       <EmailHeading>{template.heading}</EmailHeading>
       <EmailText>{template.body}</EmailText>
       <EmailButton href={CONFIRMATION_URL}>{template.button}</EmailButton>

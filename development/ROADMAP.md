@@ -906,6 +906,28 @@ code, so the templates live in Supabase's settings, not in `src/lib/email`.
 
 ---
 
+### ✅ v1.5.0.8-H — Email logo missing in Proton Mail
+
+**Branch:** `v1.5.12/email-logo-inline` · package `1.5.12` · reported 2026-10-20,
+before sending the first real (mainnet) invoice.
+
+**Report.** The "Noaddresstest" invoice email showed a broken-image placeholder
+instead of the logo in Proton Mail.
+
+**Found.** The logo URL answers 200 `image/png` to every client tried, and the
+Vercel firewall log shows Proton's network (`185.159.157.24`) fetched it twice and
+was allowed. So the file reached Proton; Proton refused to show it.
+
+- [x] Embed the logo in every email we send (Resend inline attachment, `cid:`),
+      so no email app needs to fetch it. A test checks every send carries it, the
+      HTML points at it, and the embedded copy equals the public PNG.
+- [x] Supabase sign-in emails keep the web address (they can't carry
+      attachments); templates unchanged.
+- [ ] Manual (`manual-tests/v1.5.12-email-logo-inline.md`): the logo shows in
+      Proton and Gmail.
+
+---
+
 ### ⏳ v1.5.0.7-H — Sweep: wrong-network addresses re-checked every minute (cron timeouts)
 
 **Branch:** `v<next package version>/sweep-invalid-address`.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.12 — Email logo missing in Proton Mail (roadmap v1.5.0.8-H).** The
+  first mainnet invoice email showed a broken image where the logo should be in
+  Proton Mail. Proton's servers did fetch `satsend.me/brand/satsend-logo-email.png`
+  (the Vercel firewall allowed it, and the file and headers are normal) but still
+  showed an error. Emails we send through Resend now carry the logo as an inline
+  attachment (`cid:satsend-logo`, `src/lib/email/logo-inline.ts`), so no email
+  app has to fetch it. The Supabase sign-in emails can't carry attachments and
+  still load the logo from `satsend.me`; their templates are unchanged.
+
 ### Added
 
 - **v1.5.11 — Sign-up and sign-in emails in Signal Amber (roadmap v1.5.1.3-H).**

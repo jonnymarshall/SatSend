@@ -5,6 +5,7 @@ import { PaymentDetectedOwnerEmail } from "./templates/payment-detected-owner";
 import { PaymentDetectedPayerEmail } from "./templates/payment-detected-payer";
 import { PaymentConfirmedOwnerEmail } from "./templates/payment-confirmed-owner";
 import { PaymentConfirmedPayerEmail } from "./templates/payment-confirmed-payer";
+import { LOGO_ATTACHMENT } from "./logo-inline";
 import { mempoolTxUrl } from "@/lib/btc-network";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
@@ -162,6 +163,8 @@ async function message(m: {
     subject: m.subject,
     react: m.react,
     text: await render(m.react, { plainText: true }),
+    // EmailLayout's logo is src="cid:satsend-logo" (v1.5.12).
+    attachments: [LOGO_ATTACHMENT],
     ...(m.replyTo ? { replyTo: m.replyTo } : {}),
   };
 }
