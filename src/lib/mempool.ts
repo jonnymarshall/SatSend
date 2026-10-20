@@ -25,11 +25,14 @@ export function txPaysToAddress(tx: MempoolTx, address: string): boolean {
 // API, this address has no transactions". Callers must not treat an outage as
 // "nothing paid yet": doing so burns the invoice's polling schedule during an
 // outage and can prematurely stop watching it. (v1.4.22-H / M-MONEY-2)
+/** Every mempool.space call gives up after this, so one hung request can't stall a sweep (v1.5.13). */
+const MEMPOOL_TIMEOUT_MS = 10_000;
+
 export async function fetchAddressTxs(address: string): Promise<MempoolTx[] | null> {
   const base = getMempoolBaseUrl();
   try {
     const res = await fetch(`${base}/api/address/${address}/txs`, {
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(MEMPOOL_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     return await res.json();
@@ -40,15 +43,19 @@ export async function fetchAddressTxs(address: string): Promise<MempoolTx[] | nu
 
 export async function fetchTx(txid: string): Promise<MempoolTx | null> {
   const base = getMempoolBaseUrl();
-  const res = await fetch(`${base}/api/tx/${txid}`);
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${base}/api/tx/${txid}`, { signal: AbortSignal.timeout(MEMPOOL_TIMEOUT_MS) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchTipHeight(): Promise<number | null> {
   const base = getMempoolBaseUrl();
   try {
-    const res = await fetch(`${base}/api/blocks/tip/height`);
+    const res = await fetch(`${base}/api/blocks/tip/height`, { signal: AbortSignal.timeout(MEMPOOL_TIMEOUT_MS) });
     if (!res.ok) return null;
     const text = await res.text();
     const height = parseInt(text, 10);

@@ -7,7 +7,8 @@
 //
 // Polls mempool.space for every invoice whose next_check_at has arrived and
 // transitions its status (pending/overdue → payment_detected → paid) on matching
-// txs. Drains the due queue past a single batch so a backlog catches up quickly.
+// txs (src/lib/invoices/sweep-due.ts). Drains the due queue past a single batch
+// so a backlog catches up quickly, within a time budget.
 //
 // Manual test in dev (the external scheduler only runs in production):
 //   curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/payment-sweep
@@ -16,25 +17,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTipHeight } from "@/lib/mempool";
 import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
-import {
-  CHECKABLE_COLUMNS,
-  CHECKABLE_STATUSES,
-  checkInvoicePayment,
-  type CheckableInvoice,
-} from "@/lib/invoices/check-invoice-payment";
+import { rescheduleStoppedWatches, sweepDueInvoices } from "@/lib/invoices/sweep-due";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { timingSafeStringEqual } from "@/lib/timing-safe";
 
-// Hobby allows up to 60s for a Node function. The loop below drains the due
-// queue within this budget.
+// Hobby allows up to 60s for a Node function. The payment checks stop starting
+// after SWEEP_BUDGET_MS (v1.5.13) so the scheduler, which waits 30s, hears back.
 export const maxDuration = 60;
 
-const BATCH_SIZE = 50;
-// Upper bound on batches per invocation (50 × 10 = 500 invoices). Prevents an
-// endless loop if a row ever fails to advance its next_check_at.
-const MAX_BATCHES = 10;
-
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const secret = process.env.CRON_SECRET;
   const header = request.headers.get("authorization") ?? "";
   // Constant-time compare (v1.4.25-H): a plain !== leaks length/prefix timing.
@@ -55,84 +47,21 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const tipHeight = await fetchTipHeight();
 
-  let processed = 0;
-  let transitions = 0;
-  let errors = 0;
-
-  // Drain the due queue: process a batch, then loop while a full batch was
-  // returned. Rows leave the due set as their next_check_at advances, so the
-  // next query does not re-fetch them.
-  for (let batch = 0; batch < MAX_BATCHES; batch++) {
-    const now = new Date();
-
-    const { data: rows, error: fetchError } = await supabase
-      .from("invoices")
-      .select(CHECKABLE_COLUMNS)
-      .in("status", [...CHECKABLE_STATUSES])
-      .lte("next_check_at", now.toISOString())
-      .order("next_check_at", { ascending: true })
-      .limit(BATCH_SIZE);
-
-    if (fetchError) {
-      // Fail loudly (503) so the scheduler's failure alerts fire (v1.5.8):
-      // a sweep that cannot read the database is not a quiet "nothing to do".
-      console.error("[cron/payment-sweep] fetch failed", fetchError);
-      return NextResponse.json({ error: "Could not load due invoices" }, { status: 503 });
-    }
-
-    const invoices = (rows ?? []) as CheckableInvoice[];
-    if (invoices.length === 0) break;
-    processed += invoices.length;
-
-    for (const inv of invoices) {
-      const outcome = await checkInvoicePayment(supabase, inv, tipHeight, now, {
-        logPrefix: "[cron/payment-sweep]",
-      });
-      if (outcome === "transitioned") transitions += 1;
-      if (outcome === "error" || outcome === "mempool_unreachable") errors += 1;
-    }
-
-    if (invoices.length < BATCH_SIZE) break;
+  const sweep = await sweepDueInvoices(supabase, tipHeight, { startedAt });
+  if (sweep.fetchFailed) {
+    // Fail loudly (503) so the scheduler's failure alerts fire (v1.5.8):
+    // a sweep that cannot read the database is not a quiet "nothing to do".
+    return NextResponse.json({ error: "Could not load due invoices" }, { status: 503 });
   }
 
   const overdueFlips = await sweepOverdue(supabase, new Date());
   const rescheduled = await rescheduleStoppedWatches(supabase, new Date());
   if (rescheduled > 0) console.info("[cron/payment-sweep] rescheduled stopped watches", rescheduled);
 
-  const summary = { processed, transitions, errors, overdueFlips };
+  const { processed, transitions, errors, invalid, budgetReached } = sweep;
+  const summary = { processed, transitions, errors, invalid, budgetReached, overdueFlips };
   console.log("[cron/payment-sweep]", summary);
   return NextResponse.json(summary);
-}
-
-/**
- * v1.5.8 (v1.5.0.5-H): before this release the pre-payment watch stopped ~48
- * minutes after publish, leaving next_check_at null on unpaid invoices, which
- * the due query above never matches. Put any such invoice back on the schedule
- * (due now); its next check then follows the repeating 30-minute grid. After
- * the first run nothing matches, since the schedule no longer ends while an
- * invoice is payable.
- */
-async function rescheduleStoppedWatches(
-  supabase: ReturnType<typeof createAdminClient>,
-  now: Date
-): Promise<number> {
-  try {
-    const { data, error } = await supabase
-      .from("invoices")
-      .update({ next_check_at: now.toISOString() })
-      .in("status", ["pending", "overdue"])
-      .is("next_check_at", null)
-      .not("btc_address", "is", null)
-      .select("id");
-    if (error) {
-      console.error("[cron/payment-sweep] reschedule failed", error);
-      return 0;
-    }
-    return data?.length ?? 0;
-  } catch (err) {
-    console.error("[cron/payment-sweep] reschedule failed", err);
-    return 0;
-  }
 }
 
 interface OverdueScanRow {

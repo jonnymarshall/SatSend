@@ -83,7 +83,7 @@ describe("fetchTx", () => {
       new Response(JSON.stringify(fakeTx), { status: 200 })
     );
     const result = await fetchTx("abc123");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("/api/tx/abc123"));
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("/api/tx/abc123"), expect.anything());
     expect(result?.txid).toBe("abc123");
   });
 
@@ -91,6 +91,17 @@ describe("fetchTx", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("not found", { status: 404 })
     );
+    expect(await fetchTx("abc123")).toBeNull();
+  });
+
+  it("gives up after a timeout instead of waiting forever (v1.5.13)", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    await fetchTx("abc123");
+    expect(spy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch throws (network failure or timeout)", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("timed out", "TimeoutError"));
     expect(await fetchTx("abc123")).toBeNull();
   });
 });
@@ -103,7 +114,7 @@ describe("fetchTipHeight", () => {
       new Response("900010", { status: 200 })
     );
     const result = await fetchTipHeight();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("/api/blocks/tip/height"));
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("/api/blocks/tip/height"), expect.anything());
     expect(result).toBe(900010);
   });
 
@@ -117,6 +128,12 @@ describe("fetchTipHeight", () => {
   it("returns null when fetch throws (network failure)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("network down"));
     expect(await fetchTipHeight()).toBeNull();
+  });
+
+  it("gives up after a timeout instead of waiting forever (v1.5.13)", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("1", { status: 200 }));
+    await fetchTipHeight();
+    expect(spy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });
 
