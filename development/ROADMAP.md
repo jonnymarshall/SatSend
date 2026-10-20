@@ -966,7 +966,7 @@ networks, and production no longer flips.
 - [x] Tests (TDD): wrong network and junk stop the watch without a lookup; the
       list check writes nothing; budget spent stops new checks; reschedule skips
       uncheckable addresses; timeouts present.
-- [ ] Manual (`manual-tests/v1.5.13-sweep-invalid-address.md`).
+- [x] Manual (`manual-tests/v1.5.13-sweep-invalid-address.md`): TESTS 1–2 passed on SatSend-dev (2026-10-20); TEST 3 is watching production after merge.
 
 ---
 
