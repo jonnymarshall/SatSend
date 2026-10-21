@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Timer, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/signal/button";
+import { BanknoteCheckIcon } from "@/components/marketing/icons";
 import { InvoiceRowPreview, PaymentPreview } from "@/components/marketing/product-preview";
 import { SOCIAL_LINKS } from "@/lib/site-links";
 import { cn } from "@/lib/utils";
@@ -169,7 +170,7 @@ const HIGHLIGHTS = [
     text: "A clean payment page and a PDF, not a bare address pasted into an email. Your client sees exactly what they owe and how to pay.",
   },
   {
-    icon: Check,
+    icon: BanknoteCheckIcon,
     title: "The right amount of bitcoin, every time",
     text: "You invoice in your local currency; your client sees the bitcoin amount at the current rate when they open it.",
   },
