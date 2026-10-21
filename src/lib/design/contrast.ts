@@ -1,6 +1,7 @@
 /**
- * WCAG 2.x contrast helpers (v1.5.0-H). Used by the internal styleguide's contrast
- * audit so every ratio shown there is computed, not hand-typed.
+ * WCAG 2.x contrast helpers (v1.5.0-H). Used by the token tests so every contrast
+ * ratio is computed, not hand-typed. (The internal style guide that first showed
+ * them was deleted in v1.5.16.)
  */
 
 export function hexToRgb(hex: string): [number, number, number] {
