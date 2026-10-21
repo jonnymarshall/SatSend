@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.20 — How it works screenshot shows the Send button.** The editor
+  picture still showed v1.5.18's "Publish" button and "Required to publish";
+  re-taken from v1.5.19 at 2x (same demo account, example address).
+
 ### Changed
 
 - **v1.5.19 — An invoice is a draft or it's sent (roadmap v1.5.2.0.1-H).**
