@@ -47,10 +47,19 @@ type FeedRow =
   | { kind: "email"; data: EmailEventRow }
   | { kind: "manual"; data: InvoiceEventRow };
 
+// v1.5.19: an invoice is a draft or it's sent, so the invoice email reads
+// "Invoice sent · …" ("Invoice email failed/skipped" when it didn't go out).
+// email_type keeps its stored name, invoice_published.
 const EMAIL_TYPE_LABEL: Record<EmailType, string> = {
-  invoice_published: "Invoice published",
+  invoice_published: "Invoice sent",
   payment_detected: "Payment detected",
   payment_confirmed: "Payment confirmed",
+};
+
+const EMAIL_NOT_SENT_LABEL: Record<EmailType, string> = {
+  invoice_published: "Invoice email",
+  payment_detected: "Payment detected email",
+  payment_confirmed: "Payment confirmed email",
 };
 
 const MANUAL_EVENT_LABEL: Record<InvoiceEventType, string> = {
@@ -95,9 +104,9 @@ function emailLabel(evt: EmailEventRow): string {
   const base = EMAIL_TYPE_LABEL[evt.email_type];
   switch (evt.status) {
     case "failed":
-      return `${base} failed`;
+      return `${EMAIL_NOT_SENT_LABEL[evt.email_type]} failed`;
     case "skipped_no_api_key":
-      return `${base} skipped`;
+      return `${EMAIL_NOT_SENT_LABEL[evt.email_type]} skipped`;
     case "sent":
       return `${base} · awaiting delivery`;
     case "delivered":

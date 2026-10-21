@@ -158,7 +158,25 @@ describe("InvoiceActivityCard", () => {
       }],
     });
     render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
-    expect(screen.getByText(/awaiting delivery/i)).toBeInTheDocument();
+    // v1.5.19: there's no "published" any more; the invoice email is "sent".
+    expect(screen.getByText("Invoice sent · awaiting delivery")).toBeInTheDocument();
+    expect(screen.queryByText(/published/i)).toBeNull();
+  });
+
+  it("says 'Invoice email failed', not 'Invoice published failed' (v1.5.19)", async () => {
+    mockSupabase({
+      emailEvents: [{
+        id: "e1",
+        email_type: "invoice_published",
+        recipient: "ada@example.com",
+        status: "failed",
+        error_message: "boom",
+        created_at: "2026-04-15T10:00:00Z",
+      }],
+    });
+    render(await InvoiceActivityCard({ invoiceId: "inv-1" }));
+    expect(screen.getByText("Invoice email failed")).toBeInTheDocument();
+    expect(screen.queryByText(/published/i)).toBeNull();
   });
 
   it("renders a 'delivered' email with the mail-check icon", async () => {
