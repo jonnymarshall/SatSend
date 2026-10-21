@@ -18,6 +18,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.18 — How it works page (roadmap v1.5.2.1-H).** `/how-it-works` replaces
+  its "Coming soon" placeholder: four steps (create, send, your client pays,
+  you're told), each with a real screenshot of the app; a "What your client
+  sees" panel for clients new to bitcoin; "What you'll need"; and the closing
+  band. Screenshots come from a demo account on the test database
+  (`test-automation/demo-screens.mjs`), with the testnet address and QR code
+  swapped for an unpayable example. The homepage's styles and closing band are
+  now shared components.
+
+### Fixed
+
+- **v1.5.18 — Sharper How it works screenshots.** Re-taken at 2x pixel density
+  and served at quality 90 (`images.qualities` in `next.config.ts`); text was
+  soft on high-resolution screens.
+
+- **v1.5.18 — Homepage "How it works" button opens the new page.** It
+  scrolled to the homepage's three steps; it now goes to `/how-it-works`.
+
+- **v1.5.18 — QR code ignores a late result.** `BtcQrCode` no longer applies an
+  image that arrives after it has gone or switched to a newer value (CI failed
+  on an unhandled "window is not defined" from exactly that).
+
+### Security
+
+- **v1.5.18 — QR code library pinned.** `qrcode` is now an exact version
+  (`1.5.4`, no `^`), and a test checks package.json and the lockfile's integrity
+  hash, so it can only change by a deliberate, reviewed upgrade.
+  `@types/qrcode` (type definitions only) is pinned and moved to devDependencies.
+
+### Added
+
 - **v1.5.16 — Marketing homepage (roadmap v1.5.2-H).** `/` is now the SatSend
   homepage for everyone instead of a redirect to the dashboard (signed-in
   visitors see "Go to app"). Hero, trust strip, three steps, six highlights,
