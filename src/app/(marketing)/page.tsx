@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, FileText, KeyRound, Lock, Radar, Scale, ShieldCheck, Wrench } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Target, Timer, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/signal/button";
 import { InvoiceRowPreview, PaymentPreview } from "@/components/marketing/product-preview";
 import { SOCIAL_LINKS } from "@/lib/site-links";
@@ -169,12 +169,12 @@ const HIGHLIGHTS = [
     text: "A clean payment page and a PDF, not a bare address pasted into an email. Your client sees exactly what they owe and how to pay.",
   },
   {
-    icon: Scale,
+    icon: Target,
     title: "The right amount of bitcoin, every time",
-    text: "You invoice in your local currency; your client sees the bitcoin amount at the current rate when they open it. A payment within 5% still counts as paid in full.",
+    text: "You invoice in your local currency; your client sees the bitcoin amount at the current rate when they open it.",
   },
   {
-    icon: Radar,
+    icon: Timer,
     title: "Know the moment you're paid",
     text: "SatSend watches the blockchain for you. The invoice moves to “Payment detected” within seconds, then to “Paid” once confirmed, and you get an email at each step.",
   },
@@ -184,8 +184,8 @@ const HIGHLIGHTS = [
     text: "Payments go from your client's wallet straight to yours. SatSend never holds, moves or has access to your money.",
   },
   {
-    icon: Lock,
-    title: "Private when you need it",
+    icon: EyeOff,
+    title: "Secure and private invoices",
     text: "Add an access code so only your client can open the invoice.",
   },
   {
@@ -432,12 +432,12 @@ function Faq() {
 
 function FinalCta() {
   return (
-    <section id="home--cta" aria-labelledby="home--cta--heading" className={cn(CONTAINER, "py-20 md:py-28")}>
-      <div className="flex flex-col items-center rounded-(--radius-xl) bg-(--color-brand-soft) px-6 py-14 text-center md:py-20">
+    <section id="home--cta" aria-labelledby="home--cta--heading" className="bg-(--color-ink) text-white">
+      <div className={cn(CONTAINER, "flex flex-col items-center py-20 text-center md:py-28")}>
         <h2 id="home--cta--heading" className={H2}>
           Start invoicing in bitcoin.
         </h2>
-        <p className="mt-4 text-[18px] text-(--color-text-secondary)">Free to start. Nothing to set up.</p>
+        <p className="mt-4 text-[18px] text-white/80">Free to start. Nothing to set up.</p>
         <Link id="home--cta--get-started" href="/signup" className={buttonVariants({ size: "lg", className: "mt-8" })}>
           Get started
           <ArrowRight />
