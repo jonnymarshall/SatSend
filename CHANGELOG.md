@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.18 — How it works page (roadmap v1.5.2.1-H).** `/how-it-works` replaces
+  its "Coming soon" placeholder: four steps (create, send, your client pays,
+  you're told), each with a real screenshot of the app; a "What your client
+  sees" panel for clients new to bitcoin; "What you'll need"; and the closing
+  band. Screenshots come from a demo account on the test database
+  (`test-automation/demo-screens.mjs`), with the testnet address and QR code
+  swapped for an unpayable example. The homepage's styles and closing band are
+  now shared components.
+
+### Added
+
 - **v1.5.16 — Marketing homepage (roadmap v1.5.2-H).** `/` is now the SatSend
   homepage for everyone instead of a redirect to the dashboard (signed-in
   visitors see "Go to app"). Hero, trust strip, three steps, six highlights,

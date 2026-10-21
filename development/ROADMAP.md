@@ -639,9 +639,21 @@ change wording there first.
 > `page.tsx`, drop `robots: noindex`, and remove it from `PLACEHOLDER_PAGES` in
 > `src/lib/site-links.ts`.
 
-### ⏳ v1.5.2.1-H — How it works page (`/how-it-works`)
-- [ ] The three steps in more detail, with a picture of each real screen (create,
-      send, the client's payment page, the paid email).
+### ✅ v1.5.2.1-H — How it works page (`/how-it-works`)
+
+**Branch:** `v1.5.18/how-it-works` · package `1.5.18`. Agreed with Jonny
+(2026-10-21): real screenshots (not mock-ups), four steps, plus a "What your
+client sees" panel.
+- [x] Intro; four steps (create, send, your client pays, you're told), each
+      with a real screenshot in `public/marketing/how-it-works/`.
+- [x] "What your client sees" panel; "What you'll need" (a wallet, an email);
+      closing band (now shared with the homepage).
+- [x] Removed from `PLACEHOLDER_PAGES`, so it's indexed.
+- [x] **Re-taking the screenshots:** `node test-automation/demo-screens.mjs`
+      creates `maya@example.com` and four invoices on SatSend-dev (refuses any
+      other project) and prints a one-time sign-in link. Before capturing the
+      client's page and the editor, swap the testnet address and QR code for
+      an unpayable example (see the v1.5.18 PR).
 
 ### ⏳ v1.5.2.2-H — Pricing page (`/pricing`)
 - [ ] The Free and Pro cards (same content as the homepage), a full comparison,

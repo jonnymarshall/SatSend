@@ -4,6 +4,8 @@ import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, EyeOff, FileText, Ke
 import { buttonVariants } from "@/components/signal/button";
 import { BanknoteCheckIcon } from "@/components/marketing/icons";
 import { InvoiceRowPreview, PaymentPreview } from "@/components/marketing/product-preview";
+import { ClosingCta } from "@/components/marketing/closing-cta";
+import { CONTAINER, EYEBROW, H2, TEXT_LINK } from "@/components/marketing/styles";
 import { SOCIAL_LINKS } from "@/lib/site-links";
 import { cn } from "@/lib/utils";
 
@@ -24,12 +26,6 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "SatSend", images: ["/opengraph-image"] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: ["/opengraph-image"] },
 };
-
-const CONTAINER = "mx-auto w-full max-w-(--container-max) px-4 sm:px-6 md:px-10";
-const EYEBROW = "text-[13px] font-semibold tracking-[0.08em] text-(--color-text-secondary) uppercase";
-const H2 = "font-display tracking-heading text-[32px] leading-[1.1] font-[800] md:text-[44px]";
-const TEXT_LINK =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-sm) font-semibold text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-[6px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink) [&_svg]:size-4";
 
 /* ------------------------------------------------------------------ Hero */
 
@@ -429,25 +425,6 @@ function Faq() {
   );
 }
 
-/* ------------------------------------------------------------ Final CTA */
-
-function FinalCta() {
-  return (
-    <section id="home--cta" aria-labelledby="home--cta--heading" className="bg-(--color-ink) text-white">
-      <div className={cn(CONTAINER, "flex flex-col items-center py-20 text-center md:py-28")}>
-        <h2 id="home--cta--heading" className={H2}>
-          Start invoicing in bitcoin.
-        </h2>
-        <p className="mt-4 text-[18px] text-white/80">Free to start. Nothing to set up.</p>
-        <Link id="home--cta--get-started" href="/signup" className={buttonVariants({ size: "lg", className: "mt-8" })}>
-          Get started
-          <ArrowRight />
-        </Link>
-      </div>
-    </section>
-  );
-}
-
 export default function HomePage() {
   return (
     <>
@@ -457,7 +434,7 @@ export default function HomePage() {
       <Highlights />
       <Pricing />
       <Faq />
-      <FinalCta />
+      <ClosingCta idPrefix="home" />
     </>
   );
 }
