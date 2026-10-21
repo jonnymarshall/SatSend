@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   swapped for an unpayable example. The homepage's styles and closing band are
   now shared components.
 
+### Fixed
+
+- **v1.5.18 — QR code ignores a late result.** `BtcQrCode` no longer applies an
+  image that arrives after it has gone or switched to a newer value (CI failed
+  on an unhandled "window is not defined" from exactly that).
+
 ### Added
 
 - **v1.5.16 — Marketing homepage (roadmap v1.5.2-H).** `/` is now the SatSend
