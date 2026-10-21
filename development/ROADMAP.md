@@ -707,8 +707,15 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
       within 15 days via support; Free is free forever.
 - [x] Removed from the placeholder list (indexed).
 
-### ⏳ v1.5.2.3-H — FAQ page (`/faq`)
-- [ ] All questions in one place, the homepage's eight first. Grill Jonny for more.
+### ✅ v1.5.2.3-H — FAQ page (`/faq`)
+
+**Branch:** `v1.5.22/faq-page` · package `1.5.22`. Questions agreed with Jonny (2026-10-21).
+- [x] 28 questions in five groups (Getting started, Getting paid, Invoices,
+      Security and privacy, Pricing) with jump links; fold-out answers.
+- [x] One source for every answer (`src/components/marketing/faq-content.tsx`):
+      the homepage's eight and /pricing's five read from it.
+- [x] "Can I delete my account?" answered (via support; v1.5.7-H builds it).
+- [x] Not claimed: "open source", until v1.5.2.10-H decides the licence.
 
 ### ⏳ v1.5.2.4-H — Security page (`/security`)
 - [ ] Non-custodial explained plainly; what SatSend stores and what it can never
@@ -733,11 +740,44 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 - [ ] Put the real URLs in `SOCIAL_LINKS` in `src/lib/site-links.ts`. Then
       `/coming-soon` has no users: delete it.
 
-### ⏳ v1.5.2.10-H — Open-source licence
-- [ ] The repo is public but has no `LICENSE`, which legally means "all rights
-      reserved", so the homepage's "Fully open source" claim isn't true yet.
-      Jonny chooses (for example MIT, or AGPL-3.0 so hosted forks must share
-      changes); add `LICENSE` and `"license"` in package.json.
+### ⏳ v1.5.2.10-H — Open source or source-available? Decide the licence (**pre-launch**)
+
+> Jonny, 2026-10-21: "I want the best balance between cypherpunk ethos (open
+> source) but also not opening myself up for a cloner to take all my work and
+> profit from it." Go into this properly before launch.
+
+**Today:** the repo is public with no `LICENSE`, which legally means "all rights
+reserved" (people can read the code but have no right to use it). So the
+homepage's "Fully open source" highlight isn't true yet; the FAQ leaves it out.
+
+- [ ] Compare the real options for SatSend, with examples of similar products:
+      - **AGPL-3.0** (open source): anyone may run it, even commercially, but a
+        hosted copy must publish its changes.
+      - **Source-available with a delayed open-source switch**, e.g. the
+        Functional Source License (FSL): no competing use for 2 years, then each
+        version becomes Apache-2.0 or MIT.
+      - **Source-available for auditing only** (e.g. PolyForm Strict, or a
+        custom "view for security review" licence).
+      - **MIT / Apache-2.0** (fully permissive), for completeness.
+- [ ] Weigh: how easy cloning really is (code vs brand, users, deliverability,
+      operations); what the bitcoin community expects; what each licence lets
+      SatSend claim truthfully ("open source" has a strict meaning).
+- [ ] Decide; add `LICENSE` and `"license"` in package.json.
+- [ ] Then say it wherever it helps: homepage highlight (reword "Fully open
+      source" to match), FAQ (Security and privacy), Security page
+      (v1.5.2.4-H), footer GitHub link, README.
+
+### ⏳ v1.5.7-H — Account deletion (**pre-launch**)
+
+> Agreed 2026-10-21. The FAQ already says "contact support and we'll delete your
+> account and your invoices"; privacy law in many places expects this.
+
+- [ ] Until built: a support request does it by hand. Document the steps
+      (delete the user's invoices, events and email log, then the auth user).
+- [ ] Decide: self-serve "Delete my account" in settings, or support only.
+- [ ] Decide what happens to invoices a client may still need (warn first; offer
+      to export PDFs).
+- [ ] Mention in the privacy policy (v1.5.2.7-H).
 
 ### ⏳ v1.5.2.11-H — Phones: invoice list as stacked rows
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows

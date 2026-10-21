@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { ClosingCta } from "@/components/marketing/closing-cta";
 import { PricingPlans } from "@/components/marketing/pricing-plans";
+import { PRICING_FAQ } from "@/components/marketing/faq-content";
+import { FaqList } from "@/components/marketing/faq-list";
 import { CONTAINER, EYEBROW, H1, H2, LEAD } from "@/components/marketing/styles";
 import { cn } from "@/lib/utils";
 
@@ -106,37 +107,6 @@ function Comparison() {
   );
 }
 
-const FAQ: { q: string; a: React.ReactNode }[] = [
-  {
-    q: "How do I pay for Pro?",
-    a: "In bitcoin, from any wallet, or by credit or debit card.",
-  },
-  {
-    q: "Does Pro renew automatically?",
-    a: "If you pay by card, Pro renews each month or year until you turn it off, which you can do at any time. If you pay in bitcoin, it doesn't renew automatically, because a bitcoin payment can't be taken without you sending it; you top up whenever you choose.",
-  },
-  {
-    q: "What happens when Pro runs out?",
-    a: "You keep all your invoices, including the ones you created on Pro, and you can carry on creating new ones on Free. The Pro features switch off until you renew.",
-  },
-  {
-    q: "Can I get a refund?",
-    a: (
-      <>
-        Yes. If you&apos;re not satisfied, ask for a refund within 15 days of paying:{" "}
-        <Link href="/contact" className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4">
-          contact support
-        </Link>
-        .
-      </>
-    ),
-  },
-  {
-    q: "Is Free really free forever?",
-    a: "Yes. Creating invoices and getting paid stays free.",
-  },
-];
-
 function PricingFaq() {
   return (
     <section id="pricing--faq" aria-labelledby="pricing--faq--heading" className="border-t border-(--color-border) bg-(--color-surface)">
@@ -147,17 +117,7 @@ function PricingFaq() {
             Pricing questions
           </h2>
         </div>
-        <div className="divide-y divide-(--color-border) border-y border-(--color-border)">
-          {FAQ.map(({ q, a }, i) => (
-            <details key={q} id={`pricing--faq--item-${i + 1}`} className="group">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 text-[17px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink) [&::-webkit-details-marker]:hidden">
-                {q}
-                <ChevronDown aria-hidden className="size-5 shrink-0 text-(--color-text-secondary) transition-transform group-open:rotate-180" />
-              </summary>
-              <p className="pb-5 text-[15px] leading-[1.6] text-(--color-text-secondary)">{a}</p>
-            </details>
-          ))}
-        </div>
+        <FaqList items={PRICING_FAQ} idPrefix="pricing--faq" />
       </div>
     </section>
   );

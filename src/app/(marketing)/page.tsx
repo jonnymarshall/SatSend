@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ChevronDown, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Timer, Wrench } from "lucide-react";
+import { ArrowRight, BadgeCheck, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Timer, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/signal/button";
 import { BanknoteCheckIcon } from "@/components/marketing/icons";
 import { InvoiceRowPreview, PaymentPreview } from "@/components/marketing/product-preview";
 import { ClosingCta } from "@/components/marketing/closing-cta";
 import { PricingPlans } from "@/components/marketing/pricing-plans";
+import { HOMEPAGE_FAQ } from "@/components/marketing/faq-content";
+import { FaqList } from "@/components/marketing/faq-list";
 import { CONTAINER, EYEBROW, H2, TEXT_LINK } from "@/components/marketing/styles";
 import { SOCIAL_LINKS } from "@/lib/site-links";
 import { cn } from "@/lib/utils";
@@ -256,41 +258,6 @@ function Pricing() {
 
 /* ------------------------------------------------------------------ FAQ */
 
-const FAQ = [
-  {
-    q: "Is SatSend really non-custodial?",
-    a: "Yes. Your client pays straight to a bitcoin address from your own wallet. SatSend never holds, moves or has access to your money.",
-  },
-  {
-    q: "Are there any fees?",
-    a: "SatSend takes no cut of your payments. Your client's wallet pays the usual bitcoin network fee when they send, and you receive the full invoice amount.",
-  },
-  {
-    q: "Does my client need a SatSend account?",
-    a: "No. They open the link you send, see the amount, and pay with any bitcoin wallet by scanning the QR code.",
-  },
-  {
-    q: "How is the bitcoin amount worked out?",
-    a: "You create your invoice in your local currency. When your client opens it, SatSend shows the bitcoin amount at the current rate. Prices move, so a payment within 5% of the invoice still counts as paid in full.",
-  },
-  {
-    q: "How do I know when I've been paid?",
-    a: "SatSend watches the blockchain for you. The invoice updates to “Payment detected” within seconds of your client sending, then to “Paid” once it's confirmed, usually within about 20 minutes. You get an email at each step.",
-  },
-  {
-    q: "What if my client pays the wrong amount?",
-    a: "Anything within 5% of the invoice counts as paid in full. If they pay less, the invoice shows Underpaid with the amount that arrived, so you can ask for the rest. If they pay more than 5% over, it's marked as overpaid so you can settle the difference with them.",
-  },
-  {
-    q: "Why do I need a new bitcoin address for each invoice?",
-    a: "So every payment can be matched to the right invoice and your payments stay private. Most wallets give you a fresh address with one tap.",
-  },
-  {
-    q: "Is there a limit on invoices?",
-    a: "No. Invoices are unlimited on both Free and Pro.",
-  },
-];
-
 function Faq() {
   return (
     <section id="home--faq" aria-labelledby="home--faq--heading" className="border-t border-(--color-border) bg-(--color-surface)">
@@ -305,17 +272,7 @@ function Faq() {
             <ArrowRight />
           </Link>
         </div>
-        <div className="divide-y divide-(--color-border) border-y border-(--color-border)">
-          {FAQ.map(({ q, a }, i) => (
-            <details key={q} id={`home--faq--item-${i + 1}`} className="group">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 text-[17px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink) [&::-webkit-details-marker]:hidden">
-                {q}
-                <ChevronDown aria-hidden className="size-5 shrink-0 text-(--color-text-secondary) transition-transform group-open:rotate-180" />
-              </summary>
-              <p className="pb-5 text-[15px] leading-[1.6] text-(--color-text-secondary)">{a}</p>
-            </details>
-          ))}
-        </div>
+        <FaqList items={HOMEPAGE_FAQ} idPrefix="home--faq" />
       </div>
     </section>
   );
