@@ -1,7 +1,8 @@
 {
   "name": "satsend",
-  "version": "1.5.22",
+  "version": "1.5.23",
   "private": true,
+  "license": "FSL-1.1-ALv2",
   "scripts": {
     "dev": "next dev",
     "dev:sweep": "node scripts/dev/sweep.mjs",

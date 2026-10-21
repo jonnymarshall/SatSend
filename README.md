@@ -448,3 +448,14 @@ Migration `0025_payment_amount_awareness.sql` (v1.4.19-H — see "Payment amount
 - `btc_price_at_detection NUMERIC` — the BTC/currency price used to convert `amount_received_sats` to fiat, fetched at confirmation time.
 - `amount_received_fiat NUMERIC` — `amount_received_sats` converted using `btc_price_at_detection`.
 - `overpaid BOOLEAN DEFAULT false` — true when `amount_received_fiat` exceeds `total_fiat` beyond the tolerance band. The invoice status stays `paid`; this is a flag alongside it.
+
+---
+
+## Licence
+
+SatSend is **source available** under the Functional Source License, Version
+1.1, with an Apache 2.0 future licence (**FSL-1.1-ALv2**). You can read, audit,
+run and modify the code for any purpose except offering a competing product or
+service. Two years after each version is released, it becomes available under
+the Apache License 2.0. See [`LICENSE.md`](./LICENSE.md) and
+[fsl.software](https://fsl.software).

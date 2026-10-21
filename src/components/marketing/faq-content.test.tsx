@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
 import { FAQ_GROUPS, HOMEPAGE_FAQ, PRICING_FAQ, faqById } from "./faq-content";
 
 // v1.5.22: every question lives once; the homepage, /pricing and /faq read it.
@@ -39,5 +40,17 @@ describe("faq content", () => {
     const all = FAQ_GROUPS.flatMap((g) => g.items.map((i) => i.q)).join(" ");
     expect(all).not.toMatch(/open source/i);
     expect(all).toMatch(/delete my account/i);
+  });
+
+  it("explains the code is source available under the FSL, with a link (v1.5.23)", () => {
+    const security = FAQ_GROUPS.find((g) => g.id === "security")!;
+    const code = security.items.find((i) => i.id === "source-code")!;
+    expect(code.q).toBe("Can I see SatSend's code?");
+    const { container } = render(<>{code.a}</>);
+    expect(container).toHaveTextContent(/source available/i);
+    expect(container).toHaveTextContent(/Functional Source License/);
+    expect(container).toHaveTextContent(/except offering a competing product/i);
+    expect(container).toHaveTextContent(/two years after each version is released/i);
+    expect(container.querySelector('a[href="https://fsl.software"]')).not.toBeNull();
   });
 });

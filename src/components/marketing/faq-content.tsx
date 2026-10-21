@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
  * Every FAQ answer, once (v1.5.22). The homepage shows eight of them, /pricing
  * shows the five pricing ones, and /faq shows them all, grouped; they read from
  * here so they can't drift apart. Answers are checked against the code: see the
- * v1.5.22 PR. Don't claim "open source" here until the licence is decided
- * (roadmap v1.5.2.10-H).
+ * v1.5.22 PR. SatSend is source available under FSL-1.1-ALv2 (v1.5.23): never
+ * call SatSend itself "open source".
  */
 
 export type FaqItem = { id: string; q: string; a: ReactNode };
@@ -140,6 +140,25 @@ export const FAQ_GROUPS: FaqGroup[] = [
         id: "stored",
         q: "What does SatSend store?",
         a: "Your account email and your invoices: their details, line items and the receiving address you entered. Never your keys.",
+      },
+      {
+        id: "source-code",
+        q: "Can I see SatSend's code?",
+        a: (
+          <>
+            Yes. SatSend is source available: all of its code is public, so anyone can audit how it handles your
+            invoices and payments. It&apos;s published under the Functional Source License, which lets you read, run and
+            modify it for any purpose except offering a competing product. Two years after each version is released,
+            that version also becomes available under the Apache 2.0 licence, an open-source licence.{" "}
+            <a
+              href="https://fsl.software"
+              className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4"
+            >
+              Learn more about the FSL
+            </a>
+            .
+          </>
+        ),
       },
       {
         id: "delete-account",

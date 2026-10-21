@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.23 — Licence: source available under FSL-1.1-ALv2 (roadmap
+  v1.5.2.10-H).** `LICENSE.md` (Functional Source License 1.1, Apache 2.0
+  future licence, Copyright 2026 SATSEND LLC), `"license"` in package.json and a
+  README Licence section. The homepage highlight is now "Fully auditable", the
+  FAQ adds "Can I see SatSend's code?", and the footer links "Licence (FSL)" to
+  fsl.software. Roadmap: move the code to a SatSend GitHub account (v1.5.2.9-H);
+  form SATSEND LLC and assign the code to it (v1.5.8-H).
+- **v1.5.23 — FAQ questions in the heading font.** Questions on the FAQ,
+  homepage and Pricing page now use Onest (like the headings); Geist semibold
+  looked stretched at 17px. Roadmap: fix ".me" sitting low in the link preview
+  (v1.5.2.0.2-H).
+
+### Added
+
 - **v1.5.22 — FAQ page (roadmap v1.5.2.3-H).** `/faq` replaces its
   placeholder: 28 questions in five groups with jump links. Every answer now
   lives once (`faq-content.tsx`): the homepage's eight and the Pricing page's

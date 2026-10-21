@@ -717,9 +717,29 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 - [x] "Can I delete my account?" answered (via support; v1.5.7-H builds it).
 - [x] Not claimed: "open source", until v1.5.2.10-H decides the licence.
 
+### ⏳ v1.5.2.0.2-H — Link preview: ".me" sits below the SatSend baseline (fix)
+
+> Found by Jonny, 2026-10-21, sharing satsend.me on WhatsApp: in the preview
+> image the ".me" sits too low instead of on the same line as "SatSend".
+
+**Cause.** `src/app/opengraph-image.tsx` lays out the wordmark as two text
+spans in a flex row with `alignItems: "baseline"`. The image generator (Satori)
+doesn't line up baselines of different font sizes the way a browser does, so the
+smaller ".me" drops. The real logo (`SatSendLogo`, an SVG) puts both on one
+baseline.
+
+- [ ] Fix the alignment: either position ".me" from the bottom with a measured
+      offset, or draw the logo from the SVG (as paths, since the generator
+      can't render SVG text) so it's identical to the site's logo.
+- [ ] Test: render `/opengraph-image` and compare the wordmark against
+      `SatSendLogo`; check it in a link-preview checker and WhatsApp (which
+      caches previews, so re-check with a `?v=` query on the URL).
+
 ### ⏳ v1.5.2.4-H — Security page (`/security`)
 - [ ] Non-custodial explained plainly; what SatSend stores and what it can never
-      do; access codes; open source and how to audit it.
+      do; access codes; the code is **source available and fully auditable**
+      under FSL-1.1-ALv2 (never "open source"; reuse the FAQ's "Can I see
+      SatSend's code?" wording) and how to audit it, linking fsl.software.
 
 ### ⏳ v1.5.2.5-H — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
@@ -737,35 +757,44 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 
 ### ⏳ v1.5.2.9-H — SatSend accounts on X, LinkedIn and GitHub
 - [ ] Jonny creates the accounts (a GitHub organisation for the repo).
-- [ ] Put the real URLs in `SOCIAL_LINKS` in `src/lib/site-links.ts`. Then
-      `/coming-soon` has no users: delete it.
+- [ ] **Move the codebase to the SatSend GitHub account** (Jonny, 2026-10-21):
+      transfer `jonnymarshall/SatSend` to the organisation (GitHub keeps
+      redirects), then update the git remote, the CI and payment-sweep
+      workflows' secrets/variables, Vercel's Git connection, and branch
+      protection (`scripts/enable-branch-protection.sh`).
+- [ ] Put the real URLs in `SOCIAL_LINKS` in `src/lib/site-links.ts` (the
+      homepage's "View the code" and the footer's GitHub link use the GitHub
+      one). Then `/coming-soon` has no users: delete it.
 
-### ⏳ v1.5.2.10-H — Open source or source-available? Decide the licence (**pre-launch**)
+### ✅ v1.5.2.10-H — Licence: source available under FSL-1.1-ALv2
 
-> Jonny, 2026-10-21: "I want the best balance between cypherpunk ethos (open
-> source) but also not opening myself up for a cloner to take all my work and
-> profit from it." Go into this properly before launch.
+**Branch:** `v1.5.23/fsl-licence` · package `1.5.23`.
 
-**Today:** the repo is public with no `LICENSE`, which legally means "all rights
-reserved" (people can read the code but have no right to use it). So the
-homepage's "Fully open source" highlight isn't true yet; the FAQ leaves it out.
+> **Decided by Jonny, 2026-10-21:** the Functional Source License, Apache 2.0
+> future licence (FSL-1.1-ALv2): the best balance between the cypherpunk ethos
+> and not letting a cloner profit from the work. Anyone may read, audit, run and
+> modify the code except to offer a competing product; each version becomes
+> Apache-2.0 two years after release. Wording: "source available", "fully
+> auditable"; never call SatSend "open source".
 
-- [ ] Compare the real options for SatSend, with examples of similar products:
-      - **AGPL-3.0** (open source): anyone may run it, even commercially, but a
-        hosted copy must publish its changes.
-      - **Source-available with a delayed open-source switch**, e.g. the
-        Functional Source License (FSL): no competing use for 2 years, then each
-        version becomes Apache-2.0 or MIT.
-      - **Source-available for auditing only** (e.g. PolyForm Strict, or a
-        custom "view for security review" licence).
-      - **MIT / Apache-2.0** (fully permissive), for completeness.
-- [ ] Weigh: how easy cloning really is (code vs brand, users, deliverability,
-      operations); what the bitcoin community expects; what each licence lets
-      SatSend claim truthfully ("open source" has a strict meaning).
-- [ ] Decide; add `LICENSE` and `"license"` in package.json.
-- [ ] Then say it wherever it helps: homepage highlight (reword "Fully open
-      source" to match), FAQ (Security and privacy), Security page
-      (v1.5.2.4-H), footer GitHub link, README.
+- [x] `LICENSE.md`: the official FSL-1.1-ALv2 text, `Copyright 2026 SATSEND LLC`.
+- [x] `package.json` `"license": "FSL-1.1-ALv2"`; README Licence section.
+- [x] Homepage highlight "Fully auditable"; FAQ "Can I see SatSend's code?"
+      (links fsl.software); footer Developers: "Licence (FSL)".
+- [ ] Security page wording: part of v1.5.2.4-H.
+
+### ⏳ v1.5.8-H — Form SATSEND LLC and give it the code (**pre-launch**)
+
+> `LICENSE.md` names **SATSEND LLC** as the copyright holder (Jonny,
+> 2026-10-21), but the company doesn't exist yet. Until it does, the code is
+> legally Jonny's.
+
+- [ ] Form SATSEND LLC (exact registered name to match `LICENSE.md`; update the
+      notice if it differs).
+- [ ] Assign the code to the LLC in writing (a short IP assignment from Jonny),
+      covering everything written before it was formed.
+- [ ] Use the LLC for the card-payment provider (v1.5.4-H), the privacy policy
+      and terms (v1.5.2.7-H, v1.5.2.8-H).
 
 ### ⏳ v1.5.7-H — Account deletion (**pre-launch**)
 
