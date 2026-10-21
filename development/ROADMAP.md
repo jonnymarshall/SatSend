@@ -20,7 +20,7 @@
 - **The core loop:** create a fiat invoice, share a link and access code, the client pays via a BTC QR code, and the system detects the payment automatically through mempool.space and notifies both sides.
 - **Monetisation:** a free tier and a paid tier (Pro). Invoicing is unlimited on both; Pro is feature-gated, not volume-gated. Full plan in the v2 section.
 - **Principles / non-negotiables:**
-  - Bitcoin-first. No fiat billing rails (the operator is a foreign LLC with no business bank account).
+  - Bitcoin-first for invoices. Pro can be paid in bitcoin or by card (card added 2026-10-21, v1.5.4-H; it was bitcoin-only because the operator is a foreign LLC with no business bank account).
   - The platform never holds user funds. Invoice addresses are fresh and user-controlled, and the platform never takes a user xpub. Single exception: the platform billing xpub for premium payments.
   - The core loop (create, pay, get told) stays free forever.
   - Dark-first brand.
@@ -695,9 +695,17 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 
 ---
 
-### ⏳ v1.5.2.2-H — Pricing page (`/pricing`)
-- [ ] The Free and Pro cards (same content as the homepage), a full comparison,
-      and a short pricing FAQ (paid in bitcoin, renewal terms per v1.4.34 item 5).
+### ✅ v1.5.2.2-H — Pricing page (`/pricing`)
+
+**Branch:** `v1.5.21/pricing-page` · package `1.5.21`. Agreed with Jonny (2026-10-21).
+- [x] Plan cards shared with the homepage (`src/components/marketing/pricing-plans.tsx`)
+      with a **Monthly / Yearly (2 months free)** toggle: Pro $10/month, or
+      $100/year shown as $8.33/month "Billed $100 yearly".
+- [x] Comparison table of launch features only (reports and API are added when
+      built). Pricing FAQ: pay in bitcoin or by card; card renews until turned
+      off, bitcoin doesn't; you keep all your invoices when Pro runs out; refund
+      within 15 days via support; Free is free forever.
+- [x] Removed from the placeholder list (indexed).
 
 ### ⏳ v1.5.2.3-H — FAQ page (`/faq`)
 - [ ] All questions in one place, the homepage's eight first. Grill Jonny for more.
@@ -748,6 +756,50 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 - [ ] Widen the `currency_whitelist` constraint (Appendix A: money invariants).
 
 ---
+
+### ⏳ v1.5.4-H — Card payments for Pro (**pre-launch**)
+
+> **Decided by Jonny, 2026-10-21:** "accepting fiat payments is going to be
+> pretty crucial from launch date." This **replaces the "Bitcoin-only at launch
+> (hard rule)"** in the monetisation plan below. The /pricing page already says
+> Pro can be paid by card.
+
+- [ ] Choose the provider. The old blocker still applies: the operator is a
+      foreign LLC with no business bank account, so check what each can pay out
+      to. A merchant of record (Lemon Squeezy, Paddle) also handles sales tax;
+      Stripe needs a supported entity and bank account.
+- [ ] Card payments **renew automatically** (monthly or yearly) until turned off,
+      which the customer can do at any time; bitcoin payments don't renew.
+      Renewal terms shown next to the subscribe button (v1.4.34 item 5).
+- [ ] A card payment or renewal extends `premium_until`, the same entitlement
+      model as bitcoin (one source of truth: `getEntitlements`).
+- [ ] Refunds: on request within 15 days of paying (the /pricing FAQ promises
+      this), for card and bitcoin. Decide how a bitcoin refund is sent.
+- [ ] Prices: $10/month or $100/year (2 months free), the same for both rails.
+
+### ⏳ v1.5.5-H — Consider free trials of Pro (**decide before launch**)
+
+> Jonny, 2026-10-21: "I want to at least think about this before launch."
+
+- [ ] Decide: a trial or not; length; card required up front or not; what
+      happens at the end (falls back to Free, per v1.5.6-H).
+- [ ] If yes: how it shows on /pricing and the homepage cards, and abuse limits
+      (one trial per person, not per throwaway email).
+
+### ⏳ v1.5.6-H — Moving between Free and Pro (**decide before launch**)
+
+> Jonny, 2026-10-21: consider how accounts move from Free to Pro and back,
+> including how invoices created **before** the change are handled after it.
+
+- [ ] Upgrade: do existing invoices pick up Pro features (branding on their
+      page and PDF, your company name on emails still to send, reminders)?
+- [ ] Downgrade or expiry: what happens to invoices created on Pro, their client
+      pages and your own link; saved clients beyond the Free limit of 1;
+      reminders already scheduled; branding on PDFs already sent.
+- [ ] Rule of thumb to confirm: nothing a client already has should break, and
+      no invoice is ever lost. The /pricing FAQ promises "you keep all your
+      invoices, including the ones you created on Pro"; keep that true.
+- [ ] Write the decisions into v2.0's entitlement model and the terms (v1.5.2.8-H).
 
 ### ⏳ v1.5.0.4-H — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
 
@@ -833,7 +885,8 @@ spam. Four weeks of passing results is the safety margin.
 - Gate on what costs real money per use (client email to arbitrary recipients, API resources) and on what a freelancer will happily pay for (looking professional, chasing late payers).
 
 > **Corrected by Jonny, 2026-10-21** (the earlier text made all client email
-> Pro-only). **Price: Pro is $10/month**, paid in bitcoin. The homepage pricing
+> Pro-only). **Price: Pro is $10/month or $100/year (2 months free), paid in
+> bitcoin or by card** (card added 2026-10-21, v1.5.4-H). The homepage pricing
 > cards (v1.5.16) show this split.
 
 **Free**
@@ -863,7 +916,7 @@ spam. Four weeks of passing results is the safety margin.
 - One central helper, `getEntitlements(userId)`, returns the flags. Every gated surface calls it and nothing else, so changing the paid feature list later is a one-file change.
 
 **Billing (locked)**
-- **Bitcoin-only** at launch (hard rule). Reason: the operator is a foreign LLC owner with no business bank account, so fiat rails are not viable.
+- ~~**Bitcoin-only** at launch (hard rule).~~ **Superseded 2026-10-21:** card payments are needed from launch (v1.5.4-H). The reason it was bitcoin-only (a foreign LLC with no business bank account) is now the first thing v1.5.4-H must solve.
 - **Self-serve from day one** (no manual flag-flipping).
 - **Model an upgrade as a special invoice.** Reuse the existing address-watch / sweep / detection / dedup machinery. An "upgrade attempt" has an address, an amount, a status, and a schedule, exactly like an invoice; the only new pieces are (a) derive the address from a platform billing key instead of asking the user, and (b) on confirmation, extend `premium_until` instead of marking an invoice paid.
 - Keep reconciliation dumb: one attempt, one fresh address, flip on confirm.
@@ -903,7 +956,7 @@ spam. Four weeks of passing results is the safety margin.
 **Decisions to lock before implementation**
 - Exact pricing for 1m / 6m / 12m.
 - Whether to offer "extend by N months" before expiry, or only post-expiry renewal.
-- Refund policy (likely none; bitcoin is final).
+- ~~Refund policy (likely none; bitcoin is final).~~ Decided 2026-10-21: refund on request within 15 days of paying (/pricing FAQ).
 - Do users get a receipt for their own premium payment?
 - What happens to Pro-only state on downgrade (e.g. API keys: revoke or grace?).
 

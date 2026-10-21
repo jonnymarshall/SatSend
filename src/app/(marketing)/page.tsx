@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Timer, Wrench } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronDown, Code2, EyeOff, FileText, KeyRound, ShieldCheck, Timer, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/signal/button";
 import { BanknoteCheckIcon } from "@/components/marketing/icons";
 import { InvoiceRowPreview, PaymentPreview } from "@/components/marketing/product-preview";
 import { ClosingCta } from "@/components/marketing/closing-cta";
+import { PricingPlans } from "@/components/marketing/pricing-plans";
 import { CONTAINER, EYEBROW, H2, TEXT_LINK } from "@/components/marketing/styles";
 import { SOCIAL_LINKS } from "@/lib/site-links";
 import { cn } from "@/lib/utils";
@@ -228,93 +229,6 @@ function Highlights() {
 
 /* -------------------------------------------------------------- Pricing */
 
-const FREE_FEATURES = [
-  "Unlimited invoices",
-  "Automatic payment detection",
-  "Invoice link and PDF",
-  "Invoices emailed to your client (sent from “SatSend”)",
-  "“You've been paid” emails to you",
-  "1 saved client",
-  "Non-custodial: paid straight to your wallet",
-];
-
-const PRO_FEATURES = [
-  "Everything in Free",
-  "Your own link: satsend.me/yourname",
-  "Client pages: all of a client's invoices in one place",
-  "Invoices emailed from your company name, with replies to you",
-  "Unlimited saved clients and reusable line items",
-  "Your logo and colours on invoices, PDFs and emails",
-  "Automatic payment reminders",
-];
-
-function PlanCard({
-  id,
-  name,
-  price,
-  blurb,
-  features,
-  dark,
-  tag,
-}: {
-  id: string;
-  name: string;
-  price: string;
-  blurb: string;
-  features: string[];
-  dark?: boolean;
-  tag?: string;
-}) {
-  return (
-    <article
-      id={id}
-      aria-labelledby={`${id}--name`}
-      className={cn(
-        "flex flex-col rounded-(--radius-xl) border p-7 md:p-8",
-        dark
-          ? "border-(--color-ink) bg-(--color-ink) text-white"
-          : "border-(--color-border) bg-(--color-surface) text-(--color-ink)",
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <h3 id={`${id}--name`} className="text-[20px] font-semibold">
-          {name}
-        </h3>
-        {tag ? (
-          <span className="rounded-full bg-(--color-brand) px-2.5 py-0.5 text-[13px] font-semibold text-(--color-ink)">
-            {tag}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-4 flex items-baseline gap-1.5">
-        <span className="font-display text-[48px] leading-none font-[800]">{price}</span>
-        <span className={dark ? "text-white/75" : "text-(--color-text-secondary)"}>/ month</span>
-      </p>
-      <Link
-        id={`${id}--get-started`}
-        href="/signup"
-        className={cn(
-          buttonVariants({ variant: dark ? "primary" : "secondary" }),
-          "mt-6 w-full",
-        )}
-      >
-        Get started
-      </Link>
-      <p className={cn("mt-6 text-[15px] leading-[1.55]", dark ? "text-white/80" : "text-(--color-text-secondary)")}>
-        {blurb}
-      </p>
-      <ul className={cn("mt-6 flex flex-col gap-3 border-t pt-6", dark ? "border-white/15" : "border-(--color-border)")}>
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2.5 text-[15px] leading-[1.45]">
-            <Check aria-hidden className={cn("mt-0.5 size-4 shrink-0", dark ? "text-(--color-brand)" : "text-(--color-success-text)")} />
-            {f}
-          </li>
-        ))}
-      </ul>
-    </article>
-  );
-}
-
 function Pricing() {
   return (
     <section id="home--pricing" aria-labelledby="home--pricing--heading" className={cn(CONTAINER, "py-20 md:py-28")}>
@@ -327,27 +241,9 @@ function Pricing() {
           SatSend never takes a cut of your payments, on either plan.
         </p>
       </div>
-      <div className="mx-auto mt-12 grid max-w-[920px] grid-cols-1 gap-6 md:grid-cols-2">
-        <PlanCard
-          id="home--pricing--free"
-          name="Free"
-          price="$0"
-          blurb="Everything you need to invoice in bitcoin."
-          features={FREE_FEATURES}
-        />
-        <PlanCard
-          id="home--pricing--pro"
-          name="Pro"
-          price="$10"
-          tag="Coming soon"
-          dark
-          blurb="For freelancers who want to look established and get paid on time."
-          features={PRO_FEATURES}
-        />
+      <div className="mt-10">
+        <PricingPlans idPrefix="home--pricing" />
       </div>
-      <p id="home--pricing--pro-note" className="mx-auto mt-6 max-w-[60ch] text-center text-sm text-(--color-text-secondary)">
-        Pro is paid in bitcoin. Pro features are on the way: start free today and upgrade when they land.
-      </p>
       <div className="mt-6 flex justify-center">
         <Link id="home--pricing--more" href="/pricing" className={TEXT_LINK}>
           See full pricing

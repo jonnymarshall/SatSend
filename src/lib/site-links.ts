@@ -18,7 +18,6 @@ export const SOCIAL_LINKS = {
 } as const;
 
 export const PLACEHOLDER_PAGES = [
-  { path: "/pricing", title: "Pricing", description: "SatSend's Free and Pro plans." },
   { path: "/faq", title: "FAQ", description: "Answers to common questions about SatSend." },
   { path: "/security", title: "Security", description: "How SatSend keeps your invoices safe, and why it never holds your bitcoin." },
   { path: "/about", title: "About", description: "Who's behind SatSend, and why it exists." },
