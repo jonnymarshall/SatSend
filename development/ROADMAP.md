@@ -687,11 +687,10 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 - [x] Migration 0035: invoices that went live without being sent get
       `sent_at = coalesce(published_at, created_at)`, `send_method = 'manual'`
       (test: 10 rows; production: 13 expected).
-- [ ] **At merge:** apply 0035 to production (MCP `apply_migration`, or the SQL
-      Editor if it comes back "cancelled"), then check no live invoice lacks a
-      sent date.
-- [ ] Re-take the How it works "create" screenshot (it shows the old Publish
-      button and "Required to publish").
+- [x] **At merge (2026-10-21):** 0035 applied to production via MCP (13 rows; no
+      "cancelled"). Checked: 0 live invoices without a sent date, 0 drafts with one.
+- [x] How it works "create" screenshot re-taken showing Send and "Required to
+      send" (v1.5.20).
 - [ ] Manual (`manual-tests/v1.5.19-draft-or-sent.md`).
 
 ---
