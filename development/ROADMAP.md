@@ -783,19 +783,24 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v1.7 — Address Format Standardisation
+### ⏳ v1.7 — Address Format Standardisation (**pre-launch**)
 
 **Branch:** `v1.7/address-fields`
 
-> **Note:** This branch changes the address data model. Should land before v2.2 (saved clients) since those features depend on the address structure.
+> **Note:** This branch changes the address data model. Must land **before launch**
+> (Jonny, 2026-10-21: sender and client addresses become proper address forms, not
+> one text box), and before v2.2 (saved clients) since those features depend on the
+> address structure.
 
-- [ ] Replace single freeform `your_address` / `client_address` text fields with structured fields: Line 1, Line 2, City, State/Province, Post Code, Country — following the UN/OASIS xNAL address standard ordering
+- [ ] Replace the single freeform `your_address` / `client_address` text fields with structured fields: Line 1, Line 2, City, State/Province/Region, Post Code, Country, following the UN/OASIS xNAL address standard ordering
+- [ ] **Maximally compatible with any address globally:** Line 1 and Country are the only required fields; Line 2, City, State/Province, and Post Code are all optional (many countries have no postcode or region concept); no country-specific format validation (no US-style ZIP/state rules); generous length limits
+- [ ] Country picked from the ISO 3166-1 country list (searchable dropdown), stored as the ISO code and rendered as the country name
 - [ ] Schema migration: add individual address sub-columns (nullable); keep old `*_address` column for migration only, then drop after backfill
 - [ ] Update invoice form with the new multi-field address layout
-- [ ] Update invoice detail page (user view) and client payment view to render the structured address correctly
+- [ ] Update every surface that renders an address: invoice detail page (user view), client payment view, and the PDF (`invoice-pdf.tsx` prints both addresses today). Skip empty optional lines so no blank gaps appear
 - [ ] No auto-fill or address lookup required
 
-**Done when:** All address inputs are structured multi-field; old freeform address column removed; views render the structured address neatly.
+**Done when:** all address inputs are structured multi-field forms that accept any address format in the world (no forced region or postcode), the old freeform address column is removed, and the dashboard, client payment view, and PDF all render the structured address neatly with empty optional lines omitted.
 
 ---
 
@@ -858,7 +863,7 @@ spam. Four weeks of passing results is the safety margin.
 - **Phase 1 (launch Pro):** v2.0 -> v2.1 -> v2.2 -> v2.3 -> v2.4 -> v2.5 -> v2.6
 - **Phase 2:** v2.7
 - **Phase 3:** v2.8
-- **Later:** v2.9, v2.10, v2.11 (v2.12 multi-currency moved before launch as v1.5.3-H)
+- **Later:** v2.9, v2.10, v2.11, v2.13, v2.14 (v2.12 multi-currency moved before launch as v1.5.3-H)
 
 > If you want to open the doors sooner, the natural cut line is to launch with **v2.0-v2.3** (billing, pretty links, saved clients, client pages) and add v2.4-v2.6 (branding, client email, reminders) in the weeks right after, at the same price. Early Pro buyers keep everything.
 
@@ -1175,6 +1180,145 @@ The user has flagged this entry as needing a thorough grilling before any code i
 ### 🚫 v2.12: Multi-currency support — moved
 
 Moved before launch as **v1.5.3-H** (2026-10-21).
+
+---
+
+### 🚫 v2.13: Lightning payments (non-custodial, LNURL + LUD-21)
+
+**Branch:** `v2.13/lightning-payments`
+
+**Later (post-launch).** Free for everyone (locked by Jonny, 2026-10-21): a payment
+rail is part of the core loop, not a Pro feature.
+
+**Context:** Today the only rail is on-chain BTC to a fresh address, detected via
+mempool.space. Lightning adds instant settlement, exact amounts (no
+underpaid/overpaid), and no confirmation wait. Feasibility was checked in a ChatGPT
+architecture conversation (2026-10-21,
+[transcript](https://chatgpt.com/share/6ad91472-e56c-83e8-bb31-abdc84f21c6b)): a
+fully non-custodial Lightning flow is possible without a processor like Spark or
+Voltage by combining LNURL-pay ([LUD-16](https://github.com/lnurl/luds/blob/luds/16.md)
+Lightning Addresses, [LUD-06](https://github.com/lnurl/luds/blob/luds/06.md)
+payRequest) for invoice generation with
+[LUD-21 (LNURL-verify)](https://github.com/lnurl/luds/blob/luds/21.md) for
+settlement detection. The payer pays the owner's wallet directly; the platform
+never holds or routes funds, keeping the non-custodial principle intact.
+
+**Why account-level address reuse is safe here (differs from on-chain):** a
+Lightning Address is only an identifier. Every payment requests a fresh BOLT-11
+invoice from the owner's wallet provider, with a unique payment hash and its own
+LUD-21 verify URL, so per-payment tracking is unaffected by reusing the address.
+Lightning payments also leave no public ledger to scrape, which is exactly what
+makes on-chain address reuse unacceptable. Decision (Jonny, 2026-10-21): one
+Lightning Address saved in settings as the account default, with an optional
+per-invoice override.
+
+**The catch:** LUD-21 is optional. Almost any Lightning Address can generate an
+invoice, but only some wallets expose a verify URL, and Lightning has no public
+mempool to watch. This version is therefore LUD-21-only: if the wallet cannot
+verify, Lightning is not offered on that invoice and the owner is told why. The
+Nostr Wallet Connect fallback is investigated separately (v2.14).
+
+**Scope**
+- [ ] Lightning Address in settings (account default) plus an optional per-invoice
+      override. Validate at save time: resolves via LUD-16
+      (`https://<domain>/.well-known/lnurlp/<user>`), sane min/max amount range.
+- [ ] Per-invoice payment-method toggles: on-chain and/or Lightning, at least one
+      required. This relaxes the publish-time rule that `btc_address` is mandatory
+      (v1.4.14): it is required only when on-chain is enabled, and a Lightning
+      Address (override or account default) is required when Lightning is enabled.
+- [ ] Invoice generation at payment time: resolve the address (LUD-16), request a
+      BOLT-11 invoice from the callback for the quoted amount in millisatoshis
+      (LUD-06), show it as a QR code and a copyable string on the payment view.
+- [ ] Persist per-invoice Lightning state: the BOLT-11 `pr`, the `verify` URL, the
+      payment hash, and the fiat-to-sats quote snapshot (same quote-lock
+      discipline as on-chain).
+- [ ] LUD-21 gate: if the callback response has no `verify` field, Lightning is
+      not offered for that invoice; the owner gets a clear "your wallet does not
+      support payment verification" message at save/publish time, not a silent
+      failure.
+- [ ] Detection: the payment sweep polls the `verify` URL for Lightning-enabled
+      unpaid invoices on the existing schedule. On `settled: true`, hash the
+      returned preimage and require it to match the invoice's payment hash before
+      flipping straight to `paid` (Lightning settles the exact amount atomically:
+      no `payment_detected`, `underpaid`, `overpaid`, or confirmation-depth
+      states).
+- [ ] Emails: the owner and client payment-confirmed pair fires once on
+      settlement (the detected/confirmed split is an on-chain artifact).
+- [ ] SSRF hardening on every server-side LNURL fetch (the address domain and the
+      callback URL are both untrusted input): https only, block
+      private/link-local IPs, bounded redirects, timeouts, response size caps.
+- [ ] Payment view rail picker when both rails are enabled (tabs or toggle), with
+      the same live-update treatment as on-chain.
+
+**Tests**
+- [ ] LNURL resolution and invoice generation against a mocked LNURL server.
+- [ ] Verify-poll: `settled: true` with a preimage hashing to the payment hash
+      flips the invoice to `paid`; a mismatched preimage does not; `settled:
+      false` leaves it unpaid.
+- [ ] A wallet whose callback omits `verify` is rejected with the clear message,
+      at save time and at publish time.
+- [ ] SSRF guard: callback URLs pointing at loopback/private ranges or non-https
+      are refused.
+- [ ] Publish rules: a Lightning-only invoice publishes without a `btc_address`;
+      an invoice with both rails off cannot publish.
+
+**Decisions to lock in (grilling session)**
+- Rail picker UX when both rails are on (which rail is presented first).
+- Quote lock for Lightning: BOLT-11 invoices carry their own expiry; align the
+  fiat-to-sats quote window with it, and decide the re-issue flow when a payer
+  lets an invoice lapse.
+- Whether the manual mark-as-paid backstop stays available on Lightning invoices
+  (it exists on every invoice today; with no public ledger, the owner is the only
+  witness).
+- Support raw bech32 LNURLs (LUD-06) in addition to the `user@domain` Lightning
+  Address form (LUD-16), or Lightning Addresses only.
+- Which wallets to test against at build time (LUD-21 support matrix).
+
+**Out of scope (deferred)**
+- Nostr Wallet Connect verification: tracked as v2.14.
+- Custodial anything: no node, no keys, no Spark/Voltage-style processor.
+- Lightning for platform billing (v2.0 premium payments): possible follow-on, not
+  this item.
+- Buyer-supplied preimage proof as a verification path (the weakest option in the
+  feasibility check; revisit only on real demand).
+
+**Done when:** an owner saves a Lightning Address in settings, publishes an
+invoice with Lightning enabled (alone or alongside on-chain), and a client pays
+the BOLT-11 invoice from their own wallet; SatSend detects settlement via the
+LUD-21 verify URL, validates the preimage against the payment hash, flips the
+invoice to `paid`, and sends the confirmation emails, with the money moving
+directly between the client's and owner's wallets and the platform never in the
+flow. An owner whose wallet lacks LUD-21 gets a clear explanation instead of a
+silent failure.
+
+---
+
+### 🚫 v2.14: Investigate Nostr Wallet Connect (NWC) for Lightning verification
+
+**Branch:** `v2.14/nwc-lightning-verification`
+
+**Later.** Follow-up to v2.13, flagged by Jonny (2026-10-21).
+
+**Context:** v2.13 ships Lightning with LUD-21-only verification, which excludes
+owners whose wallets expose no verify URL. Nostr Wallet Connect
+([NIP-47](https://github.com/nostr-protocol/nips/blob/master/47.md)) is an open
+protocol, not a hosted processor: the owner connects a compatible wallet once and
+grants receive-only permissions (`make_invoice`, `lookup_invoice`), letting
+SatSend create and check invoices directly with the wallet. More setup friction
+than typing a Lightning Address, but considerably more reliable detection, and
+self-custodial wallets can connect.
+
+**Scope (investigation first, then a build decision)**
+- [ ] Survey NWC-capable wallets and the connect UX (connection string, deep
+      link).
+- [ ] Confirm receive-only connections are enforceable (never request
+      `pay_invoice`).
+- [ ] Coverage question: does NWC meaningfully widen wallet support beyond
+      LUD-21?
+- [ ] Written build/no-build decision; if build, write a full roadmap entry.
+
+**Done when:** the build/no-build decision is recorded on the roadmap, with a
+full spec if build.
 
 ---
 
