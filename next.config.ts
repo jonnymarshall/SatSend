@@ -24,9 +24,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   // v1.5.5: the invoice PDF reads its fonts from disk (react-pdf cannot use web
-  // fonts), so ship them with both PDF routes.
+  // fonts), so ship them with both PDF routes. v1.5.17: the link-preview image
+  // reads the same files.
   outputFileTracingIncludes: {
     "/api/**/pdf": ["./src/lib/invoices/fonts/**/*"],
+    "/opengraph-image": ["./src/lib/invoices/fonts/**/*"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
