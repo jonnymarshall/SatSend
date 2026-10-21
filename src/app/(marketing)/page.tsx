@@ -55,7 +55,7 @@ function Hero() {
             Get started
             <ArrowRight />
           </Link>
-          <Link id="home--hero--how-it-works" href="#how-it-works" className={buttonVariants({ size: "lg", variant: "secondary" })}>
+          <Link id="home--hero--how-it-works" href="/how-it-works" className={buttonVariants({ size: "lg", variant: "secondary" })}>
             How it works
           </Link>
         </div>

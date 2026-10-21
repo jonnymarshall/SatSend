@@ -29,7 +29,7 @@ describe("homepage (v1.5.16)", () => {
     );
     const hero = screen.getByRole("region", { name: /invoice in bitcoin/i });
     expect(within(hero).getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
-    expect(within(hero).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "#how-it-works");
+    expect(within(hero).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/how-it-works");
     expect(redirect).not.toHaveBeenCalled();
   });
 

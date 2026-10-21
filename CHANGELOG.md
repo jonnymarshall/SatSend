@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and served at quality 90 (`images.qualities` in `next.config.ts`); text was
   soft on high-resolution screens.
 
+- **v1.5.18 — Homepage "How it works" button opens the new page.** It
+  scrolled to the homepage's three steps; it now goes to `/how-it-works`.
+
 - **v1.5.18 — QR code ignores a late result.** `BtcQrCode` no longer applies an
   image that arrives after it has gone or switched to a newer value (CI failed
   on an unhandled "window is not defined" from exactly that).
