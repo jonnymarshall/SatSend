@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.17 — Link-preview image matches the site.** `/opengraph-image` (the
+  card shown when a satsend.me link is shared) used the generator's default
+  font and a made-up "S" tile. It now draws the real SatSend.me wordmark, the
+  homepage's small caps label and its ink-and-amber headline in Onest and Geist
+  (read from the font files the PDF already ships; `next.config.ts` now traces
+  them for this route too).
+
 ### Added
 
 - **v1.5.16 — Marketing homepage (roadmap v1.5.2-H).** `/` is now the SatSend
