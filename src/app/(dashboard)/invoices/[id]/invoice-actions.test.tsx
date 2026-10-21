@@ -7,23 +7,23 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 vi.mock("../actions", () => ({
-  publishInvoice: vi.fn().mockResolvedValue(undefined),
   publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
-  publishAndMarkSent: vi.fn().mockResolvedValue(undefined),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
   markPaid: vi.fn().mockResolvedValue(undefined),
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
   deleteDraft: vi.fn().mockResolvedValue(undefined),
   duplicateInvoice: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 vi.mock("../bulk-actions", () => ({
   bulkArchive: vi.fn().mockResolvedValue(undefined),
   bulkUnarchive: vi.fn().mockResolvedValue({ unarchived: 1, skipped: 0 }),
   bulkDelete: vi.fn().mockResolvedValue(undefined),
 }));
 
+import { showNotice } from "@/components/notice";
 import {
-  publishInvoice,
   publishAndSendEmail,
   publishAndMarkSent,
   markPaid,
@@ -46,10 +46,11 @@ beforeEach(() => {
 describe("InvoiceActions — draft status", () => {
   const draft = { id: "inv-d", status: "draft" as const, client_email: "ada@example.com" };
 
-  it("renders Edit draft, Publish (split-button), Duplicate, Delete buttons", () => {
+  it("renders Edit draft, Send (menu), Duplicate, Delete buttons, and no Publish", () => {
     render(<InvoiceActions invoice={draft} />);
     expect(screen.getByRole("link", { name: /edit draft/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /publish/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
@@ -62,25 +63,32 @@ describe("InvoiceActions — draft status", () => {
     expect(screen.queryByRole("button", { name: /unarchive/i })).not.toBeInTheDocument();
   });
 
-  it("calls publishAndSendEmail when 'Send now via email' is chosen from the Publish menu", async () => {
+  it("calls publishAndSendEmail when 'Send now via email' is chosen from the Send menu", async () => {
     render(<InvoiceActions invoice={draft} />);
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
     await waitFor(() => expect(publishAndSendEmail).toHaveBeenCalledWith("inv-d"));
   });
 
-  it("calls publishInvoice when 'Publish only' is chosen from the Publish menu", async () => {
+  it("'Copy link and mark as sent' sends it, copies the client's link and says so (v1.5.19)", async () => {
     render(<InvoiceActions invoice={draft} />);
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /publish only/i }));
-    await waitFor(() => expect(publishInvoice).toHaveBeenCalledWith("inv-d"));
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /copy link and mark as sent/i }));
+    await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-d"));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://example.test/invoice/inv-d"),
+    );
+    await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
   });
 
-  it("calls publishAndMarkSent when 'Mark as sent' is chosen from the Publish menu", async () => {
+  it("if marking as sent fails, nothing is copied (v1.5.19)", async () => {
+    vi.mocked(publishAndMarkSent).mockResolvedValueOnce({ ok: false, field: "btc_address", message: "Invalid BTC address" });
     render(<InvoiceActions invoice={draft} />);
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /^mark as sent$/i }));
-    await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-d"));
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /copy link and mark as sent/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid BTC address");
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(showNotice).not.toHaveBeenCalledWith("Link copied");
   });
 
   it("calls duplicateInvoice when Duplicate is clicked", async () => {
@@ -163,17 +171,18 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
     const invoice = { id: "inv-fail", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/email delivery failed/i);
+    expect(alert.textContent).toMatch(/couldn't be sent/i);
+    expect(alert.textContent).toMatch(/still a draft/i);
   });
 
   it("shows a queued-for-delivery notice when publishAndSendEmail returns emailStatus='sent'", async () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "sent" } });
     const invoice = { id: "inv-ok", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
     const status = await screen.findByRole("status");
     expect(status.textContent).toMatch(/queued for delivery to ada@example\.com/i);
@@ -192,7 +201,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
     expect(screen.queryByRole("button", { name: /^send$/i })).not.toBeInTheDocument();
   });
 
-  it("shows the Send menu (not gated) when an invoice is published but not yet sent", () => {
+  it("shows the Send menu for an older invoice that went live without being sent (pre-v1.5.19)", () => {
     const invoice = {
       id: "inv-unpub",
       status: "pending" as const,

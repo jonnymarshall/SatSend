@@ -9,7 +9,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export interface PublishMenuProps {
+/**
+ * The Send menu (v1.5.19, was PublishMenu). An invoice is a draft or it's sent:
+ * every option here sends it, makes the client's link live and records its sent
+ * date. There is no "Publish only".
+ */
+export interface SendMenuProps {
   invoiceId: string;
   isDraft: boolean;
   emailAttemptedAt: string | null;
@@ -17,57 +22,45 @@ export interface PublishMenuProps {
   sentAt?: string | null;
   sendMethod?: string | null;
   onSendEmail: (id: string) => void;
-  onMarkSent: (id: string) => void;
   onDownloadAndMarkSent: (id: string) => void;
-  onPublishOnly: (id: string) => void;
-  triggerLabel?: string;
+  onCopyLinkAndMarkSent: (id: string) => void;
   triggerVariant?: "primary" | "secondary";
   busy?: boolean;
 }
 
-export function PublishMenu({
+export function SendMenu({
   invoiceId,
-  isDraft,
   emailAttemptedAt,
   clientEmail,
   sentAt,
   onSendEmail,
-  onMarkSent,
   onDownloadAndMarkSent,
-  onPublishOnly,
-  triggerLabel,
+  onCopyLinkAndMarkSent,
   triggerVariant = "primary",
   busy,
-}: PublishMenuProps) {
+}: SendMenuProps) {
   const emailDisabled = !!emailAttemptedAt || !clientEmail;
   const emailDisabledReason = emailAttemptedAt
     ? "An email has already been attempted for this invoice; multiple sends are not supported."
     : !clientEmail
-    ? "No client email on this invoice — cannot send."
+    ? "No client email on this invoice, so it can't be sent by email."
     : undefined;
-
-  // Once the invoice is marked as sent (either method), the manual options are no-ops —
-  // only "Send now via email" still has work to do. The Download PDF action lives elsewhere.
+  // Once it's been sent by hand, the hand-sent options have nothing left to do;
+  // only "Send now via email" can still add something.
   const showManualSendOptions = !sentAt;
-
-  const label = triggerLabel ?? (isDraft ? "Publish" : "Send");
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            id={`publish-menu--trigger-${invoiceId}`}
-            variant={triggerVariant}
-            disabled={busy}
-          >
-            {label}
+          <Button id={`send-menu--trigger-${invoiceId}`} variant={triggerVariant} disabled={busy}>
+            Send
             <ChevronDown className="ml-1 h-4 w-4" />
           </Button>
         }
       />
-      <DropdownMenuContent align="end" className="w-64 whitespace-nowrap">
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem
+          id={`send-menu--email-${invoiceId}`}
           disabled={emailDisabled}
           title={emailDisabled ? emailDisabledReason : undefined}
           onClick={() => !emailDisabled && onSendEmail(invoiceId)}
@@ -76,18 +69,18 @@ export function PublishMenu({
         </DropdownMenuItem>
         {showManualSendOptions && (
           <>
-            <DropdownMenuItem onClick={() => onDownloadAndMarkSent(invoiceId)}>
-              Download and mark as sent
+            <DropdownMenuItem id={`send-menu--download-${invoiceId}`} onClick={() => onDownloadAndMarkSent(invoiceId)}>
+              Download PDF and mark as sent
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onMarkSent(invoiceId)}>
-              Mark as sent
+            <DropdownMenuItem
+              id={`send-menu--copy-link-${invoiceId}`}
+              onClick={() => onCopyLinkAndMarkSent(invoiceId)}
+              className="flex-col items-start gap-0.5"
+            >
+              <span>Copy link and mark as sent</span>
+              <span className="text-xs text-(--color-text-secondary)">Share the link yourself</span>
             </DropdownMenuItem>
           </>
-        )}
-        {isDraft && (
-          <DropdownMenuItem onClick={() => onPublishOnly(invoiceId)}>
-            Publish only (don&apos;t send yet)
-          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

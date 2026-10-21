@@ -295,7 +295,7 @@ async function publishFieldError(
       field: "btc_address",
       message:
         check.error === "btc_address_required"
-          ? "A bitcoin address is required to publish"
+          ? "A bitcoin address is required to send"
           : "Invalid BTC address",
     };
   }
@@ -352,9 +352,9 @@ async function applyPublishUpdate(
   revalidatePath(`/invoices/${invoice.id}`);
 }
 
-// v1.5.9 (v1.5.0.6-H): the send actions also run on an invoice that was already
-// published ("Publish only", then "Send now via email" / "Mark as sent"). That
-// must not re-publish it: the publish checks would find the invoice's own row in
+// v1.5.9 (v1.5.0.6-H): the send actions also run on an invoice that is already
+// live (sent by hand, then "Send now via email"; or, before v1.5.19, published
+// without sending). That must not re-publish it: the publish checks would find the invoice's own row in
 // the global address RPC ("already used on another invoice"), and the publish
 // patch would reset its status and payment schedule. Record the send only.
 async function applySendUpdate(
@@ -368,13 +368,10 @@ async function applySendUpdate(
   revalidatePath(`/invoices/${invoice.id}`);
 }
 
-export async function publishInvoice(invoiceId: string): Promise<ActionResult<undefined>> {
-  const { supabase, invoice } = await loadAndAuthorise(invoiceId);
-  const fieldError = await publishFieldError(supabase, invoice, invoiceId);
-  if (fieldError) return fieldError;
-  await applyPublishUpdate(supabase, invoice, {});
-  return { ok: true, data: undefined };
-}
+// v1.5.19 (roadmap v1.5.2.0.1-H): an invoice is a draft or it's sent. There is
+// no "Publish only": each send action makes the invoice live AND gives it its
+// sent date in the same write, and a send that doesn't happen leaves a draft a
+// draft. The first sent date is kept (a later email doesn't move it).
 
 export async function publishAndSendEmail(
   invoiceId: string,
@@ -390,10 +387,16 @@ export async function publishAndSendEmail(
     if (fieldError) return fieldError;
   }
 
-  // v1.4.26-H: skip quietly for a missing OR malformed address (old drafts may
-  // carry bad ones) — publish-only, no send attempt.
+  // v1.4.26-H: no send attempt for a missing OR malformed address (old drafts
+  // may carry bad ones). v1.5.19: a draft is not published instead.
   if (!invoice.client_email || !isValidEmail(invoice.client_email)) {
-    if (isDraft) await applyPublishUpdate(supabase, invoice, {});
+    if (isDraft) {
+      return {
+        ok: false,
+        field: "client_email",
+        message: "Add your client's email address to send it by email.",
+      };
+    }
     return { ok: true, data: { emailStatus: "no_recipient" } };
   }
 
@@ -415,17 +418,22 @@ export async function publishAndSendEmail(
   });
 
   const succeeded = outcome.status === "sent";
-  const sendFields = {
-    sent_at: succeeded ? attemptAt : null,
-    send_method: succeeded ? ("email" as const) : null,
-    email_attempted_at: attemptAt,
-  };
   if (isDraft) {
-    await applyPublishUpdate(supabase, invoice, sendFields);
-  } else if (succeeded) {
-    await applySendUpdate(supabase, invoice, sendFields);
+    // Not sent: it stays a draft (nothing went to the client, so it isn't live).
+    if (!succeeded) return { ok: true, data: { emailStatus: outcome.status } };
+    await applyPublishUpdate(supabase, invoice, {
+      sent_at: attemptAt,
+      send_method: "email" as const,
+      email_attempted_at: attemptAt,
+    });
+  } else if (succeeded && !invoice.sent_at) {
+    await applySendUpdate(supabase, invoice, {
+      sent_at: attemptAt,
+      send_method: "email" as const,
+      email_attempted_at: attemptAt,
+    });
   } else {
-    // Keep an earlier manual "sent" mark if this email attempt failed.
+    // Already sent (keep the first sent date and method), or this attempt failed.
     await applySendUpdate(supabase, invoice, { email_attempted_at: attemptAt });
   }
 
@@ -437,6 +445,10 @@ export async function publishAndMarkSent(
   opts: { withDownload?: boolean } = {},
 ): Promise<ActionResult<{ downloadUrl?: string }>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
+  const download = opts.withDownload ? { downloadUrl: `/api/invoices/${invoiceId}/pdf` } : {};
+  // Already sent: the first sent date stands, and there's nothing to log.
+  if (invoice.status !== "draft" && invoice.sent_at) return { ok: true, data: download };
+
   const sendFields = { sent_at: new Date().toISOString(), send_method: "manual" as const };
   if (invoice.status === "draft") {
     const fieldError = await publishFieldError(supabase, invoice, invoiceId);
@@ -452,10 +464,7 @@ export async function publishAndMarkSent(
     eventType: "marked_as_sent",
   });
 
-  return {
-    ok: true,
-    data: opts.withDownload ? { downloadUrl: `/api/invoices/${invoiceId}/pdf` } : {},
-  };
+  return { ok: true, data: download };
 }
 
 export async function markPaid(invoiceId: string) {

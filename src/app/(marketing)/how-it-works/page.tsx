@@ -51,15 +51,15 @@ const STEPS: Step[] = [
       src: "/marketing/how-it-works/create.png",
       width: 2240,
       height: 2116,
-      alt: "The invoice form: a line item for packaging design, a bitcoin address, the $960 total and the Publish button.",
+      alt: "The invoice form: a line item for packaging design, a bitcoin address, the $960 total and the Send button.",
     },
   },
   {
     id: "send",
     title: "Send it",
-    intro: "Press Publish and SatSend emails your client a link to the invoice and a PDF copy.",
+    intro: "Press Send and choose how. SatSend can email your client a link to the invoice and a PDF copy.",
     points: [
-      "Prefer to send it yourself? Copy the link and share it however you like.",
+      "Prefer to send it yourself? Copy the link, or download the PDF, and share it however you like.",
       "Your client sees who it's from, the amount and the due date, with one button to view and pay.",
     ],
     image: {

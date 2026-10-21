@@ -6,6 +6,7 @@ export interface PdfFilenameInput {
   your_email: string | null;
   created_at: string;
   published_at?: string | null;
+  sent_at?: string | null;
   account_email?: string | null;
 }
 
@@ -38,7 +39,8 @@ function pickInvoiceName(input: PdfFilenameInput): string {
 }
 
 function pickDate(input: PdfFilenameInput): string {
-  const iso = input.published_at ?? input.created_at;
+  // v1.5.19: the invoice date is the day it was sent.
+  const iso = input.sent_at ?? input.published_at ?? input.created_at;
   const d = new Date(iso);
   const yyyy = d.getUTCFullYear().toString().padStart(4, "0");
   const mm = (d.getUTCMonth() + 1).toString().padStart(2, "0");

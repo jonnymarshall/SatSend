@@ -89,7 +89,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
             <h1 id="invoice-view--title" className="font-display tracking-heading text-[26px] leading-tight font-bold break-words sm:text-[30px]">
               {invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice"}
             </h1>
-            <InvoiceDates createdAt={invoice.created_at} dueDate={invoice.due_date} />
+            <InvoiceDates audience="client" sentAt={invoice.sent_at} dueDate={invoice.due_date} />
           </div>
           <div id="invoice-view--header-actions" className="flex flex-wrap items-center gap-3 sm:flex-col sm:items-end">
             {invoice.btc_address ? (

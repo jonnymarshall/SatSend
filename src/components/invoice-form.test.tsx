@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InvoiceForm } from "./invoice-form";
-import { saveDraft } from "@/app/(dashboard)/invoices/actions";
+import { saveDraft, publishAndMarkSent, publishAndSendEmail } from "@/app/(dashboard)/invoices/actions";
+import { showNotice } from "@/components/notice";
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -13,14 +14,15 @@ vi.mock("@/lib/supabase/client", () => ({
   })),
 }));
 
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: vi.fn(() => ({ push: vi.fn() })),
+  useRouter: vi.fn(() => ({ push })),
 }));
+vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 
 vi.mock("@/app/(dashboard)/invoices/actions", () => ({
   saveDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id" } }),
   updateDraft: vi.fn().mockResolvedValue({ ok: true, data: {} }),
-  publishInvoice: vi.fn().mockResolvedValue({ ok: true, data: undefined }),
   publishAndSendEmail: vi.fn().mockResolvedValue({ ok: true, data: { emailStatus: "sent" } }),
   publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
 }));
@@ -119,23 +121,21 @@ describe("InvoiceForm bitcoin-only (v1.4.14)", () => {
     expect(saveDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks publish when btc_address is empty and surfaces an error", async () => {
-    const { publishInvoice } = await import("@/app/(dashboard)/invoices/actions");
+  it("blocks sending when btc_address is empty and surfaces an error", async () => {
+    vi.mocked(publishAndMarkSent).mockClear();
     const user = userEvent.setup();
     render(<InvoiceForm />);
-    await user.click(screen.getByRole("button", { name: /^publish/i }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: /publish only/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /^send/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
     expect(screen.getByText(/btc address.*required/i)).toBeInTheDocument();
-    expect(publishInvoice).not.toHaveBeenCalled();
+    expect(publishAndMarkSent).not.toHaveBeenCalled();
   });
 });
 
 describe("InvoiceForm BTC address validation", () => {
-  async function choosePublishOnly(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole("button", { name: /^publish/i }));
-    await user.click(await screen.findByRole("menuitem", { name: /publish only/i }));
+  async function chooseCopyLinkAndMarkSent(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^send/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
   }
 
   it("shows an error when publishing with an invalid BTC address", async () => {
@@ -144,7 +144,7 @@ describe("InvoiceForm BTC address validation", () => {
 
     const btcInput = screen.getByPlaceholderText(/bc1q/i);
     await user.type(btcInput, "notavalidaddress");
-    await choosePublishOnly(user);
+    await chooseCopyLinkAndMarkSent(user);
 
     expect(screen.getByText(/invalid btc address/i)).toBeInTheDocument();
   });
@@ -155,33 +155,64 @@ describe("InvoiceForm BTC address validation", () => {
 
     const btcInput = screen.getByPlaceholderText(/bc1q/i);
     await user.type(btcInput, "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
-    await choosePublishOnly(user);
+    await chooseCopyLinkAndMarkSent(user);
 
     expect(screen.queryByText(/invalid btc address/i)).not.toBeInTheDocument();
   });
 });
 
-describe("InvoiceForm publish/send menu", () => {
-  it("renders a 'Publish' split-button (not the legacy 'Publish invoice' button)", () => {
+describe("InvoiceForm Send menu (v1.5.19)", () => {
+  const VALID_ADDRESS = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+
+  it("has a Send button and nothing called Publish", () => {
     render(<InvoiceForm />);
-    expect(screen.getByRole("button", { name: /^publish/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /publish invoice/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^send/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
 
-  it("offers all four publish options for a new draft", async () => {
+  it("offers the three ways to send, and no Publish only", async () => {
     const user = userEvent.setup();
     render(<InvoiceForm />);
-    await user.click(screen.getByRole("button", { name: /^publish/i }));
+    await user.click(screen.getByRole("button", { name: /^send/i }));
     expect(await screen.findByRole("menuitem", { name: /send now via email/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /download and mark as sent/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /^mark as sent$/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /publish only/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /download pdf and mark as sent/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /copy link and mark as sent/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /publish/i })).not.toBeInTheDocument();
   });
+
+  it("'Copy link and mark as sent' saves, sends, opens the invoice, copies the link and says so", async () => {
+    push.mockClear();
+    const user = userEvent.setup(); // provides a working test clipboard
+    render(<InvoiceForm />);
+    await user.type(screen.getByPlaceholderText(/bc1q/i), VALID_ADDRESS);
+    await chooseCopyLink(user);
+    await vi.waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("test-id"));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/test-id"));
+    await vi.waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
+    expect(await navigator.clipboard.readText()).toBe(`${window.location.origin}/invoice/test-id`);
+  });
+
+  it("an email that doesn't go out leaves a draft, and its page explains why", async () => {
+    push.mockClear();
+    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(screen.getByPlaceholderText(/bc1q/i), VALID_ADDRESS);
+    await user.type(document.getElementById("input-client-email")!, "client@example.com");
+    await user.click(screen.getByRole("button", { name: /^send/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /send now via email/i }));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/test-id?email=failed"));
+  });
+
+  async function chooseCopyLink(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^send/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
+  }
 
   it("disables 'Send now via email' when no client_email is filled in", async () => {
     const user = userEvent.setup();
     render(<InvoiceForm />);
-    await user.click(screen.getByRole("button", { name: /^publish/i }));
+    await user.click(screen.getByRole("button", { name: /^send/i }));
     const item = await screen.findByRole("menuitem", { name: /send now via email/i });
     expect(item).toHaveAttribute("data-disabled");
   });
