@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import InvoiceDetailPage from "./page";
+import { createClient } from "@/lib/supabase/server";
 
 const BASE_INVOICE = {
   id: "inv-abc",
@@ -69,11 +70,37 @@ vi.mock("@/app/invoice/[id]/payment-watcher-uncontrolled", () => ({
   },
 }));
 
+// The next page render reads this row (v1.5.19 date tests).
+function mockInvoiceRow(over: Record<string, unknown>) {
+  vi.mocked(createClient).mockResolvedValueOnce(
+    makeSupabaseMock({ ...BASE_INVOICE, ...over } as typeof BASE_INVOICE) as never,
+  );
+}
+
 describe("InvoiceDetailPage — dates", () => {
-  it("shows 'Date Sent:' label with formatted date", async () => {
+  it("shows 'Date Sent:' as the day it was sent, not the day it was created (v1.5.19)", async () => {
+    mockInvoiceRow({ sent_at: "2026-04-20T09:00:00Z", send_method: "manual" });
     render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
     expect(screen.getByText(/date sent:/i)).toBeInTheDocument();
-    expect(screen.getByText(/apr(il)? 15,? 2026/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/apr(il)? 20,? 2026/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/apr(il)? 15,? 2026/i)).not.toBeInTheDocument();
+  });
+
+  it("a draft shows no Date Sent (v1.5.19)", async () => {
+    mockInvoiceRow({ status: "draft", sent_at: null });
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    expect(screen.queryByText(/date sent/i)).not.toBeInTheDocument();
+  });
+
+  it("explains an email that didn't go out, passed from the editor (v1.5.19)", async () => {
+    mockInvoiceRow({ status: "draft", sent_at: null });
+    render(
+      await InvoiceDetailPage({
+        params: Promise.resolve({ id: "inv-abc" }),
+        searchParams: Promise.resolve({ email: "failed" }),
+      }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/still a draft/i);
   });
 
   it("shows 'Date Due:' label with formatted date when due_date is present", async () => {

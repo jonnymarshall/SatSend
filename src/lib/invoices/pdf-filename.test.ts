@@ -133,4 +133,20 @@ describe("buildPdfFilename", () => {
       })
     ).toBe("Acme_INV-008_20260501.pdf");
   });
+
+  it("uses the sent date first: it's the invoice date (v1.5.19)", () => {
+    expect(
+      buildPdfFilename({
+        id: "11111111-2222-3333-4444-555555555555",
+        invoice_number: "INV-009",
+        your_company: "Acme",
+        your_name: null,
+        your_email: null,
+        created_at: "2026-04-20T10:00:00Z",
+        // published_at can be reset to restart payment checks; never shown.
+        published_at: "2026-06-30T10:00:00Z",
+        sent_at: "2026-05-02T10:00:00Z",
+      })
+    ).toBe("Acme_INV-009_20260502.pdf");
+  });
 });

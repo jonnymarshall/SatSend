@@ -216,8 +216,10 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
 
         <View style={styles.summary}>
           <View style={styles.summaryCell}>
-            <Text style={styles.label}>Date Created</Text>
-            <Text style={styles.summaryValue}>{fmtDate(invoice.created_at)}</Text>
+            {/* v1.5.19: the invoice date is the day it was sent. A PDF only exists
+                once it's sent; created_at covers anything older. */}
+            <Text style={styles.label}>Invoice date</Text>
+            <Text style={styles.summaryValue}>{fmtDate(invoice.sent_at ?? invoice.created_at)}</Text>
           </View>
           <View style={styles.summaryCell}>
             <Text style={styles.label}>Date Due</Text>
