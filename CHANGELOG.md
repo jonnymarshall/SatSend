@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.16 — Marketing homepage (roadmap v1.5.2-H).** `/` is now the SatSend
+  homepage for everyone instead of a redirect to the dashboard (signed-in
+  visitors see "Go to app"). Hero, trust strip, three steps, six highlights,
+  Free/Pro pricing (Pro $10/month, "Coming soon"), eight FAQ answers, closing
+  call to action and a full footer; wording signed off in
+  `development/plans/v1.5.16-homepage-content-plan.md`. Pages the menu and
+  footer link to (How it works, Pricing, FAQ, Security, About, Contact, Privacy,
+  Terms, API) are "Coming soon" placeholders at their real addresses, each a
+  pre-launch roadmap item; every link lives in `src/lib/site-links.ts`. Link
+  previews: OpenGraph/Twitter tags and a generated image (`/opengraph-image`).
+
+### Removed
+
+- **v1.5.16 — The internal UI kit (`/styleguide`, `SHOW_UI_KIT`).** Its product
+  pictures moved to `src/components/marketing/product-preview.tsx`, with a QR
+  code that can't be paid.
+
 ### Security
 
 - **v1.5.15 — Create account's email check limited to 5 an hour per

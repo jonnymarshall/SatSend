@@ -1055,50 +1055,111 @@ layer (2026-10-20), and the 5-an-hour limit is counted in the app.
 
 ---
 
-### ⏳ v1.5.2-H — Redesign: marketing homepage
+### ✅ v1.5.2-H — Redesign: marketing homepage
 
-**Branch:** `v<next package version>/marketing` (the version-sync hook wants the
-branch name to match package.json) · absorbs the old **v1.4.23 Marketing Landing Page**
-(superseded, archived 2026-10-10).
+**Branch:** `v1.5.16/marketing` · package `1.5.16` · absorbs the old **v1.4.23
+Marketing Landing Page** (superseded, archived 2026-10-10).
 
-> **Jonny's brief (2026-10-10):** "I really like how that was mocked up in the
-> styleguide. So I want you to just go ahead and give it your best shot." Build
-> from the kit's marketing composition (nav, hero, footer in
-> `src/app/styleguide/_kit`) without stopping for design approval; show him the
-> result in the PR.
+**Content signed off by Jonny (2026-10-21)** after a grill-me session, with four
+reference sites (kvistly.com; jiro.build Payway, PayUp, JobHunt). Every word,
+section and link is in `development/plans/v1.5.16-homepage-content-plan.md`;
+change wording there first.
 
 **Homepage**
-- [ ] Build the homepage at `/` (today `/` redirects to `/dashboard`). Start from
-      the styleguide's marketing nav, hero and footer; use the product UI itself
-      as the core visual (DESIGN.md §10), not stock imagery. Bitcoin explicitness
-      2–2.5/5; copy plain and specific (DESIGN.md §15).
-- [ ] Sections: hero (one-line value prop + "Create invoice" CTA), 3–5 product
-      highlights (bitcoin invoice in seconds; live BTC/fiat at view time; on-chain
-      payment detection; no fiat rails; you keep your own keys), a 1-2-3 "How it
-      works", and a closing sign-in CTA. No newsletter, analytics or form embeds.
-- [ ] **`/` shows the homepage to everyone** (changed from v1.4.23, which
-      redirected signed-in users to `/invoices`; that would make the logo link
-      below pointless). Signed-in visitors see "Go to app" in the nav instead of
-      "Sign in".
-- [ ] Metadata: `title`, `description`, `openGraph` (title, description, image).
-      An OpenGraph image route with the wordmark and "Bitcoin invoicing" tagline.
-- [ ] `README.md` top-of-file description matches the positioning.
-- [ ] Copy audit for anything contradicting bitcoin-only positioning.
-- [ ] Desktop + 390px, 44px targets, contrast pass (same checks as v1.5-H).
+- [x] `/` is the homepage for everyone (the redirect to `/dashboard` is gone).
+      Signed-in visitors see "Go to app" in the menu instead of Log in / Get started.
+- [x] Sections: hero ("Invoice in bitcoin. Paid straight to your wallet.", Get
+      started plus How it works), trust strip, three steps, six highlights
+      (including "Fully open source"), Free/Pro pricing cards (Pro $10, "Coming
+      soon"), eight FAQ questions, closing call to action, footer (Product,
+      Company, Developers, Legal; X and LinkedIn icons; no Log in; no wordmark).
+- [x] The hero visual is the product (payment panel plus invoice row, moved from
+      the style guide to `src/components/marketing/product-preview.tsx`). Its QR
+      code encodes plain text, so scanning it can't send money.
+- [x] Every link goes to a real page. Pages not built yet are "Coming soon"
+      placeholders at their real addresses (`src/lib/site-links.ts`), each its own
+      pre-launch item below. Kept out of search results meanwhile.
+- [x] Metadata: title, description, OpenGraph and Twitter cards;
+      `src/app/opengraph-image.tsx` (wordmark plus "Bitcoin invoicing");
+      `metadataBase` from `getAppUrl()` so the image URL is absolute.
+- [x] `README.md` description; copy audit (bitcoin only).
+- [x] Desktop and 390px: no sideways scrolling; every tap target 44px or more.
+- [x] **Deleted `src/app/styleguide/`** and `SHOW_UI_KIT`.
 
-**Logo always links home:** done early in v1.5.1.1-H. When `/` becomes the
-homepage, check that each logo click now lands there.
-
-**Also**
-- [ ] Optional follow-up from v1.5-H: on phones, show the invoice table as stacked
-      rows instead of sideways scrolling (a layout change, so it needs a decision).
-- [ ] **Delete `src/app/styleguide/`** (the internal kit) as the last step, after
-      the homepage is built from it, and tick it off in `OUTSTANDING-VERIFICATIONS.md`.
+**Moved out:** the phone stacked invoice table is now its own item (v1.5.2.11-H).
 
 **Tests**
-- [ ] `/` renders without auth (hero copy present) and with auth (nav shows
-      "Go to app"; no redirect).
-- [ ] Metadata snapshot: `title` and `openGraph.title` contain "SatSend".
+- [x] `/` renders signed out and signed in ("Go to app", no redirect); every
+      agreed section, plan card and FAQ question present; the example QR code
+      isn't a `bitcoin:` request; metadata contains "SatSend"; every menu, footer
+      and social link has a page (no dead links).
+
+---
+
+## Pre-launch: marketing site pages and accounts
+
+> **Jonny (2026-10-21):** "I don't want to launch with any placeholder links or
+> pages." Each page below exists today as a "Coming soon" placeholder (v1.5.16).
+> **Every item in this section must be done before launch.** Build each from the
+> placeholder at the same address: replace `<ComingSoon path=… />` in its
+> `page.tsx`, drop `robots: noindex`, and remove it from `PLACEHOLDER_PAGES` in
+> `src/lib/site-links.ts`.
+
+### ⏳ v1.5.2.1-H — How it works page (`/how-it-works`)
+- [ ] The three steps in more detail, with a picture of each real screen (create,
+      send, the client's payment page, the paid email).
+
+### ⏳ v1.5.2.2-H — Pricing page (`/pricing`)
+- [ ] The Free and Pro cards (same content as the homepage), a full comparison,
+      and a short pricing FAQ (paid in bitcoin, renewal terms per v1.4.34 item 5).
+
+### ⏳ v1.5.2.3-H — FAQ page (`/faq`)
+- [ ] All questions in one place, the homepage's eight first. Grill Jonny for more.
+
+### ⏳ v1.5.2.4-H — Security page (`/security`)
+- [ ] Non-custodial explained plainly; what SatSend stores and what it can never
+      do; access codes; open source and how to audit it.
+
+### ⏳ v1.5.2.5-H — About page (`/about`)
+- [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
+
+### ⏳ v1.5.2.6-H — Contact page (`/contact`)
+- [ ] How to get in touch. **Needs the support email address from Jonny.**
+
+### ⏳ v1.5.2.7-H — Privacy policy (`/privacy`)
+- [ ] Drafted from what SatSend actually stores and sends; Jonny reviews (ideally
+      a qualified person too). Coordinate with v1.4.34. **Must be live before Pro.**
+
+### ⏳ v1.5.2.8-H — Terms of service (`/terms`)
+- [ ] As above. Include the Pro fair-use limit (500 saved clients) and bitcoin
+      payment terms. **Must be live before Pro.**
+
+### ⏳ v1.5.2.9-H — SatSend accounts on X, LinkedIn and GitHub
+- [ ] Jonny creates the accounts (a GitHub organisation for the repo).
+- [ ] Put the real URLs in `SOCIAL_LINKS` in `src/lib/site-links.ts`. Then
+      `/coming-soon` has no users: delete it.
+
+### ⏳ v1.5.2.10-H — Open-source licence
+- [ ] The repo is public but has no `LICENSE`, which legally means "all rights
+      reserved", so the homepage's "Fully open source" claim isn't true yet.
+      Jonny chooses (for example MIT, or AGPL-3.0 so hosted forks must share
+      changes); add `LICENSE` and `"license"` in package.json.
+
+### ⏳ v1.5.2.11-H — Phones: invoice list as stacked rows
+- [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
+      instead of sideways scrolling. A layout change, so it needs Jonny's decision.
+
+### ⏳ v1.5.3-H — Multi-currency support (moved from v2.12; **pre-launch**)
+
+**Branch:** `v1.5.3/multi-currency`
+
+> Moved before launch (Jonny, 2026-10-21): the homepage says "create your invoice
+> in your local currency", which is only true for USD until this ships.
+
+- [ ] Currency selector on invoice creation (USD, EUR, GBP, AUD, CAD, etc.)
+- [ ] BTC price fetched in the selected fiat currency
+- [ ] Dashboard shows currency alongside invoice totals
+- [ ] Widen the `currency_whitelist` constraint (Appendix A: money invariants).
 
 ---
 
@@ -1180,22 +1241,28 @@ spam. Four weeks of passing results is the safety margin.
 - Keep the core loop free forever: create an invoice, the payer pays, both sides are told. Sell polish, automation, and integration.
 - Gate on what costs real money per use (client email to arbitrary recipients, API resources) and on what a freelancer will happily pay for (looking professional, chasing late payers).
 
+> **Corrected by Jonny, 2026-10-21** (the earlier text made all client email
+> Pro-only). **Price: Pro is $10/month**, paid in bitcoin. The homepage pricing
+> cards (v1.5.16) show this split.
+
 **Free**
 - Unlimited invoices, BTC payment detection, share link, PDF, dashboard.
 - Owner-facing "payment detected" and "payment confirmed" emails (the "you got paid" pair). This is the heartbeat of the product and stays free.
-- No client-facing email. No pretty links, client pages, branding, reminders, reports, or API.
+- **Invoices emailed to the client, sent as "SatSend".**
+- **1 saved client.**
+- No pretty links, client pages, branding, reminders, reports, or API.
 
 **Pro**
 - Pretty links (`satsend.me/theircompanyname`) and client pages (`satsend.me/theircompanyname/<client>`).
-- Saved clients + reusable line items.
+- Saved clients (up to 500, shown as "Unlimited"; the cap is fair use, in the terms) + reusable line items.
 - Custom branding (logo, colours) across the invoice page, PDF, client page, and emails.
-- Client-facing email with a display-name sender (see email rules).
+- Client email sent **from the owner's company name**, with reply-to the owner (Free sends it as "SatSend").
 - Payment reminders.
 - Financial reports + export.
 - API access.
 
 **Email rules (locked)**
-- **All client-facing email is Pro-only.**
+- **Client email (sending the invoice) is on both plans.** Free sends as "SatSend"; Pro sends as the owner's company name. **Payment reminders are Pro-only.**
 - **Owner-facing payment notifications stay free.** Rule of thumb: if the system is *telling the owner something happened*, free; if it is *doing work for them* (sending to clients, chasing, digests), Pro.
 - **Custom sender = display name only**, e.g. `Acme Studio <team@mail.satsend.me>`, with reply-to set to the owner's email so replies reach them. **Never** the owner's own domain: that needs the user to configure DNS, and misconfiguration sends their mail to spam and creates support load. Out of scope permanently unless demand appears.
 - **Do not gate payer-page live updates.** That is the *payer's* experience and the payer will never be the customer. Gating it punishes the wrong person.
@@ -1220,7 +1287,7 @@ spam. Four weeks of passing results is the safety margin.
 - **Phase 1 (launch Pro):** v2.0 -> v2.1 -> v2.2 -> v2.3 -> v2.4 -> v2.5 -> v2.6
 - **Phase 2:** v2.7
 - **Phase 3:** v2.8
-- **Later:** v2.9, v2.10, v2.11, v2.12
+- **Later:** v2.9, v2.10, v2.11 (v2.12 multi-currency moved before launch as v1.5.3-H)
 
 > If you want to open the doors sooner, the natural cut line is to launch with **v2.0-v2.3** (billing, pretty links, saved clients, client pages) and add v2.4-v2.6 (branding, client email, reminders) in the weeks right after, at the same price. Early Pro buyers keep everything.
 
@@ -1293,7 +1360,7 @@ spam. Four weeks of passing results is the safety margin.
 - [ ] Manage clients (add / edit / delete) from a clients page or settings.
 - [ ] Saved sender (own) details: one set, pre-filled on the form.
 - [ ] Reusable line-item templates.
-- [ ] Confirm whether saved clients themselves are free or Pro (client pages in v2.3 are Pro).
+- [x] Decided (2026-10-21): **1 saved client on Free, up to 500 on Pro** (shown as "Unlimited"). Enforce through `getEntitlements`.
 
 **Out of scope**
 - Multi-tier client grouping / tags.
@@ -1350,18 +1417,18 @@ spam. Four weeks of passing results is the safety margin.
 
 **Branch:** `v2.5/client-email`
 
-**Context:** Today email goes out from `SatSend <team@mail.satsend.me>` to both owner and payer. This entry makes client-facing email a Pro feature and makes it look like it came from the owner.
+**Context:** Today email goes out from `SatSend <team@mail.satsend.me>` to both owner and payer. This entry makes a Pro user's client email look like it came from them. **Client email stays free** (corrected 2026-10-21): Free keeps sending as "SatSend".
 
 **Scope**
-- [ ] Gate **all client-facing email** behind Pro. Keep owner-facing payment notifications free.
+- [ ] **Do not gate client email.** Pro only changes the sender name and reply-to.
 - [ ] **Display-name sender**: send as `<owner company> <team@mail.satsend.me>`, with reply-to set to the owner's email. Built branding-aware (v2.4).
-- [ ] Free users: no client-facing email; share-link delivery only.
+- [ ] Free users: client email unchanged (sent as "SatSend").
 - [ ] Owner notification emails stay free and unchanged.
 
 **Out of scope (permanently)**
 - Sending from the owner's own domain. It requires the user to configure DNS; misconfiguration routes their mail to spam and creates support load. Revisit only on real demand.
 
-**Done when:** A Pro user's client email arrives from the owner's display name with replies going to the owner; a free user's client-facing sends are refused and the UI offers an upgrade.
+**Done when:** A Pro user's client email arrives from the owner's display name with replies going to the owner; a free user's client email still arrives, from "SatSend".
 
 ---
 
@@ -1415,6 +1482,8 @@ spam. Four weeks of passing results is the safety margin.
 **Phase 3.**
 
 > **Depends on:** v2.0 (entitlement system).
+
+> **Also:** replace the `/developers/api` "Coming soon" placeholder (v1.5.16) with the API docs page.
 
 **Context:** Let premium users interact with SatSend programmatically. Primary use case: AI agents creating invoices, checking payment status, and sending emails on the user's behalf without a browser session. Secondary use case: third-party integrations (accounting tools, custom dashboards). Gated to premium so the API surface is a value-add of the paid tier rather than a free-tier abuse vector.
 
@@ -1532,13 +1601,9 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ---
 
-### 🚫 v2.12: Multi-currency support
+### 🚫 v2.12: Multi-currency support — moved
 
-**Branch:** `v2.12/multi-currency`
-
-- [ ] Currency selector on invoice creation (USD, EUR, GBP, AUD, CAD, etc.)
-- [ ] BTC price fetched in the selected fiat currency
-- [ ] Dashboard shows currency alongside invoice totals
+Moved before launch as **v1.5.3-H** (2026-10-21).
 
 ---
 

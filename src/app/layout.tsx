@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Onest } from "next/font/google";
+import { getAppUrl } from "@/lib/app-url";
 import "./globals.css";
 import "@/styles/signal-amber.css";
 
@@ -20,8 +21,10 @@ const onest = Onest({
 });
 
 export const metadata: Metadata = {
+  // Makes link-preview image URLs absolute (https://satsend.me/... in production).
+  metadataBase: new URL(getAppUrl()),
   title: "SatSend",
-  description: "Bitcoin-enabled invoicing for freelancers and small businesses.",
+  description: "Bitcoin invoicing for independent professionals. Non-custodial: paid straight to your wallet.",
 };
 
 export const viewport: Viewport = {

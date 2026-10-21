@@ -1,6 +1,9 @@
 # SatSend
 
-Bitcoin-enabled invoicing for freelancers and small businesses.
+Bitcoin invoicing for independent professionals. Create an invoice in your
+local currency, your client pays in bitcoin straight to your own wallet
+(non-custodial: SatSend never holds funds), and SatSend detects the payment and
+tells you both. Zero transaction fees, nothing to set up.
 
 ---
 

@@ -4,7 +4,7 @@
  * Values are copied verbatim from satsend-brand-handoff/design-tokens.css and
  * guarded against drift by src/lib/design/signal-amber-tokens.test.ts.
  *
- * GLOBAL since v1.5-H (scoped to the /styleguide kit in v1.5.0-H). globals.css
+ * GLOBAL since v1.5-H (scoped to the since-deleted /styleguide kit in v1.5.0-H). globals.css
  * maps the shadcn variables (--background, --primary, ...) onto these tokens, so
  * there is one palette. The old dark/red palette is retired.
  *
