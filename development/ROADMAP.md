@@ -717,6 +717,24 @@ shown. `sent_at` is set once, at the moment the invoice goes live.
 - [x] "Can I delete my account?" answered (via support; v1.5.7-H builds it).
 - [x] Not claimed: "open source", until v1.5.2.10-H decides the licence.
 
+### ⏳ v1.5.2.0.2-H — Link preview: ".me" sits below the SatSend baseline (fix)
+
+> Found by Jonny, 2026-10-21, sharing satsend.me on WhatsApp: in the preview
+> image the ".me" sits too low instead of on the same line as "SatSend".
+
+**Cause.** `src/app/opengraph-image.tsx` lays out the wordmark as two text
+spans in a flex row with `alignItems: "baseline"`. The image generator (Satori)
+doesn't line up baselines of different font sizes the way a browser does, so the
+smaller ".me" drops. The real logo (`SatSendLogo`, an SVG) puts both on one
+baseline.
+
+- [ ] Fix the alignment: either position ".me" from the bottom with a measured
+      offset, or draw the logo from the SVG (as paths, since the generator
+      can't render SVG text) so it's identical to the site's logo.
+- [ ] Test: render `/opengraph-image` and compare the wordmark against
+      `SatSendLogo`; check it in a link-preview checker and WhatsApp (which
+      caches previews, so re-check with a `?v=` query on the URL).
+
 ### ⏳ v1.5.2.4-H — Security page (`/security`)
 - [ ] Non-custodial explained plainly; what SatSend stores and what it can never
       do; access codes; the code is **source available and fully auditable**

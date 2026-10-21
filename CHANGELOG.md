@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   FAQ adds "Can I see SatSend's code?", and the footer links "Licence (FSL)" to
   fsl.software. Roadmap: move the code to a SatSend GitHub account (v1.5.2.9-H);
   form SATSEND LLC and assign the code to it (v1.5.8-H).
+- **v1.5.23 — FAQ questions in the heading font.** Questions on the FAQ,
+  homepage and Pricing page now use Onest (like the headings); Geist semibold
+  looked stretched at 17px. Roadmap: fix ".me" sitting low in the link preview
+  (v1.5.2.0.2-H).
 
 ### Added
 
