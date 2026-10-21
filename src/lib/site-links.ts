@@ -55,6 +55,8 @@ export const FOOTER_COLUMNS: { heading: string; links: SiteLink[] }[] = [
     links: [
       { label: "GitHub", href: SOCIAL_LINKS.github },
       { label: "API", href: "/developers/api" },
+      // v1.5.23: SatSend is source available under the FSL.
+      { label: "Licence (FSL)", href: "https://fsl.software" },
     ],
   },
   {

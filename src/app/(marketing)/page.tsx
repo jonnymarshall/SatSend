@@ -190,8 +190,9 @@ const HIGHLIGHTS = [
   },
   {
     icon: Code2,
-    title: "Fully open source",
-    text: "Every line of SatSend's code is public on GitHub, so anyone can audit exactly how it handles your invoices and payments. Don't trust, verify.",
+    // v1.5.23: source available under the FSL (never "open source").
+    title: "Fully auditable",
+    text: "SatSend's source code is public, so you, or anyone you trust, can check exactly how it handles your invoices and payments. Don't trust, verify.",
     link: { label: "View the code", href: SOCIAL_LINKS.github },
   },
 ];

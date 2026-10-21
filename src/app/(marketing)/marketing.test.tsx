@@ -38,7 +38,9 @@ describe("homepage (v1.5.16)", () => {
     for (const id of ["hero", "trust", "how-it-works", "highlights", "pricing", "faq", "cta"]) {
       expect(container.querySelector(`#${id === "how-it-works" ? id : `home--${id}`}`)).not.toBeNull();
     }
-    expect(screen.getByText("Fully open source")).toBeInTheDocument();
+    // v1.5.23: source available under the FSL, so never "open source".
+    expect(screen.getByText("Fully auditable")).toBeInTheDocument();
+    expect(screen.queryByText(/open source/i)).not.toBeInTheDocument();
     expect(screen.getByText("Non-custodial by design")).toBeInTheDocument();
   });
 
@@ -105,6 +107,7 @@ describe("site footer (v1.5.16)", () => {
     expect(screen.getByRole("link", { name: "SatSend on X" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "SatSend on LinkedIn" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Licence (FSL)" })).toHaveAttribute("href", "https://fsl.software");
     expect(screen.queryByRole("link", { name: "Log in" })).not.toBeInTheDocument();
     expect(screen.getByText(/© 2026 SatSend/)).toBeInTheDocument();
   });
