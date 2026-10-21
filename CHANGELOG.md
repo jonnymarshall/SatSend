@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v1.5.22 — FAQ page (roadmap v1.5.2.3-H).** `/faq` replaces its
+  placeholder: 28 questions in five groups with jump links. Every answer now
+  lives once (`faq-content.tsx`): the homepage's eight and the Pricing page's
+  five read from it, through one shared list component. Roadmap: account
+  deletion (v1.5.7-H) added; the licence item (v1.5.2.10-H) expanded into a
+  proper open source vs source-available decision.
+
+### Added
+
 - **v1.5.21 — Pricing page (roadmap v1.5.2.2-H).** `/pricing` replaces its
   placeholder: the Free and Pro cards (now shared with the homepage) with a
   Monthly / Yearly (2 months free) toggle (Pro $10/month, or $100/year shown as
