@@ -32,6 +32,38 @@ describe("Pricing page (v1.5.21)", () => {
     expect(row(/unlimited invoices/i)).not.toHaveTextContent(/not included/i);
   });
 
+  it("orders the rows: both plans, fees, emails in your name, saved clients, then Pro only (v1.5.21)", () => {
+    render(<PricingPage />);
+    const table = screen.getByRole("table", { name: /compare plans/i });
+    const features = within(table).getAllByRole("rowheader").map((h) => h.textContent);
+    expect(features).toEqual([
+      "Unlimited invoices",
+      "Automatic payment detection",
+      "Invoice link and PDF",
+      "Invoices emailed to your client",
+      "Payment confirmation emails",
+      "Non-custodial: paid straight to your wallet",
+      "Transaction fees",
+      "Emails sent in your name",
+      "Saved clients",
+      "Reusable line items",
+      "Your own link: satsend.me/yourname",
+      "Client pages: all of a client's invoices in one place",
+      "Your logo and colours on invoices, PDFs and emails",
+      "Automatic payment reminders",
+    ]);
+  });
+
+  it("uses a cross, not a dash, for what Free doesn't include; cells are short", () => {
+    const { container } = render(<PricingPage />);
+    const table = container.querySelector("#pricing--compare--table")!;
+    expect(table.querySelectorAll(".lucide-minus")).toHaveLength(0);
+    expect(table.querySelectorAll(".lucide-x").length).toBeGreaterThan(0);
+    expect(table).not.toHaveTextContent(/replies to you|sent from/i);
+    const emails = within(table as HTMLElement).getByRole("row", { name: /emails sent in your name/i });
+    expect(emails).toHaveTextContent(/not included/i);
+  });
+
   it("answers the five pricing questions as agreed", () => {
     render(<PricingPage />);
     const faq = screen.getByRole("region", { name: /pricing questions/i });

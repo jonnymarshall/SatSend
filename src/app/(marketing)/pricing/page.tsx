@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, ChevronDown, Minus } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { ClosingCta } from "@/components/marketing/closing-cta";
 import { PricingPlans } from "@/components/marketing/pricing-plans";
 import { CONTAINER, EYEBROW, H1, H2, LEAD } from "@/components/marketing/styles";
@@ -24,14 +24,18 @@ export const metadata: Metadata = {
 
 type Cell = true | false | string;
 
+// Order (Jonny, 2026-10-21): in both plans, then transaction fees, then emails in
+// your name, then saved clients, then Pro only. Ticks and crosses, not wording.
 const COMPARISON: { feature: string; free: Cell; pro: Cell }[] = [
   { feature: "Unlimited invoices", free: true, pro: true },
   { feature: "Automatic payment detection", free: true, pro: true },
   { feature: "Invoice link and PDF", free: true, pro: true },
+  { feature: "Invoices emailed to your client", free: true, pro: true },
+  { feature: "Payment confirmation emails", free: true, pro: true },
   { feature: "Non-custodial: paid straight to your wallet", free: true, pro: true },
   { feature: "Transaction fees", free: "None", pro: "None" },
-  { feature: "“You've been paid” emails to you", free: true, pro: true },
-  { feature: "Invoices emailed to your client", free: "Sent from “SatSend”", pro: "From your company name, replies to you" },
+  // Free emails come from "SatSend"; Pro's from your company name, replies to you.
+  { feature: "Emails sent in your name", free: false, pro: true },
   { feature: "Saved clients", free: "1", pro: "Unlimited" },
   { feature: "Reusable line items", free: false, pro: true },
   { feature: "Your own link: satsend.me/yourname", free: false, pro: true },
@@ -52,7 +56,7 @@ function CellValue({ value }: { value: Cell }) {
   if (value === false) {
     return (
       <>
-        <Minus aria-hidden className="mx-auto size-5 text-(--color-text-secondary)" />
+        <X aria-hidden className="mx-auto size-5 text-(--color-text-secondary)" />
         <span className="sr-only">Not included</span>
       </>
     );
@@ -90,7 +94,7 @@ function Comparison() {
                 <td className="px-2 py-3.5 text-center text-(--color-text-secondary)">
                   <CellValue value={row.free} />
                 </td>
-                <td className="px-2 py-3.5 text-center">
+                <td className="px-2 py-3.5 text-center text-(--color-text-secondary)">
                   <CellValue value={row.pro} />
                 </td>
               </tr>
