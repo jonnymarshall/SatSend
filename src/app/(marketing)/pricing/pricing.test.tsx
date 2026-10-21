@@ -32,7 +32,7 @@ describe("Pricing page (v1.5.21)", () => {
     expect(row(/unlimited invoices/i)).not.toHaveTextContent(/not included/i);
   });
 
-  it("orders the rows: both plans, fees, emails in your name, saved clients, then Pro only (v1.5.21)", () => {
+  it("orders the rows: both plans, fees, saved clients, then the Free-cross / Pro-tick rows (v1.5.21)", () => {
     render(<PricingPage />);
     const table = screen.getByRole("table", { name: /compare plans/i });
     const features = within(table).getAllByRole("rowheader").map((h) => h.textContent);
@@ -44,8 +44,8 @@ describe("Pricing page (v1.5.21)", () => {
       "Payment confirmation emails",
       "Non-custodial: paid straight to your wallet",
       "Transaction fees",
-      "Emails sent in your name",
       "Saved clients",
+      "Emails sent in your name",
       "Reusable line items",
       "Your own link: satsend.me/yourname",
       "Client pages: all of a client's invoices in one place",

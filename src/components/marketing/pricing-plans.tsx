@@ -22,7 +22,7 @@ export const FREE_FEATURES = [
   "Automatic payment detection",
   "Invoice link and PDF",
   "Invoices emailed to your client (sent from “SatSend”)",
-  "“You've been paid” emails to you",
+  "Payment confirmation emails",
   "1 saved client",
   "Non-custodial: paid straight to your wallet",
 ];

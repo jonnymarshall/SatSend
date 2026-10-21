@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 
 type Cell = true | false | string;
 
-// Order (Jonny, 2026-10-21): in both plans, then transaction fees, then emails in
-// your name, then saved clients, then Pro only. Ticks and crosses, not wording.
+// Order (Jonny, 2026-10-21): in both plans, then transaction fees and saved
+// clients, then everything that's a cross on Free and a tick on Pro.
 const COMPARISON: { feature: string; free: Cell; pro: Cell }[] = [
   { feature: "Unlimited invoices", free: true, pro: true },
   { feature: "Automatic payment detection", free: true, pro: true },
@@ -34,9 +34,9 @@ const COMPARISON: { feature: string; free: Cell; pro: Cell }[] = [
   { feature: "Payment confirmation emails", free: true, pro: true },
   { feature: "Non-custodial: paid straight to your wallet", free: true, pro: true },
   { feature: "Transaction fees", free: "None", pro: "None" },
+  { feature: "Saved clients", free: "1", pro: "Unlimited" },
   // Free emails come from "SatSend"; Pro's from your company name, replies to you.
   { feature: "Emails sent in your name", free: false, pro: true },
-  { feature: "Saved clients", free: "1", pro: "Unlimited" },
   { feature: "Reusable line items", free: false, pro: true },
   { feature: "Your own link: satsend.me/yourname", free: false, pro: true },
   { feature: "Client pages: all of a client's invoices in one place", free: false, pro: true },

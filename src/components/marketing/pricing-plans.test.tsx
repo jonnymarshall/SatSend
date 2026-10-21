@@ -39,6 +39,12 @@ describe("PricingPlans", () => {
     expect(within(group).getAllByRole("radio")).toHaveLength(2);
   });
 
+  it("Free lists 'Payment confirmation emails', the same name as the comparison table", () => {
+    render(<PricingPlans idPrefix="t" />);
+    expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("Payment confirmation emails");
+    expect(screen.queryByText(/you've been paid/i)).not.toBeInTheDocument();
+  });
+
   it("says Pro can be paid in bitcoin or by card", () => {
     render(<PricingPlans idPrefix="t" />);
     expect(screen.getByText(/bitcoin or by card/i)).toBeInTheDocument();
