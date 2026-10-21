@@ -655,28 +655,44 @@ client sees" panel.
       client's page and the editor, swap the testnet address and QR code for
       an unpayable example (see the v1.5.18 PR).
 
-### ⏳ v1.5.2.0.1-H — "Date Sent" shows the creation date (drafts included)
+### ✅ v1.5.2.0.1-H — Draft or sent: no "Publish only"; dates are the sent date
 
-> Found 2026-10-21 while taking the How it works screenshots. **Jonny: it should
-> never say Date Sent for a draft.**
+**Branch:** `v1.5.19/draft-or-sent` · package `1.5.19` · migration `0035`.
 
-**The bug.** Every "Date Sent" shows `created_at` (when the invoice was first
-saved), not when it was published:
-- the invoice list's "Date Sent" column (`src/app/(dashboard)/invoices/columns.tsx`,
-  `accessorKey: "created_at"`), which also sorts by it;
-- the invoice page and the client's page (`src/components/invoice-dates.tsx`,
-  `createdAt`).
+> Found 2026-10-21 while taking the How it works screenshots: every "Date Sent"
+> showed `created_at`, so a draft showed a sent date and an invoice drafted on
+> Monday and sent on Friday said Monday (the client saw that too).
+> **Jonny's decision:** remove "Publish only". An invoice is a draft or it's
+> sent (email, PDF download, or copy the link and share it yourself), and every
+> way to send gives it a sent date. First sent date stays.
 
-So a draft shows a sent date it never had, and an invoice drafted on Monday and
-published on Friday says it was sent on Monday (the client sees that too).
+**Why not `published_at`.** It's the payment checks' timer anchor and gets reset
+(a detected payment that vanishes; restoring an archived invoice), so it's never
+shown. `sent_at` is set once, at the moment the invoice goes live.
 
-- [ ] Use `published_at` for "Date Sent" everywhere (list column and sorting,
-      invoice page, client page, PDF if it shows one).
-- [ ] Drafts (no `published_at`): show "Not sent" in the list, and no Date Sent
-      line on the invoice page.
-- [ ] Tests: a draft never renders "Date Sent"; a published invoice shows its
-      publish date, not its creation date; the list sorts by publish date with
-      drafts together.
+- [x] Send menu (was Publish): Send now via email · Download PDF and mark as sent ·
+      Copy link and mark as sent ("Share the link yourself"). Same in the editor,
+      the invoice page and the list's row menu. `publishInvoice` removed.
+- [x] Copy link copies the client's link and shows a small "Link copied" notice
+      that fades on its own (`showNotice`, `<NoticeHost />` in the app layout;
+      copy starts inside the click so Safari allows it).
+- [x] An email that doesn't go out leaves a draft a draft (no silent go-live);
+      a draft with no client email can't be emailed. Messages shared by all three
+      places (`src/lib/invoices/send-feedback.ts`); the editor opens the draft
+      with the reason (`?email=`).
+- [x] First sent date stays: a later email or a second "mark as sent" doesn't move it.
+- [x] Dates: list "Date Sent" (sorts by it) and invoice page = `sent_at`; drafts
+      show "Not sent" / no line. Client page and PDF say "Invoice date". PDF file
+      name uses it too.
+- [x] Migration 0035: invoices that went live without being sent get
+      `sent_at = coalesce(published_at, created_at)`, `send_method = 'manual'`
+      (test: 10 rows; production: 13 expected).
+- [ ] **At merge:** apply 0035 to production (MCP `apply_migration`, or the SQL
+      Editor if it comes back "cancelled"), then check no live invoice lacks a
+      sent date.
+- [ ] Re-take the How it works "create" screenshot (it shows the old Publish
+      button and "Required to publish").
+- [ ] Manual (`manual-tests/v1.5.19-draft-or-sent.md`).
 
 ---
 

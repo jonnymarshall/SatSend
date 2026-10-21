@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Button } from "@/components/signal/button";
 import { signOutAction } from "./sign-out-action";
 import { AppHeader, AppMain } from "./app-header";
+import { NoticeHost } from "@/components/notice";
 
 export default async function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default async function DashboardLayout({
         <div className="min-h-screen flex flex-col">
           <AppHeader email="dev@playwright.test" />
           <AppMain>{children}</AppMain>
+          <NoticeHost />
         </div>
       );
     }
@@ -37,6 +39,7 @@ export default async function DashboardLayout({
         </form>
       </AppHeader>
       <AppMain>{children}</AppMain>
+      <NoticeHost />
     </div>
   );
 }

@@ -22,19 +22,20 @@ vi.mock("./bulk-actions", () => ({
   bulkUnarchive: vi.fn().mockResolvedValue({ unarchived: 1, skipped: 0 }),
 }));
 vi.mock("./actions", () => ({
-  publishInvoice: vi.fn().mockResolvedValue(undefined),
   publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
-  publishAndMarkSent: vi.fn().mockResolvedValue(undefined),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
   duplicateInvoice: vi.fn().mockResolvedValue(undefined),
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 vi.mock("./use-invoice-realtime", () => ({
   useInvoiceRealtime: vi.fn(),
 }));
 
 import { bulkArchive, bulkDelete, bulkMarkPaid, bulkUnarchive } from "./bulk-actions";
-import { publishInvoice, publishAndSendEmail, publishAndMarkSent, duplicateInvoice, markOverdue, markUnpaid } from "./actions";
+import { showNotice } from "@/components/notice";
+import { publishAndSendEmail, publishAndMarkSent, duplicateInvoice, markOverdue, markUnpaid } from "./actions";
 
 const baseRow = {
   client_email: "client@example.com",
@@ -61,6 +62,7 @@ const WITH_UNDERPAID: InvoiceRow[] = [
 const bulkActionsBtn = () => document.getElementById("invoice-data-table--bulk-actions") as HTMLButtonElement;
 
 beforeEach(() => {
+  Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
   vi.clearAllMocks();
   mockSearchParams = new URLSearchParams();
 });
@@ -90,6 +92,25 @@ describe("InvoiceDataTable — structure", () => {
     expect(screen.getByRole("button", { name: /date due/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^amount/i })).toBeInTheDocument();
     expect(screen.getByText(/^status$/i)).toBeInTheDocument();
+  });
+
+  it("Date Sent shows the sent date, and 'Not sent' for a draft (v1.5.19)", () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    const draftRow = screen.getByText("INV-001").closest("tr")!;
+    expect(draftRow).toHaveTextContent("Not sent");
+    expect(draftRow).not.toHaveTextContent("Apr 15, 2026");
+    const sentRow = screen.getByText("INV-002").closest("tr")!;
+    expect(sentRow).toHaveTextContent("Apr 16, 2026");
+  });
+
+  it("Date Sent uses the sent date, not the created date (v1.5.19)", () => {
+    const data: InvoiceRow[] = [
+      { ...MOCK_INVOICES[1], id: "inv-late", invoice_number: "INV-LATE", created_at: "2026-04-01T12:00:00Z", sent_at: "2026-04-09T12:00:00Z" },
+    ];
+    render(<InvoiceDataTable data={data} userId="u1" />);
+    const row = screen.getByText("INV-LATE").closest("tr")!;
+    expect(row).toHaveTextContent("Apr 9, 2026");
+    expect(row).not.toHaveTextContent("Apr 1, 2026");
   });
 
   it("hides archived invoices by default", () => {
@@ -232,16 +253,16 @@ describe("InvoiceDataTable — bulk actions", () => {
 });
 
 describe("InvoiceDataTable — per-row actions", () => {
-  it("shows 'Edit' and the four publish/send options for draft invoices", async () => {
+  it("shows 'Edit' and the three ways to send for draft invoices, with no Publish only", async () => {
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     // open first row's dropdown (inv-1 is a draft)
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[0]);
     expect(await screen.findByRole("menuitem", { name: /^edit$/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /send now via email/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /download and mark as sent/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /^mark as sent$/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /publish only/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /download pdf and mark as sent/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /copy link and mark as sent/i })).toHaveTextContent(/share the link yourself/i);
+    expect(screen.queryByRole("menuitem", { name: /publish/i })).not.toBeInTheDocument();
   });
 
   it("shows 'View public invoice' and 'Copy public link' for non-draft invoices", async () => {
@@ -270,20 +291,33 @@ describe("InvoiceDataTable — per-row actions", () => {
     await waitFor(() => expect(publishAndSendEmail).toHaveBeenCalledWith("inv-1"));
   });
 
-  it("calls publishInvoice when 'Publish only' is clicked on a draft", async () => {
+  it("'Copy link and mark as sent' on a draft sends it, copies its link and says so (v1.5.19)", async () => {
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[0]);
-    fireEvent.click(await screen.findByRole("menuitem", { name: /publish only/i }));
-    await waitFor(() => expect(publishInvoice).toHaveBeenCalledWith("inv-1"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
+    await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-1"));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/invoice/inv-1`),
+    );
+    await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
   });
 
-  it("calls publishAndMarkSent when 'Mark as sent' is clicked on a draft", async () => {
+  it("'Copy public link' also confirms with the notice (v1.5.19)", async () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
+    fireEvent.click(openMenuButtons[1]); // inv-2 pending
+    fireEvent.click(await screen.findByRole("menuitem", { name: /copy public link/i }));
+    await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
+  });
+
+  it("an email that doesn't go out on a draft says it's still a draft (v1.5.19)", async () => {
+    vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[0]);
-    fireEvent.click(await screen.findByRole("menuitem", { name: /^mark as sent$/i }));
-    await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-1"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /send now via email/i }));
+    expect(await screen.findByText(/still a draft/i)).toBeInTheDocument();
   });
 
   it("calls duplicateInvoice when 'Duplicate' is clicked", async () => {
@@ -300,7 +334,7 @@ describe("InvoiceDataTable — per-row actions", () => {
     fireEvent.click(openMenuButtons[1]); // inv-2 pending, already sent via email
     expect(await screen.findByRole("menuitem", { name: /^mark as paid$/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /send now via email/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /^mark as sent$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /copy link and mark as sent/i })).not.toBeInTheDocument();
   });
 
   it("on a manually-marked-sent row, only 'Send now via email' is reachable from the publish/send group", async () => {
@@ -325,8 +359,8 @@ describe("InvoiceDataTable — per-row actions", () => {
 
     const item = await screen.findByRole("menuitem", { name: /send now via email/i });
     expect(item).not.toHaveAttribute("data-disabled");
-    expect(screen.queryByRole("menuitem", { name: /download and mark as sent/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /^mark as sent$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /download pdf and mark as sent/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /copy link and mark as sent/i })).not.toBeInTheDocument();
   });
 
   it("renders the email-sent indicator next to the status badge for emailed rows (inv-2 and inv-3)", () => {
@@ -390,7 +424,8 @@ describe("InvoiceDataTable — per-row actions", () => {
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[0]); // inv-1 draft
     expect(await screen.findByRole("menuitem", { name: /^edit$/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /download pdf/i })).not.toBeInTheDocument();
+    // The plain download; "Download PDF and mark as sent" is a way to send it.
+    expect(screen.queryByRole("menuitem", { name: /^download pdf$/i })).not.toBeInTheDocument();
   });
 
   it("renders an email-failed indicator next to the status badge for rows whose last invoice_published email_event is failed", () => {

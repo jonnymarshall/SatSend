@@ -43,13 +43,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { bulkArchive, bulkDelete, bulkMarkPaid, bulkUnarchive } from "./bulk-actions";
 import {
-  publishInvoice,
   publishAndSendEmail,
   publishAndMarkSent,
   duplicateInvoice,
   markOverdue,
   markUnpaid,
 } from "./actions";
+import { showNotice } from "@/components/notice";
+import { copyWhenReady, deferredCopy } from "@/lib/copy-when-ready";
+import { clientInvoiceUrl, emailOutcomeMessage } from "@/lib/invoices/send-feedback";
 import { buildColumns, InvoiceRow } from "./columns";
 import { useInvoiceRealtime } from "./use-invoice-realtime";
 import { useCheckWaitingPayments } from "./use-check-waiting-payments";
@@ -70,7 +72,7 @@ const WAITING_STATUSES = new Set<string>(["pending", "payment_detected", "overdu
 const COLUMN_LABELS: Record<string, string> = {
   invoice_number: "Invoice",
   client_name: "Client",
-  created_at: "Date Sent",
+  sent_at: "Date Sent",
   due_date: "Date Due",
   total_fiat: "Amount",
   status: "Status",
@@ -127,8 +129,9 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const [archiveFeedback, setArchiveFeedback] = React.useState<string | null>(null);
 
   const copyPublicLink = React.useCallback((id: string) => {
-    const url = `${window.location.origin}/invoice/${id}`;
-    navigator.clipboard.writeText(url).catch(() => {});
+    void copyWhenReady(Promise.resolve(clientInvoiceUrl(id, window.location.origin))).then((ok) =>
+      showNotice(ok ? "Link copied" : "Couldn't copy the link. Open the invoice to copy it."),
+    );
   }, []);
 
   const runRowAction = React.useCallback(
@@ -154,9 +157,37 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const columns = React.useMemo(
     () =>
       buildColumns({
-        onPublishOnly: (id) => runRowAction(() => publishInvoice(id)),
-        onSendEmail: (id) => runRowAction(() => publishAndSendEmail(id)),
-        onMarkSent: (id) => runRowAction(() => publishAndMarkSent(id)),
+        onSendEmail: (id) =>
+          runRowAction(async () => {
+            const wasDraft = data.find((row) => row.id === id)?.status === "draft";
+            const result = await publishAndSendEmail(id);
+            if (result.ok) {
+              const message = emailOutcomeMessage(result.data.emailStatus, {
+                wasDraft,
+                clientEmail: data.find((row) => row.id === id)?.client_email,
+              });
+              if (message.tone === "error") setArchiveFeedback(message.text);
+            }
+            return result;
+          }),
+        onCopyLinkAndMarkSent: (id) => {
+          // Start the copy inside the click (Safari); supply the link only once
+          // marking as sent succeeds.
+          const copy = deferredCopy();
+          void runRowAction(async () => {
+            const result = await publishAndMarkSent(id).catch((e) => {
+              copy.provide(null);
+              throw e;
+            });
+            if (!result.ok) {
+              copy.provide(null);
+              return result;
+            }
+            copy.provide(clientInvoiceUrl(id, window.location.origin));
+            showNotice((await copy.copied) ? "Link copied" : "Marked as sent. Copy the link from the invoice.");
+            return result;
+          });
+        },
         onDownloadAndMarkSent: (id) =>
           runRowAction(async () => {
             const result = await publishAndMarkSent(id, { withDownload: true });
@@ -182,7 +213,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
         onCopyPublicLink: copyPublicLink,
         onDuplicate: (id) => runRowAction(() => duplicateInvoice(id)),
       }),
-    [runRowAction, copyPublicLink]
+    [runRowAction, copyPublicLink, data]
   );
 
   const table = useReactTable({

@@ -16,7 +16,6 @@ import { logInvoiceEvent } from "@/lib/invoice-events";
 import { addressHasHistory } from "@/lib/mempool";
 import {
   saveDraft,
-  publishInvoice,
   publishAndSendEmail,
   publishAndMarkSent,
   markPaid,
@@ -305,16 +304,16 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
   // the next cron tick — up to 60 seconds, and never in dev).
   const PAST_DUE_INVOICE = { ...PUBLISHABLE_INVOICE, due_date: "2020-01-01" };
 
-  it("publishInvoice with a past due_date flips status straight to overdue", async () => {
+  it("publishAndMarkSent with a past due_date flips status straight to overdue", async () => {
     const { updateChain } = makeSupabase({ fetchData: PAST_DUE_INVOICE });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.status).toBe("overdue");
   });
 
-  it("publishInvoice with a past due_date logs marked_as_overdue", async () => {
+  it("publishAndMarkSent with a past due_date logs marked_as_overdue", async () => {
     makeSupabase({ fetchData: PAST_DUE_INVOICE });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     expect(logInvoiceEvent).toHaveBeenCalledWith({
       invoiceId: "inv-1",
       userId: "user-1",
@@ -322,11 +321,11 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
     });
   });
 
-  it("publishInvoice with no due_date stays pending (no flip)", async () => {
+  it("publishAndMarkSent with no due_date stays pending (no flip)", async () => {
     const { updateChain } = makeSupabase({
       fetchData: { ...PUBLISHABLE_INVOICE, due_date: null },
     });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.status).toBe("pending");
     expect(logInvoiceEvent).not.toHaveBeenCalledWith(
@@ -334,9 +333,9 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
     );
   });
 
-  it("publishInvoice with a future due_date stays pending (no flip)", async () => {
+  it("publishAndMarkSent with a future due_date stays pending (no flip)", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.status).toBe("pending");
   });
@@ -362,33 +361,33 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
   });
 });
 
-describe("publishInvoice — btc_address publish-gate (v1.4.14)", () => {
+describe("sending a draft — btc_address gate (v1.4.14)", () => {
   it("returns a btc_address field error when the invoice has no btc_address", async () => {
     const noAddress = { ...PUBLISHABLE_INVOICE, btc_address: null };
     const { updateChain } = makeSupabase({ fetchData: noAddress });
-    const res = await publishInvoice("inv-1");
+    const res = await publishAndMarkSent("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
     expect(updateChain).not.toHaveBeenCalled();
   });
 });
 
-describe("publishInvoice (publish-only, no email)", () => {
+describe("sending a draft by hand: goes live (v1.5.19: there is no publish-only)", () => {
   it("sets status=pending without firing the invoice_published email", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
 
     expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.status).toBe("pending");
   });
 
-  it("does not set sent_at, send_method, or email_attempted_at on the update payload", async () => {
+  it("going live and being sent happen together: sent_at and send_method set, no email attempt", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
 
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty("sent_at");
-    expect(payload).not.toHaveProperty("send_method");
+    expect(payload.sent_at).toBeTruthy();
+    expect(payload.send_method).toBe("manual");
     expect(payload).not.toHaveProperty("email_attempted_at");
   });
 
@@ -397,14 +396,14 @@ describe("publishInvoice (publish-only, no email)", () => {
       fetchData: PUBLISHABLE_INVOICE,
       btcConflict: { id: "inv-other", status: "pending" },
     });
-    const res = await publishInvoice("inv-1");
+    const res = await publishAndMarkSent("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
   it("returns a btc_address field error when the address has on-chain or mempool history (v1.4.12)", async () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(true);
-    const res = await publishInvoice("inv-1");
+    const res = await publishAndMarkSent("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
   });
 
@@ -412,7 +411,7 @@ describe("publishInvoice (publish-only, no email)", () => {
     const { updateChain } = makeSupabase({
       fetchData: { ...PUBLISHABLE_INVOICE, btc_address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx" },
     });
-    const res = await publishInvoice("inv-1");
+    const res = await publishAndMarkSent("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
     if (!res.ok) expect(res.message).toMatch(/testnet address/i);
     expect(addressHasHistory).not.toHaveBeenCalled();
@@ -422,14 +421,14 @@ describe("publishInvoice (publish-only, no email)", () => {
   it("proceeds when the BTC address has no prior history (v1.4.12)", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(false);
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     expect(updateChain).toHaveBeenCalled();
   });
 
   it("returns a field error when mempool.space is unreachable — fail closed (v1.4.22-H / M-MONEY-5)", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     vi.mocked(addressHasHistory).mockResolvedValueOnce(null);
-    const res = await publishInvoice("inv-1");
+    const res = await publishAndMarkSent("inv-1");
     expect(res).toMatchObject({ ok: false, field: "btc_address" });
     expect(updateChain).not.toHaveBeenCalled();
   });
@@ -437,7 +436,7 @@ describe("publishInvoice (publish-only, no email)", () => {
   it("initialises background-polling columns (published_at set, next_check_at = +15s, stage_attempt = 0, mempool_seen_at = null) alongside the status change", async () => {
     const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
     const before = Date.now();
-    await publishInvoice("inv-1");
+    await publishAndMarkSent("inv-1");
     const after = Date.now();
 
     const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
@@ -479,17 +478,16 @@ describe("publishAndSendEmail", () => {
     expect(attemptAt).toBeLessThanOrEqual(after + 1_000);
   });
 
-  it("on email failure: status=pending, email_attempted_at set, sent_at and send_method NULL", async () => {
-    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "failed" });
-    const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
-    await publishAndSendEmail("inv-1");
-
-    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.status).toBe("pending");
-    expect(payload.sent_at).toBeNull();
-    expect(payload.send_method).toBeNull();
-    expect(payload.email_attempted_at).toBeTruthy();
-  });
+  it.each(["failed", "skipped_daily_cap", "skipped_no_api_key"] as const)(
+    "if the email isn't sent (%s), a draft stays a draft: nothing is written (v1.5.19)",
+    async (status) => {
+      vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status });
+      const { updateChain } = makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
+      const result = await publishAndSendEmail("inv-1");
+      expect(result).toEqual({ ok: true, data: { emailStatus: status } });
+      expect(updateChain).not.toHaveBeenCalled();
+    },
+  );
 
   it("calls sendInvoicePublishedEmail with the invoice details", async () => {
     makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
@@ -527,22 +525,17 @@ describe("publishAndSendEmail", () => {
     expect(result).toEqual({ ok: true, data: { emailStatus: "failed" } });
   });
 
-  it("skips quietly (no send) for a malformed client_email, but still publishes (v1.4.26-H)", async () => {
-    const { updateChain } = makeSupabase({
-      fetchData: { ...PUBLISHABLE_INVOICE, client_email: "not-an-email" },
-    });
-    const result = await publishAndSendEmail("inv-1");
-    expect(result).toEqual({ ok: true, data: { emailStatus: "no_recipient" } });
-    expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
-    expect(updateChain).toHaveBeenCalled();
-  });
+  it.each([null, "", "not-an-email"])(
+    "a draft with no valid client email (%j) isn't sent and doesn't go live (v1.5.19)",
+    async (client_email) => {
+      const { updateChain } = makeSupabase({ fetchData: { ...PUBLISHABLE_INVOICE, client_email } });
+      const result = await publishAndSendEmail("inv-1");
+      expect(result).toMatchObject({ ok: false, field: "client_email" });
+      expect(sendInvoicePublishedEmail).not.toHaveBeenCalled();
+      expect(updateChain).not.toHaveBeenCalled();
+    },
+  );
 
-  it("surfaces the daily send cap to the caller (v1.4.26-H)", async () => {
-    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "skipped_daily_cap" });
-    makeSupabase({ fetchData: PUBLISHABLE_INVOICE });
-    const result = await publishAndSendEmail("inv-1");
-    expect(result).toEqual({ ok: true, data: { emailStatus: "skipped_daily_cap" } });
-  });
 });
 
 describe("publishAndMarkSent", () => {
@@ -624,6 +617,31 @@ describe("send actions on an already-published invoice (v1.5.9)", () => {
     expect(payload.sent_at).toBeTruthy();
     expect(payload.email_attempted_at).toBeTruthy();
     expect(updateEq).toHaveBeenCalledWith("id", "inv-1");
+  });
+
+  it("an email after sending by hand keeps the first sent date and method (v1.5.19)", async () => {
+    vi.mocked(sendInvoicePublishedEmail).mockResolvedValueOnce({ status: "sent" });
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHED, sent_at: "2026-05-31T12:00:00.000Z", send_method: "manual" },
+      rpcResult: true,
+    });
+    const result = await publishAndSendEmail("inv-1");
+    expect(result).toEqual({ ok: true, data: { emailStatus: "sent" } });
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("sent_at");
+    expect(payload).not.toHaveProperty("send_method");
+    expect(payload.email_attempted_at).toBeTruthy();
+  });
+
+  it("marking an already-sent invoice as sent again changes nothing (v1.5.19)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { ...PUBLISHED, sent_at: "2026-05-31T12:00:00.000Z", send_method: "email" },
+      rpcResult: true,
+    });
+    const result = await publishAndMarkSent("inv-1");
+    expect(result).toEqual({ ok: true, data: {} });
+    expect(updateChain).not.toHaveBeenCalled();
+    expect(logInvoiceEvent).not.toHaveBeenCalled();
   });
 
   it("publishAndSendEmail leaves a payment_detected invoice's status alone", async () => {

@@ -102,10 +102,12 @@ describe("renderInvoicePdf", () => {
     expect(text).toContain("No due date");
   });
 
-  it("includes a 'Date Created' label and the formatted creation date", async () => {
-    const text = await textFromPdf(baseInvoice);
-    expect(text).toContain("Date Created");
-    expect(text).toContain("April 15, 2026");
+  it("shows 'Invoice date' as the day it was sent, not the day it was created (v1.5.19)", async () => {
+    const text = await textFromPdf({ ...baseInvoice, sent_at: "2026-04-20T09:00:00Z" });
+    expect(text).toContain("Invoice date");
+    expect(text).not.toContain("Date Created");
+    expect(text).toContain("April 20, 2026");
+    expect(text).not.toContain("April 15, 2026");
   });
 
   it("includes the public invoice URL built from the supplied appUrl, labelled 'View and pay online'", async () => {

@@ -96,10 +96,14 @@ describe("InvoicePaymentView — download PDF", () => {
 });
 
 describe("InvoicePaymentView — dates", () => {
-  it("shows 'Date Sent:' label with formatted date", () => {
-    render(<InvoicePaymentView invoice={BASE_INVOICE} btcPrice={null} />);
-    expect(screen.getByText(/date sent:/i)).toBeInTheDocument();
-    expect(screen.getByText(/apr(il)? 15,? 2026/i)).toBeInTheDocument();
+  it("shows 'Invoice date:' as the day it was sent, not the day it was created (v1.5.19)", () => {
+    render(
+      <InvoicePaymentView invoice={{ ...BASE_INVOICE, sent_at: "2026-04-20T09:00:00Z" }} btcPrice={null} />,
+    );
+    expect(screen.getByText(/invoice date:/i)).toBeInTheDocument();
+    expect(screen.queryByText(/date sent/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/apr(il)? 20,? 2026/i)).toBeInTheDocument();
+    expect(screen.queryByText(/apr(il)? 15,? 2026/i)).not.toBeInTheDocument();
   });
 
   it("shows 'Date Due:' label with formatted date when due_date is present", () => {

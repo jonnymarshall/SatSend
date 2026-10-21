@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.19 — An invoice is a draft or it's sent (roadmap v1.5.2.0.1-H).**
+  "Publish only" is gone. The Send menu (was Publish) offers Send now via email,
+  Download PDF and mark as sent, and Copy link and mark as sent ("Share the link
+  yourself"), which copies the client's link and confirms with a small "Link
+  copied" notice. Each makes the invoice live and records its sent date in the
+  same step; an email that doesn't go out leaves a draft a draft. Migration 0035
+  gives invoices that went live without being sent their publish day as their
+  sent date.
+
+### Fixed
+
+- **v1.5.19 — Dates show when an invoice was sent.** "Date Sent" (list, sorting,
+  invoice page) showed the day the draft was created, drafts included; it now
+  shows the first sent date, and "Not sent" for drafts. The client's page and
+  the PDF say "Invoice date". A later email no longer overwrites the first sent
+  date.
+
 ### Fixed
 
 - **v1.5.17 — Link-preview image matches the site.** `/opengraph-image` (the

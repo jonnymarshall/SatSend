@@ -37,9 +37,8 @@ export type InvoiceRow = Pick<
 >;
 
 export interface RowActions {
-  onPublishOnly: (id: string) => void;
   onSendEmail: (id: string) => void;
-  onMarkSent: (id: string) => void;
+  onCopyLinkAndMarkSent: (id: string) => void;
   onDownloadAndMarkSent: (id: string) => void;
   onMarkPaid: (id: string) => void;
   onMarkOverdue: (id: string) => void;
@@ -113,13 +112,22 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       ),
     },
     {
-      accessorKey: "created_at",
+      // v1.5.19: the day it was actually sent (first send), never the day the
+      // draft was created. Drafts aren't sent; they sort together, above the
+      // newest sent invoice when sorted newest first.
+      id: "sent_at",
+      accessorFn: (row) => row.sent_at,
       header: sortableHeader("Date Sent"),
-      cell: ({ row }) => (
-        <span className="text-(--color-text-secondary)">
-          {format(new Date(row.original.created_at), "MMM d, yyyy")}
-        </span>
-      ),
+      sortingFn: (a, b) => {
+        const t = (v: string | null) => (v ? new Date(v).getTime() : Number.POSITIVE_INFINITY);
+        return t(a.original.sent_at) - t(b.original.sent_at);
+      },
+      cell: ({ row }) =>
+        row.original.sent_at ? (
+          <span className="text-(--color-text-secondary)">{format(new Date(row.original.sent_at), "MMM d, yyyy")}</span>
+        ) : (
+          <span className="text-(--color-text-secondary) italic">Not sent</span>
+        ),
     },
     {
       accessorKey: "due_date",
@@ -215,16 +223,16 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
         const invoice = row.original;
         const isDraft = invoice.status === "draft";
         const isArchived = invoice.status === "archived";
-        // Hide the publish/send menu only when truly nothing remains to do — i.e., the invoice
-        // has both been marked sent AND had an email attempt. Manual-mark-sent (without email)
-        // leaves email_attempted_at NULL, so "Send now via email" must still be reachable.
+        // Hide the send options only when truly nothing remains to do: sent AND
+        // an email attempted. Sending by hand leaves email_attempted_at NULL, so
+        // "Send now via email" must still be reachable.
         const allSendActionsDone = !!invoice.sent_at && !!invoice.email_attempted_at;
-        const showPublishMenu = isDraft || (!isArchived && !allSendActionsDone);
+        const showSendOptions = isDraft || (!isArchived && !allSendActionsDone);
         const emailDisabled = !!invoice.email_attempted_at || !invoice.client_email;
         const emailDisabledReason = invoice.email_attempted_at
           ? "An email has already been attempted for this invoice; multiple sends are not supported."
           : !invoice.client_email
-          ? "No client email on this invoice — cannot send."
+          ? "No client email on this invoice, so it can't be sent by email."
           : undefined;
         return (
           <DropdownMenu>
@@ -236,7 +244,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                 </Button>
               }
             />
-            <DropdownMenuContent align="end" className="w-56 whitespace-nowrap">
+            <DropdownMenuContent align="end" className="w-64">
               <DropdownMenuItem render={<Link href={`/invoices/${invoice.id}`}>View invoice</Link>} />
               {isDraft && (
                 <DropdownMenuItem render={<Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>} />
@@ -250,7 +258,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                   <DropdownMenuItem render={<a href={`/api/invoices/${invoice.id}/pdf`} download>Download PDF</a>} />
                 </>
               )}
-              {showPublishMenu && (
+              {showSendOptions && (
                 <>
                   <DropdownMenuItem
                     disabled={emailDisabled}
@@ -262,17 +270,16 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                   {!invoice.sent_at && (
                     <>
                       <DropdownMenuItem onClick={() => actions.onDownloadAndMarkSent(invoice.id)}>
-                        Download and mark as sent
+                        Download PDF and mark as sent
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => actions.onMarkSent(invoice.id)}>
-                        Mark as sent
+                      <DropdownMenuItem
+                        onClick={() => actions.onCopyLinkAndMarkSent(invoice.id)}
+                        className="flex-col items-start gap-0.5"
+                      >
+                        <span>Copy link and mark as sent</span>
+                        <span className="text-xs text-(--color-text-secondary)">Share the link yourself</span>
                       </DropdownMenuItem>
                     </>
-                  )}
-                  {isDraft && (
-                    <DropdownMenuItem onClick={() => actions.onPublishOnly(invoice.id)}>
-                      Publish only (don&apos;t send yet)
-                    </DropdownMenuItem>
                   )}
                 </>
               )}

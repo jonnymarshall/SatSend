@@ -10,12 +10,14 @@ import { DatePicker } from "@/components/date-picker";
 import {
   saveDraft,
   updateDraft,
-  publishInvoice,
   publishAndSendEmail,
   publishAndMarkSent,
   InvoicePayload,
 } from "@/app/(dashboard)/invoices/actions";
-import { PublishMenu } from "@/components/publish-menu";
+import { SendMenu } from "@/components/send-menu";
+import { showNotice } from "@/components/notice";
+import { deferredCopy } from "@/lib/copy-when-ready";
+import { clientInvoiceUrl } from "@/lib/invoices/send-feedback";
 import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
 import { addressNetworkError } from "@/lib/btc-network";
 import { invoiceSchema } from "@/lib/invoices/schema";
@@ -209,7 +211,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     const btc = form.btc_address.trim();
     if (btc && !isValidBtcAddress(btc)) errs.btc_address = "Invalid BTC address";
     else if (btc && addressNetworkError(btc)) errs.btc_address = addressNetworkError(btc)!;
-    if (isPublish && !btc) errs.btc_address = "BTC address is required to publish";
+    if (isPublish && !btc) errs.btc_address = "BTC address is required to send";
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstKey = Object.keys(errs)[0];
@@ -270,13 +272,22 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     }
   }
 
-  // Shared flow for all four publish/send options. Saves/updates the draft to obtain
-  // an id, then runs the chosen publish action against that id, then navigates.
-  async function runPublishFlow<T>(
+  // Shared flow for the three ways to send (v1.5.19: no "Publish only"). Saves or
+  // updates the draft to obtain an id, runs the chosen send action against it,
+  // then opens the invoice (with `pathFor` deciding where, e.g. an email that
+  // didn't go out opens the still-draft invoice with the reason).
+  async function runSendFlow<T>(
     action: (id: string) => Promise<ActionResult<T>>,
-    postNavigate?: (data: T) => void,
+    {
+      postNavigate,
+      pathFor = (id) => `/invoices/${id}`,
+      onFail,
+    }: { postNavigate?: (data: T, id: string) => void; pathFor?: (id: string, data: T) => string; onFail?: () => void } = {},
   ) {
-    if (!validate(true)) return;
+    if (!validate(true)) {
+      onFail?.();
+      return;
+    }
     setSaving(true);
     try {
       const payload = buildPayload();
@@ -290,28 +301,44 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
         id = res.data.id;
       }
       const result = await action(id!);
-      if (!result.ok) return handleFieldError(result);
-      router.push(`/invoices/${id}`);
-      postNavigate?.(result.data);
+      if (!result.ok) {
+        onFail?.();
+        return handleFieldError(result);
+      }
+      router.push(pathFor(id!, result.data));
+      postNavigate?.(result.data, id!);
     } catch {
+      onFail?.();
       setErrors({ _form: "Something went wrong. Please try again." });
     } finally {
       setSaving(false);
     }
   }
 
-  const handlePublishOnly = () => runPublishFlow((id) => publishInvoice(id));
-  const handleSendEmail = () => runPublishFlow((id) => publishAndSendEmail(id));
-  const handleMarkSent = () => runPublishFlow((id) => publishAndMarkSent(id));
+  const handleSendEmail = () =>
+    runSendFlow((id) => publishAndSendEmail(id), {
+      // Not sent: it's still a draft; its page says why.
+      pathFor: (id, data) => (data.emailStatus === "sent" ? `/invoices/${id}` : `/invoices/${id}?email=${data.emailStatus}`),
+    });
+  const handleCopyLinkAndMarkSent = () => {
+    // Start the copy inside the click (Safari); supply the link once it's sent.
+    const copy = deferredCopy();
+    void runSendFlow((id) => publishAndMarkSent(id), {
+      onFail: () => copy.provide(null),
+      postNavigate: async (_data, id) => {
+        copy.provide(clientInvoiceUrl(id, window.location.origin));
+        showNotice((await copy.copied) ? "Link copied" : "Marked as sent. Copy the link from View public invoice.");
+      },
+    });
+  };
   const handleDownloadAndMarkSent = () =>
-    runPublishFlow(
-      (id) => publishAndMarkSent(id, { withDownload: true }),
-      (data) => {
+    runSendFlow((id) => publishAndMarkSent(id, { withDownload: true }), {
+      postNavigate: (data) => {
         if (data?.downloadUrl && typeof window !== "undefined") {
           window.location.href = data.downloadUrl;
         }
-      }
-    );
+      },
+    });
 
   const taxPct = parseFloat(form.tax_percent) || 0;
   const { subtotal, taxFiat, total } = computeInvoiceTotals(toLineItems(items), taxPct);
@@ -502,7 +529,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
         </Field>
       </section>
 
-      {/* Bitcoin address — required to publish, optional for drafts */}
+      {/* Bitcoin address — required to send, optional for drafts */}
       </Card>
 
       <Card id="section-payment" className="space-y-6">
@@ -517,7 +544,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             placeholder="bc1q…"
           />
           <p id="hint-btc-address" className="text-sm text-(--color-text-secondary)">
-            Required to publish. Each invoice needs a fresh, unique address — reusing one breaks payment detection.
+            Required to send. Each invoice needs a fresh, unique address — reusing one breaks payment detection.
           </p>
         </Field>
       </section>
@@ -561,7 +588,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
         <Button id="btn-save-draft" variant="secondary" onClick={handleSaveDraft} disabled={saving}>
           Save draft
         </Button>
-        <PublishMenu
+        <SendMenu
           invoiceId={invoiceId ?? "new"}
           isDraft
           emailAttemptedAt={null}
@@ -570,9 +597,8 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           sendMethod={null}
           busy={saving}
           onSendEmail={handleSendEmail}
-          onMarkSent={handleMarkSent}
+          onCopyLinkAndMarkSent={handleCopyLinkAndMarkSent}
           onDownloadAndMarkSent={handleDownloadAndMarkSent}
-          onPublishOnly={handlePublishOnly}
         />
         <Button id="btn-cancel" variant="secondary" type="button" onClick={handleCancel} disabled={saving}>
           Cancel

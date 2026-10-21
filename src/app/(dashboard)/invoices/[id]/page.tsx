@@ -13,13 +13,21 @@ import type { LineItem } from "@/lib/invoices";
 import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { getAppUrl } from "@/lib/app-url";
+import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
+
+const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
 export default async function InvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ email?: string }>;
 }) {
   const { id } = await params;
+  // v1.5.19: the editor sends you here when an email didn't go out (the invoice
+  // is still a draft), with the reason in ?email=.
+  const emailParam = (await searchParams)?.email as EmailStatus | undefined;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -33,6 +41,10 @@ export default async function InvoiceDetailPage({
   if (!invoice) notFound();
 
   const items: LineItem[] = toInvoice(invoice).line_items;
+  const emailProblem =
+    emailParam && EMAIL_STATUSES.includes(emailParam) && invoice.status === "draft"
+      ? emailOutcomeMessage(emailParam, { wasDraft: true, clientEmail: invoice.client_email }).text
+      : null;
   const appUrl = getAppUrl();
   const shareLink = `${appUrl}/invoice/${invoice.id}`;
 
@@ -54,7 +66,7 @@ export default async function InvoiceDetailPage({
               <p id="invoice-detail--client-email" className="text-[15px] text-(--color-text-secondary)">{invoice.client_email}</p>
             )}
             <div id="invoice-detail--dates" className="pt-1">
-              <InvoiceDates createdAt={invoice.created_at} dueDate={invoice.due_date} />
+              <InvoiceDates audience="owner" sentAt={invoice.sent_at} dueDate={invoice.due_date} />
             </div>
           </div>
           {invoice.btc_address &&
@@ -72,6 +84,12 @@ export default async function InvoiceDetailPage({
           )}
         </div>
       </div>
+
+      {emailProblem && (
+        <p id="invoice-detail--email-problem" role="alert" className="rounded-(--radius-md) bg-(--color-danger-soft) px-4 py-3 text-sm font-medium text-(--color-danger-text)">
+          {emailProblem}
+        </p>
+      )}
 
       {invoice.status === "underpaid" && invoice.amount_received_fiat !== null && (
         <p id="invoice-detail--underpaid-indicator" className="rounded-(--radius-md) bg-(--color-warning-soft) px-4 py-3 text-sm font-medium text-(--color-warning-text)">
