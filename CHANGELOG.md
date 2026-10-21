@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.21 — Pricing page (roadmap v1.5.2.2-H).** `/pricing` replaces its
+  placeholder: the Free and Pro cards (now shared with the homepage) with a
+  Monthly / Yearly (2 months free) toggle (Pro $10/month, or $100/year shown as
+  $8.33/month), a comparison table, and a pricing FAQ (bitcoin or card; card
+  renews until turned off; keep all your invoices; refund within 15 days).
+  Roadmap: card payments (v1.5.4-H), free trials (v1.5.5-H) and moving between
+  Free and Pro (v1.5.6-H) added as pre-launch items.
+
 ### Fixed
 
 - **v1.5.20 — How it works screenshot shows the Send button.** The editor
