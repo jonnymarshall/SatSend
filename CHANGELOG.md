@@ -29,9 +29,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **v1.5.18 — Sharper How it works screenshots.** Re-taken at 2x pixel density
+  and served at quality 90 (`images.qualities` in `next.config.ts`); text was
+  soft on high-resolution screens.
+
 - **v1.5.18 — QR code ignores a late result.** `BtcQrCode` no longer applies an
   image that arrives after it has gone or switched to a newer value (CI failed
   on an unhandled "window is not defined" from exactly that).
+
+### Security
+
+- **v1.5.18 — QR code library pinned.** `qrcode` is now an exact version
+  (`1.5.4`, no `^`), and a test checks package.json and the lockfile's integrity
+  hash, so it can only change by a deliberate, reviewed upgrade.
+  `@types/qrcode` (type definitions only) is pinned and moved to devDependencies.
 
 ### Added
 

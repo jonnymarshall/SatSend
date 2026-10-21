@@ -10,8 +10,13 @@ import { cn } from "@/lib/utils";
  * How it works (v1.5.18, roadmap v1.5.2.1-H). Screenshots are the real app on the
  * test database with a demo account (test-automation/demo-screens.mjs); the
  * testnet address and QR code were swapped for an unpayable example before
- * capture. Re-take them when these screens change.
+ * capture. Re-take them when these screens change, at 2x pixel density
+ * (deviceScaleFactor 2) so they stay sharp on high-resolution screens.
  */
+
+// Text-heavy screenshots blur at Next's default quality (75). Must be listed in
+// images.qualities in next.config.ts.
+const IMAGE_QUALITY = 90;
 
 const TITLE = "How it works · SatSend";
 const DESCRIPTION =
@@ -44,8 +49,8 @@ const STEPS: Step[] = [
     ],
     image: {
       src: "/marketing/how-it-works/create.png",
-      width: 1120,
-      height: 1058,
+      width: 2240,
+      height: 2116,
       alt: "The invoice form: a line item for packaging design, a bitcoin address, the $960 total and the Publish button.",
     },
   },
@@ -59,8 +64,8 @@ const STEPS: Step[] = [
     ],
     image: {
       src: "/marketing/how-it-works/send.png",
-      width: 760,
-      height: 574,
+      width: 1520,
+      height: 1148,
       alt: "The email a client receives: “Invoice INV-0043 from Maya Chen Design”, $1,380 due, and a View and pay button.",
     },
   },
@@ -75,8 +80,8 @@ const STEPS: Step[] = [
     ],
     image: {
       src: "/marketing/how-it-works/pay.png",
-      width: 808,
-      height: 1072,
+      width: 1616,
+      height: 2144,
       alt: "The client's invoice page: line items, a $1,380 total, and Pay with Bitcoin showing the bitcoin amount, a QR code and the address.",
     },
   },
@@ -92,8 +97,8 @@ const STEPS: Step[] = [
     ],
     image: {
       src: "/marketing/how-it-works/paid.png",
-      width: 1120,
-      height: 510,
+      width: 2240,
+      height: 1020,
       alt: "Your invoice list: two invoices marked Paid, one Pending and one Draft.",
     },
   },
@@ -147,6 +152,7 @@ function Steps() {
               height={step.image.height}
               alt={step.image.alt}
               sizes="(min-width: 1024px) 560px, 100vw"
+              quality={IMAGE_QUALITY}
               className="h-auto w-full"
             />
           </div>

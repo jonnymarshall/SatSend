@@ -23,6 +23,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // v1.5.18: the How it works screenshots are served at 90 so their text stays
+  // sharp; Next 16 only allows qualities listed here.
+  images: { qualities: [75, 90] },
   // v1.5.5: the invoice PDF reads its fonts from disk (react-pdf cannot use web
   // fonts), so ship them with both PDF routes. v1.5.17: the link-preview image
   // reads the same files.
