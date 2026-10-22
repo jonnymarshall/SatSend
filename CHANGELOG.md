@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.25 — Security page (roadmap v1.5.2.4-H).** `/security` is a real page
+  instead of "Coming soon": non-custodial explained, what SatSend stores and can
+  never do, how the receiving address is protected, access codes, auditing the
+  source-available code (the FAQ's licence answer, linking fsl.software), and how
+  to report a problem (contact us, or a GitHub issue if not urgent). Now indexed.
+  Roadmap: new pre-launch item v1.5.2.12-H to limit wrong access-code guesses.
+
 ### Fixed
 
 - **v1.5.24 — Link-preview logo lines up (roadmap v1.5.2.0.2-H).** The preview

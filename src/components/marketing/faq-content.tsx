@@ -18,6 +18,23 @@ const SUPPORT = (
   </Link>
 );
 
+/** The licence wording, shared by the FAQ and /security (v1.5.25). */
+export const SOURCE_AVAILABLE = (
+  <>
+    SatSend is source available: all of its code is public, so anyone can audit how it handles your invoices and
+    payments. It&apos;s published under the Functional Source License, which lets you read, run and modify it for any
+    purpose except offering a competing product. Two years after each version is released, that version also becomes
+    available under the Apache 2.0 licence, an open-source licence.{" "}
+    <a
+      href="https://fsl.software"
+      className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4"
+    >
+      Learn more about the FSL
+    </a>
+    .
+  </>
+);
+
 export const FAQ_GROUPS: FaqGroup[] = [
   {
     id: "getting-started",
@@ -144,21 +161,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: "source-code",
         q: "Can I see SatSend's code?",
-        a: (
-          <>
-            Yes. SatSend is source available: all of its code is public, so anyone can audit how it handles your
-            invoices and payments. It&apos;s published under the Functional Source License, which lets you read, run and
-            modify it for any purpose except offering a competing product. Two years after each version is released,
-            that version also becomes available under the Apache 2.0 licence, an open-source licence.{" "}
-            <a
-              href="https://fsl.software"
-              className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4"
-            >
-              Learn more about the FSL
-            </a>
-            .
-          </>
-        ),
+        a: <>Yes. {SOURCE_AVAILABLE}</>,
       },
       {
         id: "delete-account",
