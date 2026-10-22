@@ -30,23 +30,42 @@ const HEADING = "font-display tracking-heading text-[26px] leading-[1.15] font-[
 const BODY = "text-[17px] leading-[1.6] text-(--color-text-secondary)";
 const INLINE_LINK = "font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4";
 
+// Short labels for the topic buttons under the heading, as on /faq.
+const TOPICS = [
+  { id: "custody", label: "Your bitcoin" },
+  { id: "stored", label: "What we store" },
+  { id: "address", label: "Your address" },
+  { id: "access-codes", label: "Access codes" },
+  { id: "audit", label: "Audit the code" },
+  { id: "report", label: "Report a problem" },
+];
+
+// The minimum: everything else on an invoice is optional (src/lib/invoices/schema.ts).
 const STORED = [
   "Your account email",
-  "Your invoices: their details, line items and the receiving address you entered",
+  "Your invoices: their amounts, line items and the receiving address you entered",
 ];
 
 const NEVER = [
   "Hold, move or spend your bitcoin",
   "Ask for your keys or seed phrase",
   "Take a cut of your payments",
-  "See your balance or the rest of your wallet",
+  "See your wallet balance",
 ];
 
 const ADDRESS = [
   "Every address is checked when you enter it, so a mistyped one is caught before you can send the invoice.",
   "An address can only be used on one invoice, so every payment matches the right invoice.",
   "Once an invoice is sent, its details are fixed, including the address, so it can't be swapped for another one.",
-  "The QR code your client scans is made from the address on the invoice, and shown next to it so they can compare.",
+];
+
+// btc-qr-code.tsx draws it in the payer's browser from buildBip21Uri(invoice.btc_address, ...);
+// qrcode is pinned and checked by src/qrcode-pinned.test.ts.
+const QR = [
+  "Your client's own browser draws the QR code when they open the invoice, from the address saved on it and the amount due. It's a standard bitcoin payment request that any wallet can read.",
+  "No outside QR service is involved, so no other website ever sees or handles your address.",
+  "The software that draws it is locked to one checked version and is only ever updated deliberately, never automatically, so a tampered update can't slip in.",
+  "The address is also printed in full next to the QR code, so your client can check their wallet shows the same one before they pay.",
 ];
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -54,7 +73,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
     <section
       id={`security--${id}`}
       aria-labelledby={`security--${id}--heading`}
-      className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.6fr] lg:gap-16"
+      className="grid scroll-mt-6 grid-cols-1 gap-6 lg:grid-cols-[1fr_1.6fr] lg:gap-16"
     >
       <h2 id={`security--${id}--heading`} className={HEADING}>
         {title}
@@ -96,6 +115,20 @@ export default function SecurityPage() {
           SatSend sends the invoice and watches for the payment. Your client pays straight to your wallet, so there&apos;s
           nothing of yours here for anyone to take.
         </p>
+        <nav id="security--jump" aria-label="Jump to a topic" className="mt-8">
+          <ul className="flex flex-wrap gap-2">
+            {TOPICS.map((topic) => (
+              <li key={topic.id}>
+                <a
+                  href={`#security--${topic.id}`}
+                  className="inline-flex min-h-11 items-center rounded-full border border-(--color-border) bg-(--color-surface) px-4 text-[15px] font-medium text-(--color-ink) hover:border-(--color-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-ink)"
+                >
+                  {topic.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </section>
 
       <div className={cn(CONTAINER, "flex flex-col gap-16 pb-20 md:gap-20 md:pb-28")}>
@@ -111,16 +144,21 @@ export default function SecurityPage() {
           </p>
         </Section>
 
-        <Section id="stored" title="What we store, and what we never can">
+        <Section id="stored" title="What we store, and what we'll never do">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div>
               <h3 className="text-[18px] font-semibold">What SatSend stores</h3>
+              <p className="mt-1 text-[15px] text-(--color-text-secondary)">At a minimum:</p>
               <div className="mt-4">
                 <List id="security--stored--list" items={STORED} icon="check" />
               </div>
+              <p id="security--stored--optional" className="mt-4 text-[15px] leading-[1.55] text-(--color-text-secondary)">
+                Plus anything else you choose to add, such as your name, company, address or tax ID, and your
+                client&apos;s details.
+              </p>
             </div>
             <div>
-              <h3 className="text-[18px] font-semibold">What SatSend can never do</h3>
+              <h3 className="text-[18px] font-semibold">What SatSend will never do</h3>
               <div className="mt-4">
                 <List id="security--never--list" items={NEVER} icon="cross" />
               </div>
@@ -135,6 +173,10 @@ export default function SecurityPage() {
         <Section id="address" title="Your receiving address is protected">
           <p className={BODY}>The address is the one thing that decides where the money goes, so SatSend guards it closely.</p>
           <List id="security--address--list" items={ADDRESS} icon="check" />
+          <h3 id="security--qr--heading" className="mt-4 text-[18px] font-semibold">
+            How the QR code is made
+          </h3>
+          <List id="security--qr--list" items={QR} icon="check" />
         </Section>
 
         <Section id="access-codes" title="Access codes">

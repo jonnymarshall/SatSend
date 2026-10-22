@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of "Coming soon": non-custodial explained, what SatSend stores and can
   never do, how the receiving address is protected, access codes, auditing the
   source-available code (the FAQ's licence answer, linking fsl.software), and how
-  to report a problem (contact us, or a GitHub issue if not urgent). Now indexed.
+  to report a problem (contact us, or a GitHub issue if not urgent). Topic buttons
+  under the heading, as on /faq; what's stored is the minimum (plus anything you
+  add); how the payment QR code is made and why it's safe. Now indexed.
   Roadmap: new pre-launch item v1.5.2.12-H to limit wrong access-code guesses.
 
 ### Fixed

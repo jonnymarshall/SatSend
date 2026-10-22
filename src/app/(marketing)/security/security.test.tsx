@@ -27,6 +27,34 @@ describe("Security page (v1.5.25)", () => {
     }
   });
 
+  it("has topic buttons under the heading that jump to each section", () => {
+    const { container } = render(<SecurityPage />);
+    const links = within(screen.getByRole("navigation", { name: /jump to/i })).getAllByRole("link");
+    expect(links).toHaveLength(6);
+    for (const link of links) {
+      const target = container.querySelector(link.getAttribute("href")!);
+      expect(target?.tagName).toBe("SECTION");
+    }
+  });
+
+  it("says what it stores is the minimum, and what it will never do", () => {
+    render(<SecurityPage />);
+    const stored = screen.getByRole("region", { name: /what we store/i });
+    expect(stored.textContent).toMatch(/at a minimum/i);
+    expect(stored.textContent).toMatch(/anything else you choose to add/i);
+    expect(within(stored).getByRole("heading", { name: "What SatSend will never do" })).toBeInTheDocument();
+    expect(stored.textContent).toMatch(/see your wallet balance/i);
+  });
+
+  it("explains how the QR code is made", () => {
+    render(<SecurityPage />);
+    const address = screen.getByRole("region", { name: /your receiving address/i });
+    expect(within(address).getByRole("heading", { name: /how the qr code is made/i })).toBeInTheDocument();
+    expect(address.textContent).toMatch(/own browser/i);
+    expect(address.textContent).toMatch(/no outside qr service/i);
+    expect(address.textContent).toMatch(/never automatically/i);
+  });
+
   it("calls the code source available, never open source", () => {
     const { container } = render(<SecurityPage />);
     const text = container.textContent ?? "";
