@@ -18,7 +18,6 @@ export const SOCIAL_LINKS = {
 } as const;
 
 export const PLACEHOLDER_PAGES = [
-  { path: "/security", title: "Security", description: "How SatSend keeps your invoices safe, and why it never holds your bitcoin." },
   { path: "/about", title: "About", description: "Who's behind SatSend, and why it exists." },
   { path: "/contact", title: "Contact", description: "How to get in touch with SatSend." },
   { path: "/privacy", title: "Privacy policy", description: "What SatSend stores and why." },

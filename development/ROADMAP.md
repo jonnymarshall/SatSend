@@ -734,11 +734,30 @@ baseline.
 - [ ] Test: WhatsApp after merge, sharing `https://satsend.me/?v=2` (it caches
       previews). Rendered locally: matches the site's logo.
 
-### ⏳ v1.5.2.4-H — Security page (`/security`)
-- [ ] Non-custodial explained plainly; what SatSend stores and what it can never
+### ✅ v1.5.2.4-H — Security page (`/security`)
+
+**Branch:** `v1.5.25/security-page` · package `1.5.25`. Agreed with Jonny (2026-10-21).
+- [x] Non-custodial explained plainly; what SatSend stores and what it can never
       do; access codes; the code is **source available and fully auditable**
       under FSL-1.1-ALv2 (never "open source"; reuse the FAQ's "Can I see
       SatSend's code?" wording) and how to audit it, linking fsl.software.
+- [x] Never explains bitcoin networks (testnet is for development only).
+      Access codes described broadly, no guess counts (limit: v1.5.2.12-H).
+- [x] "Found a problem?": contact us, or a GitHub issue if it isn't urgent.
+      Both GitHub links use `SOCIAL_LINKS.github` (`/coming-soon` until v1.5.2.9-H).
+
+### ⏳ v1.5.2.12-H — Limit wrong access-code guesses (**pre-launch**)
+
+> Found while writing the Security page (2026-10-21). Nothing limits wrong
+> guesses at an invoice's access code, so someone with the link could keep
+> trying until one works. Agreed with Jonny as its own small item; the
+> Security page stays broad, so it needn't change.
+
+- [ ] Limit wrong guesses per invoice (and per IP), reusing the sign-up rate
+      limit pattern (v1.5.15, migration 0034). Friendly "too many tries,
+      wait a few minutes" message on the gate.
+- [ ] Tests: the limit trips, resets after the wait, and one invoice's
+      guesses don't lock another.
 
 ### ⏳ v1.5.2.5-H — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
@@ -761,9 +780,11 @@ baseline.
       redirects), then update the git remote, the CI and payment-sweep
       workflows' secrets/variables, Vercel's Git connection, and branch
       protection (`scripts/enable-branch-protection.sh`).
-- [ ] Put the real URLs in `SOCIAL_LINKS` in `src/lib/site-links.ts` (the
-      homepage's "View the code" and the footer's GitHub link use the GitHub
-      one). Then `/coming-soon` has no users: delete it.
+- [ ] **After the move above,** put the real URLs in `SOCIAL_LINKS` in
+      `src/lib/site-links.ts`. The GitHub one feeds the homepage's "View the
+      code", the footer's GitHub link, and the Security page's "View the code"
+      and "open an issue on GitHub" (v1.5.25); point the issue link at the
+      repo's `/issues`. Then `/coming-soon` has no users: delete it.
 
 ### ✅ v1.5.2.10-H — Licence: source available under FSL-1.1-ALv2
 
@@ -780,7 +801,7 @@ baseline.
 - [x] `package.json` `"license": "FSL-1.1-ALv2"`; README Licence section.
 - [x] Homepage highlight "Fully auditable"; FAQ "Can I see SatSend's code?"
       (links fsl.software); footer Developers: "Licence (FSL)".
-- [ ] Security page wording: part of v1.5.2.4-H.
+- [x] Security page wording: done in v1.5.2.4-H (v1.5.25).
 
 ### ⏳ v1.5.8-H — Form SATSEND LLC and give it the code (**pre-launch**)
 
