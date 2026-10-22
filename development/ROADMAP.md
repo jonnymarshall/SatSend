@@ -746,18 +746,32 @@ baseline.
 - [x] "Found a problem?": contact us, or a GitHub issue if it isn't urgent.
       Both GitHub links use `SOCIAL_LINKS.github` (`/coming-soon` until v1.5.2.9-H).
 
-### ⏳ v1.5.2.12-H — Limit wrong access-code guesses (**pre-launch**)
+### ✅ v1.5.2.12-H — Limit wrong access-code guesses (**pre-launch**)
+
+**Branch:** `v1.5.26/access-code-limit` · package `1.5.26` · migration `0036`.
+Agreed with Jonny (2026-10-22): 5 wrong tries per 15 minutes, per connection,
+per invoice; no cap per invoice across connections (it would let a stranger lock
+the real client out).
 
 > Found while writing the Security page (2026-10-21). Nothing limits wrong
 > guesses at an invoice's access code, so someone with the link could keep
 > trying until one works. Agreed with Jonny as its own small item; the
 > Security page stays broad, so it needn't change.
 
-- [ ] Limit wrong guesses per invoice (and per IP), reusing the sign-up rate
-      limit pattern (v1.5.15, migration 0034). Friendly "too many tries,
-      wait a few minutes" message on the gate.
-- [ ] Tests: the limit trips, resets after the wait, and one invoice's
-      guesses don't lock another.
+- [x] Limit wrong guesses per invoice per connection, reusing the sign-up rate
+      limit pattern (v1.5.15, migration 0034): `access_code_attempts` and
+      `take_access_code_guess` (service_role only), connection = HMAC of the IP
+      (`src/lib/client-key.ts`, now shared). Once the limit is reached every
+      guess is refused, the right one included. "Too many wrong tries. Please
+      wait 15 minutes and try again." Fails closed.
+- [x] **Found while planning:** the access cookie held the code itself, and the
+      PDF and payment-status routes accepted it, so codes could be guessed there,
+      around the form. The cookie is now a server-made fingerprint (HMAC of
+      invoice + code); a plain-code or made-up cookie opens nothing. Anyone who
+      unlocked an invoice before v1.5.26 enters the code once more.
+- [x] Tests: the limit trips, resets after the wait, and one invoice's
+      guesses don't lock another (unit tests, plus `npm run test:rls` against
+      the real test database).
 
 ### ⏳ v1.5.2.5-H — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**

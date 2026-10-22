@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { accessToken } from "@/lib/access-code";
 
 const mockFetchPublic = vi.fn();
 vi.mock("@/lib/invoice-public", () => ({
@@ -52,6 +53,7 @@ const publishedInvoice = {
 const gatedInvoice = { ...publishedInvoice, access_code: "SECRET1" };
 
 beforeEach(() => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
   vi.resetModules();
   vi.clearAllMocks();
   mockCookieGet.mockReturnValue(undefined);
@@ -95,9 +97,16 @@ describe("GET /api/invoice/[id]/pdf (public, unauthenticated)", () => {
       expect(res.status).toBe(404);
     });
 
-    it("returns the PDF for a gated invoice with the correct code", async () => {
+    it("returns 404 for a cookie holding the plain code (v1.5.26: guessing must go through the form)", async () => {
       mockFetchPublic.mockResolvedValueOnce(gatedInvoice);
-      mockCookieGet.mockReturnValue({ value: "secret1" });
+      mockCookieGet.mockReturnValue({ value: "SECRET1" });
+      const res = await getRequest("inv-1");
+      expect(res.status).toBe(404);
+    });
+
+    it("returns the PDF for a gated invoice with the server's fingerprint of the correct code", async () => {
+      mockFetchPublic.mockResolvedValueOnce(gatedInvoice);
+      mockCookieGet.mockReturnValue({ value: accessToken("inv-1", "secret1") });
       const res = await getRequest("inv-1");
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("application/pdf");

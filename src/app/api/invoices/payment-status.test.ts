@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { NextRequest } from "next/server";
+import { accessToken } from "@/lib/access-code";
 
 // Mock Supabase admin
 const mockUpdate = vi.fn().mockReturnThis();
@@ -90,6 +91,7 @@ const matchingTx = {
 };
 
 beforeEach(() => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
   vi.resetModules();
   vi.clearAllMocks();
   mockFetchTipHeight.mockResolvedValue(900_001);
@@ -318,11 +320,20 @@ describe("POST /api/invoices/[id]/payment-status", () => {
       expect(res.status).toBe(404);
     });
 
-    it("accepts the request when the access-code cookie matches", async () => {
+    it("returns 404 when the cookie holds the plain code (v1.5.26)", async () => {
+      mockSingle.mockResolvedValueOnce({ data: gatedInvoice, error: null });
+      mockCookieGet.mockReturnValue({ value: "secret123" });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "payment_detected" });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("accepts the request when the cookie holds the server's fingerprint of the code", async () => {
       mockSingle
         .mockResolvedValueOnce({ data: gatedInvoice, error: null })
         .mockResolvedValueOnce({ data: { status: "payment_detected" }, error: null });
-      mockCookieGet.mockReturnValue({ value: "secret123" });
+      mockCookieGet.mockReturnValue({ value: accessToken("inv-1", "secret123") });
       mockFetchTx.mockResolvedValueOnce(matchingTx);
       mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
 

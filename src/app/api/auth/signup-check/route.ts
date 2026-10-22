@@ -10,27 +10,15 @@
 // Logging in needs no such check: Supabase answers it (`otp_disabled`) under its
 // own rate limits.
 
-import { createHmac } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { clientKey } from "@/lib/client-key";
 
 // Shape check only; Supabase is the judge of what it will send to.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const CHECKS_PER_WINDOW = 5;
 const WINDOW_SECONDS = 3600;
-
-/**
- * The connection's bucket: an HMAC of its IP keyed with a server-only secret, so
- * the table never holds an address and the values can't be reversed by trying
- * every IP. Vercel sets x-forwarded-for (first entry = the client); locally it
- * may be missing, and every local request shares one bucket.
- */
-function clientKey(request: NextRequest): string {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
-  return createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").update(ip).digest("hex");
-}
 
 export async function POST(request: NextRequest) {
   let email: unknown;
@@ -49,7 +37,7 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient();
 
   const { data: allowed, error: limitError } = await supabase.rpc("take_signup_check", {
-    p_client_key: clientKey(request),
+    p_client_key: clientKey(request.headers),
     p_limit: CHECKS_PER_WINDOW,
     p_window_seconds: WINDOW_SECONDS,
   });

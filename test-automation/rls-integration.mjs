@@ -9,6 +9,8 @@
 //   - TEST project only (aborts if the URL looks like production).
 //   - PAYMENT_SWEEP_ENABLED must not be set (one writer per database).
 //
+// v1.5.26 adds the access-code guess limit (migration 0036).
+//
 // Run: node test-automation/rls-integration.mjs   (or: npm run test:rls)
 // Skips (exit 0) when the anon key is absent, so it never blocks a plain checkout.
 
@@ -161,6 +163,53 @@ try {
   const bReadsA = await rest(`invoices?id=eq.${invoiceId}&select=id`, { jwt: userB.jwt, key: ANON });
   check("RLS hides A's invoice from B", Array.isArray(bReadsA.json) && bReadsA.json.length === 0,
     `body ${JSON.stringify(bReadsA.json)}`);
+
+  // 5. Access-code guess limit (v1.5.26, migration 0036): server-only, and
+  //    5 wrong guesses per window per (invoice, connection).
+  const guess = (args, key = SERVICE) =>
+    rest("rpc/take_access_code_guess", {
+      method: "POST",
+      key,
+      body: { p_limit: 5, p_window_seconds: 900, p_wrong: true, ...args },
+    });
+  const conn = `int-${rnd()}`;
+  const anonGuess = await guess({ p_invoice_id: invoiceId, p_client_key: conn }, ANON);
+  check("anon cannot execute take_access_code_guess", !anonGuess.ok, `status ${anonGuess.status}`);
+  const userGuess = await rest("rpc/take_access_code_guess", {
+    method: "POST", jwt: userA.jwt, key: ANON,
+    body: { p_invoice_id: invoiceId, p_client_key: conn, p_wrong: true, p_limit: 5, p_window_seconds: 900 },
+  });
+  check("a signed-in user cannot execute take_access_code_guess", !userGuess.ok, `status ${userGuess.status}`);
+  const anonRead = await rest("access_code_attempts?select=id", { key: ANON });
+  check("anon cannot read access_code_attempts", !anonRead.ok || (Array.isArray(anonRead.json) && anonRead.json.length === 0),
+    `status ${anonRead.status}`);
+
+  const answers = [];
+  for (let i = 0; i < 5; i++) answers.push((await guess({ p_invoice_id: invoiceId, p_client_key: conn })).json);
+  check("5 wrong guesses are allowed", answers.every((a) => a === true), JSON.stringify(answers));
+  const sixth = await guess({ p_invoice_id: invoiceId, p_client_key: conn });
+  check("the 6th guess is refused", sixth.json === false, JSON.stringify(sixth.json));
+  const rightAfter = await guess({ p_invoice_id: invoiceId, p_client_key: conn, p_wrong: false });
+  check("even a right guess is refused once the limit is reached", rightAfter.json === false,
+    JSON.stringify(rightAfter.json));
+  const otherConn = await guess({ p_invoice_id: invoiceId, p_client_key: `int-${rnd()}` });
+  check("another connection is unaffected", otherConn.json === true, JSON.stringify(otherConn.json));
+
+  const second = await rest("invoices", {
+    method: "POST", prefer: "return=representation",
+    body: {
+      user_id: userA.id, status: "draft", invoice_number: `INTTEST2-${Date.now()}`,
+      client_name: "Integration Test", client_email: "rls-int@example.com", currency: "USD",
+      subtotal_fiat: 0, tax_fiat: 0, tax_percent: 0, total_fiat: 0, line_items: [],
+    },
+  });
+  const secondId = second.json?.[0]?.id;
+  if (secondId) created.push({ id: secondId, userId: userA.id });
+  const otherInvoice = await guess({ p_invoice_id: secondId, p_client_key: conn });
+  check("another invoice is unaffected for the same connection", otherInvoice.json === true,
+    `status ${second.status} ${second.text?.slice(0, 200)}`);
+  const shortWindow = await guess({ p_invoice_id: invoiceId, p_client_key: conn, p_window_seconds: 0, p_wrong: false });
+  check("old guesses age out of the window", shortWindow.json === true, JSON.stringify(shortWindow.json));
 } finally {
   await cleanup();
   if (userA) await deleteUser(userA.id);

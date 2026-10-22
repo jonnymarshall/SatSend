@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Security
+
+- **v1.5.26 — Limit wrong access-code guesses (roadmap v1.5.2.12-H).** 5 wrong
+  tries per 15 minutes, per connection, per invoice (migration 0036,
+  `take_access_code_guess`, server only); after that every guess is refused
+  until the wait ends. The access cookie now holds a server-made fingerprint
+  instead of the code, so codes can't be guessed through the PDF or
+  payment-status routes. Visitors who unlocked an invoice before this release
+  enter its code once more. The connection fingerprint helper is shared
+  (`src/lib/client-key.ts`).
+
 ### Added
 
 - **v1.5.25 — Security page (roadmap v1.5.2.4-H).** `/security` is a real page
