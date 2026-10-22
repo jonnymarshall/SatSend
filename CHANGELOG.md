@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.24 — Link-preview logo lines up (roadmap v1.5.2.0.2-H).** The preview
+  image typed "SatSend" and ".me" as two pieces of text, and the image generator
+  dropped ".me" below the line (seen on WhatsApp). It now draws the site's own
+  logo file, so it matches the real logo exactly.
+
 ### Added
 
 - **v1.5.23 — Licence: source available under FSL-1.1-ALv2 (roadmap

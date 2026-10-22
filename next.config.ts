@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
   // reads the same files.
   outputFileTracingIncludes: {
     "/api/**/pdf": ["./src/lib/invoices/fonts/**/*"],
-    "/opengraph-image": ["./src/lib/invoices/fonts/**/*"],
+    "/opengraph-image": ["./src/lib/invoices/fonts/**/*", "./public/brand/satsend-logo.svg"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

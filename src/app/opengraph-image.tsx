@@ -17,6 +17,17 @@ export const alt = "SatSend: Invoice in bitcoin. Paid straight to your wallet.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// The site's logo, drawn as shapes (v1.5.24): typing "SatSend" + ".me" as two
+// text spans let the generator drop ".me" below the baseline.
+export const OG_LOGO_FILE = "public/brand/satsend-logo.svg";
+
+// The logo's viewBox is 420 × 120 with the wordmark starting 24 units in;
+// scaled so the wordmark matches the old 56px type (72px in the logo).
+const LOGO_SCALE = 56 / 72;
+const LOGO_WIDTH = Math.round(420 * LOGO_SCALE);
+const LOGO_HEIGHT = Math.round(120 * LOGO_SCALE);
+const LOGO_INSET = Math.round(24 * LOGO_SCALE);
+
 export const OG_FONT_FILES = [
   "src/lib/invoices/fonts/Onest-Bold.ttf",
   "src/lib/invoices/fonts/Geist-Medium.ttf",
@@ -33,6 +44,7 @@ const font = (file: string) => readFile(path.join(process.cwd(), file));
 
 export default async function OpengraphImage() {
   const [onestBold, geistMedium, geistSemiBold] = await Promise.all(OG_FONT_FILES.map(font));
+  const logo = `data:image/svg+xml;base64,${(await font(OG_LOGO_FILE)).toString("base64")}`;
 
   return new ImageResponse(
     (
@@ -49,11 +61,13 @@ export default async function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", padding: "72px 88px 0" }}>
-          {/* Wordmark: same proportions as SatSendLogo (72 / 42, tracking -4.3 / -1.4). */}
-          <div style={{ display: "flex", alignItems: "baseline", fontFamily: "Onest" }}>
-            <span style={{ fontSize: 56, letterSpacing: -3.3, color: INK }}>SatSend</span>
-            <span style={{ fontSize: 33, letterSpacing: -1.1, color: BRAND, marginLeft: 1 }}>.me</span>
-          </div>
+          <img
+            src={logo}
+            width={LOGO_WIDTH}
+            height={LOGO_HEIGHT}
+            alt=""
+            style={{ marginLeft: -LOGO_INSET, marginTop: -LOGO_HEIGHT * 0.3, marginBottom: -LOGO_HEIGHT * 0.25 }}
+          />
 
           <div
             style={{
