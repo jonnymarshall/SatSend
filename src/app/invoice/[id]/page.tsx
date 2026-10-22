@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { fetchPublicInvoice, toPublicInvoice } from "@/lib/invoice-public";
 import { fetchBtcPrice } from "@/lib/btc-price";
-import { isAccessCodeValid, accessCookieName } from "@/lib/access-code";
+import { hasAccess, accessCookieName } from "@/lib/access-code";
 import { AccessCodeGate } from "./access-code-gate";
 import { InvoicePaymentView } from "./invoice-payment-view";
 
@@ -19,7 +19,7 @@ export default async function ClientInvoicePage({ params }: Props) {
   const cookieStore = await cookies();
   const storedCode = cookieStore.get(accessCookieName(id))?.value ?? null;
 
-  if (!isAccessCodeValid(invoice.access_code, storedCode)) {
+  if (!hasAccess(id, invoice.access_code, storedCode)) {
     return <AccessCodeGate invoiceId={id} />;
   }
 

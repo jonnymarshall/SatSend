@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTx, fetchTipHeight, txPaysToAddress } from "@/lib/mempool";
 import { fetchBtcPrice } from "@/lib/btc-price";
-import { isAccessCodeValid, accessCookieName } from "@/lib/access-code";
+import { hasAccess, accessCookieName } from "@/lib/access-code";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 
@@ -51,7 +51,7 @@ export async function POST(
 
   const cookieStore = await cookies();
   const storedCode = cookieStore.get(accessCookieName(id))?.value ?? null;
-  if (!isAccessCodeValid(invoice.access_code, storedCode)) {
+  if (!hasAccess(id, invoice.access_code, storedCode)) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 

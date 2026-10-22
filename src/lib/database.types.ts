@@ -261,6 +261,35 @@ export type Database = {
         }
         Relationships: []
       }
+      access_code_attempts: {
+        Row: {
+          client_key: string
+          created_at: string
+          id: number
+          invoice_id: string
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          id?: never
+          invoice_id: string
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          id?: never
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_code_attempts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signup_check_attempts: {
         Row: {
           client_key: string
@@ -354,6 +383,16 @@ export type Database = {
       is_address_registered: { Args: { addr: string }; Returns: boolean }
       is_email_registered: { Args: { p_email: string }; Returns: boolean }
       line_items_valid: { Args: { items: Json }; Returns: boolean }
+      take_access_code_guess: {
+        Args: {
+          p_client_key: string
+          p_invoice_id: string
+          p_limit: number
+          p_wrong: boolean
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       take_signup_check: {
         Args: {
           p_client_key: string
