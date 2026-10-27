@@ -600,47 +600,8 @@ subscribe button ships without its required disclosure.
 
 > Finished v1.5.0.1-H – v1.5.1.5-H sections were moved to
 > [`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.md) on 2026-10-21.
-
-### ✅ v1.5.2-H — Redesign: marketing homepage
-
-**Branch:** `v1.5.16/marketing` · package `1.5.16` · absorbs the old **v1.4.23
-Marketing Landing Page** (superseded, archived 2026-10-10).
-
-**Content signed off by Jonny (2026-10-21)** after a grill-me session, with four
-reference sites (kvistly.com; jiro.build Payway, PayUp, JobHunt). Every word,
-section and link is in `development/plans/v1.5.16-homepage-content-plan.md`;
-change wording there first.
-
-**Homepage**
-- [x] `/` is the homepage for everyone (the redirect to `/dashboard` is gone).
-      Signed-in visitors see "Go to app" in the menu instead of Log in / Get started.
-- [x] Sections: hero ("Invoice in bitcoin. Paid straight to your wallet.", Get
-      started plus How it works), trust strip, three steps, six highlights
-      (including "Fully open source"), Free/Pro pricing cards (Pro $10, "Coming
-      soon"), eight FAQ questions, closing call to action, footer (Product,
-      Company, Developers, Legal; X and LinkedIn icons; no Log in; no wordmark).
-- [x] The hero visual is the product (payment panel plus invoice row, moved from
-      the style guide to `src/components/marketing/product-preview.tsx`). Its QR
-      code encodes plain text, so scanning it can't send money.
-- [x] Every link goes to a real page. Pages not built yet are "Coming soon"
-      placeholders at their real addresses (`src/lib/site-links.ts`), each its own
-      pre-launch item below. Kept out of search results meanwhile.
-- [x] Metadata: title, description, OpenGraph and Twitter cards;
-      `src/app/opengraph-image.tsx` (wordmark plus "Bitcoin invoicing");
-      `metadataBase` from `getAppUrl()` so the image URL is absolute.
-- [x] `README.md` description; copy audit (bitcoin only).
-- [x] Desktop and 390px: no sideways scrolling; every tap target 44px or more.
-- [x] **Deleted `src/app/styleguide/`** and `SHOW_UI_KIT`.
-
-**Moved out:** the phone stacked invoice table is now its own item (v1.5.2.11-H).
-
-**Tests**
-- [x] `/` renders signed out and signed in ("Go to app", no redirect); every
-      agreed section, plan card and FAQ question present; the example QR code
-      isn't a `bitcoin:` request; metadata contains "SatSend"; every menu, footer
-      and social link has a page (no dead links).
-
----
+> Finished v1.5.2-H – v1.5.2.12-H sections (marketing pages, licence, access-code
+> limit) were moved there on 2026-10-27.
 
 ## Pre-launch: marketing site pages and accounts
 
@@ -651,141 +612,7 @@ change wording there first.
 > `page.tsx`, drop `robots: noindex`, and remove it from `PLACEHOLDER_PAGES` in
 > `src/lib/site-links.ts`.
 
-### ✅ v1.5.2.1-H — How it works page (`/how-it-works`)
-
-**Branch:** `v1.5.18/how-it-works` · package `1.5.18`. Agreed with Jonny
-(2026-10-21): real screenshots (not mock-ups), four steps, plus a "What your
-client sees" panel.
-- [x] Intro; four steps (create, send, your client pays, you're told), each
-      with a real screenshot in `public/marketing/how-it-works/`.
-- [x] "What your client sees" panel; "What you'll need" (a wallet, an email);
-      closing band (now shared with the homepage).
-- [x] Removed from `PLACEHOLDER_PAGES`, so it's indexed.
-- [x] **Re-taking the screenshots:** `node test-automation/demo-screens.mjs`
-      creates `maya@example.com` and four invoices on SatSend-dev (refuses any
-      other project) and prints a one-time sign-in link. Before capturing the
-      client's page and the editor, swap the testnet address and QR code for
-      an unpayable example (see the v1.5.18 PR).
-
-### ✅ v1.5.2.0.1-H — Draft or sent: no "Publish only"; dates are the sent date
-
-**Branch:** `v1.5.19/draft-or-sent` · package `1.5.19` · migration `0035`.
-
-> Found 2026-10-21 while taking the How it works screenshots: every "Date Sent"
-> showed `created_at`, so a draft showed a sent date and an invoice drafted on
-> Monday and sent on Friday said Monday (the client saw that too).
-> **Jonny's decision:** remove "Publish only". An invoice is a draft or it's
-> sent (email, PDF download, or copy the link and share it yourself), and every
-> way to send gives it a sent date. First sent date stays.
-
-**Why not `published_at`.** It's the payment checks' timer anchor and gets reset
-(a detected payment that vanishes; restoring an archived invoice), so it's never
-shown. `sent_at` is set once, at the moment the invoice goes live.
-
-- [x] Send menu (was Publish): Send now via email · Download PDF and mark as sent ·
-      Copy link and mark as sent ("Share the link yourself"). Same in the editor,
-      the invoice page and the list's row menu. `publishInvoice` removed.
-- [x] Copy link copies the client's link and shows a small "Link copied" notice
-      that fades on its own (`showNotice`, `<NoticeHost />` in the app layout;
-      copy starts inside the click so Safari allows it).
-- [x] An email that doesn't go out leaves a draft a draft (no silent go-live);
-      a draft with no client email can't be emailed. Messages shared by all three
-      places (`src/lib/invoices/send-feedback.ts`); the editor opens the draft
-      with the reason (`?email=`).
-- [x] First sent date stays: a later email or a second "mark as sent" doesn't move it.
-- [x] Dates: list "Date Sent" (sorts by it) and invoice page = `sent_at`; drafts
-      show "Not sent" / no line. Client page and PDF say "Invoice date". PDF file
-      name uses it too.
-- [x] Migration 0035: invoices that went live without being sent get
-      `sent_at = coalesce(published_at, created_at)`, `send_method = 'manual'`
-      (test: 10 rows; production: 13 expected).
-- [x] **At merge (2026-10-21):** 0035 applied to production via MCP (13 rows; no
-      "cancelled"). Checked: 0 live invoices without a sent date, 0 drafts with one.
-- [x] How it works "create" screenshot re-taken showing Send and "Required to
-      send" (v1.5.20).
-- [ ] Manual (`manual-tests/v1.5.19-draft-or-sent.md`).
-
----
-
-### ✅ v1.5.2.2-H — Pricing page (`/pricing`)
-
-**Branch:** `v1.5.21/pricing-page` · package `1.5.21`. Agreed with Jonny (2026-10-21).
-- [x] Plan cards shared with the homepage (`src/components/marketing/pricing-plans.tsx`)
-      with a **Monthly / Yearly (2 months free)** toggle: Pro $10/month, or
-      $100/year shown as $8.33/month "Billed $100 yearly".
-- [x] Comparison table of launch features only (reports and API are added when
-      built). Pricing FAQ: pay in bitcoin or by card; card renews until turned
-      off, bitcoin doesn't; you keep all your invoices when Pro runs out; refund
-      within 15 days via support; Free is free forever.
-- [x] Removed from the placeholder list (indexed).
-
-### ✅ v1.5.2.3-H — FAQ page (`/faq`)
-
-**Branch:** `v1.5.22/faq-page` · package `1.5.22`. Questions agreed with Jonny (2026-10-21).
-- [x] 28 questions in five groups (Getting started, Getting paid, Invoices,
-      Security and privacy, Pricing) with jump links; fold-out answers.
-- [x] One source for every answer (`src/components/marketing/faq-content.tsx`):
-      the homepage's eight and /pricing's five read from it.
-- [x] "Can I delete my account?" answered (via support; v1.5.7-H builds it).
-- [x] Not claimed: "open source", until v1.5.2.10-H decides the licence.
-
-### ✅ v1.5.2.0.2-H — Link preview: ".me" sits below the SatSend baseline (fix)
-
-> Found by Jonny, 2026-10-21, sharing satsend.me on WhatsApp: in the preview
-> image the ".me" sits too low instead of on the same line as "SatSend".
-
-**Cause.** `src/app/opengraph-image.tsx` lays out the wordmark as two text
-spans in a flex row with `alignItems: "baseline"`. The image generator (Satori)
-doesn't line up baselines of different font sizes the way a browser does, so the
-smaller ".me" drops. The real logo (`SatSendLogo`, an SVG) puts both on one
-baseline.
-
-- [x] Fixed in v1.5.24 (`v1.5.24/og-logo`): the preview draws the site's own
-      logo file (`public/brand/satsend-logo.svg`, already outlined as shapes),
-      traced for the route; nothing left to mis-align.
-- [ ] Test: WhatsApp after merge, sharing `https://satsend.me/?v=2` (it caches
-      previews). Rendered locally: matches the site's logo.
-
-### ✅ v1.5.2.4-H — Security page (`/security`)
-
-**Branch:** `v1.5.25/security-page` · package `1.5.25`. Agreed with Jonny (2026-10-21).
-- [x] Non-custodial explained plainly; what SatSend stores and what it can never
-      do; access codes; the code is **source available and fully auditable**
-      under FSL-1.1-ALv2 (never "open source"; reuse the FAQ's "Can I see
-      SatSend's code?" wording) and how to audit it, linking fsl.software.
-- [x] Never explains bitcoin networks (testnet is for development only).
-      Access codes described broadly, no guess counts (limit: v1.5.2.12-H).
-- [x] "Found a problem?": contact us, or a GitHub issue if it isn't urgent.
-      Both GitHub links use `SOCIAL_LINKS.github` (`/coming-soon` until v1.5.2.9-H).
-
-### ✅ v1.5.2.12-H — Limit wrong access-code guesses (**pre-launch**)
-
-**Branch:** `v1.5.26/access-code-limit` · package `1.5.26` · migration `0036`.
-Agreed with Jonny (2026-10-22): 5 wrong tries per 15 minutes, per connection,
-per invoice; no cap per invoice across connections (it would let a stranger lock
-the real client out).
-
-> Found while writing the Security page (2026-10-21). Nothing limits wrong
-> guesses at an invoice's access code, so someone with the link could keep
-> trying until one works. Agreed with Jonny as its own small item; the
-> Security page stays broad, so it needn't change.
-
-- [x] Limit wrong guesses per invoice per connection, reusing the sign-up rate
-      limit pattern (v1.5.15, migration 0034): `access_code_attempts` and
-      `take_access_code_guess` (service_role only), connection = HMAC of the IP
-      (`src/lib/client-key.ts`, now shared). Once the limit is reached every
-      guess is refused, the right one included. "Too many wrong tries. Please
-      wait 15 minutes and try again." Fails closed.
-- [x] **Found while planning:** the access cookie held the code itself, and the
-      PDF and payment-status routes accepted it, so codes could be guessed there,
-      around the form. The cookie is now a server-made fingerprint (HMAC of
-      invoice + code); a plain-code or made-up cookie opens nothing. Anyone who
-      unlocked an invoice before v1.5.26 enters the code once more.
-- [x] Tests: the limit trips, resets after the wait, and one invoice's
-      guesses don't lock another (unit tests, plus `npm run test:rls` against
-      the real test database).
-
-### ⏳ v1.5.2.13-H — Paid invoice: hide the payment QR once a txid exists (**pre-launch**)
+### ✅ v1.5.2.13-H — Paid invoice: hide the payment QR once a txid exists (**pre-launch**)
 
 **Branch:** `v1.5.27/hide-qr-after-txid` · package `1.5.27` · no migration.
 
@@ -809,20 +636,29 @@ show no payable QR and no live-recomputed BTC amount. Gate on **`btcTxid`**
 (persisted `btc_txid`), which covers both `payment_detected` and `paid`; do not
 gate on the status string alone.
 
-- [ ] In `invoice-payment-view.tsx`, when `btcTxid` is set: drop the
+- [x] In `invoice-payment-view.tsx`, when `btcTxid` is set: drop the
       `BtcQrCode`, the "BTC amount"/"at $X/BTC" block, and the copy that implies
       the client still owes. Keep the address (for reference), the transaction ID
       link, and the amount-received figures when recorded.
-- [ ] Treat it as a permanent state, not a transient one: the same rule must hold
+- [x] Treat it as a permanent state, not a transient one: the same rule must hold
       for a txid that arrives mid-session by watcher or realtime UPDATE, and for
       a paid invoice reopened later from a fresh page load.
-- [ ] Do **not** change the visibility-driven `router.refresh()` (it carries
+- [x] Do **not** change the visibility-driven `router.refresh()` (it carries
       status updates) or the amount shown on the dashboard/PDF. Display-only.
-- [ ] Tests in `invoice-payment-view.test.tsx`: no txid → QR and amount shown;
+- [x] Tests in `invoice-payment-view.test.tsx`: no txid → QR and amount shown;
       `payment_detected` with a txid → no QR; `paid` → no QR; a txid arriving via
       the realtime callback hides it in the same session.
-- [ ] Manual: pay a testnet invoice, leave the tab, return after a price move:
+- [x] Manual: pay a testnet invoice, leave the tab, return after a price move:
       the QR must not appear or change.
+
+- [x] Shipped as a "Payment detected" / "Paid" / "Underpaid" card: the address
+      for reference, the transaction link, and what arrived when recorded.
+      Wording says the bitcoin "was received to the bitcoin address for this
+      invoice", never "we received" (SatSend holds nothing). Underpaid, Jonny's
+      wording (2026-10-27): "… less than the amount requested. To resolve full
+      settlement of this invoice, reach out to [Sender]." Also fixed: a paid
+      invoice viewed while the price service is down no longer says "please
+      calculate the amount manually".
 
 **Done when:** a paid/detected invoice never renders a payment QR or a live BTC
 amount, however and whenever its page is loaded.
@@ -1059,23 +895,6 @@ payments; that is safe.
       code", the footer's GitHub link, and the Security page's "View the code"
       and "open an issue on GitHub" (v1.5.25); point the issue link at the
       repo's `/issues`. Then `/coming-soon` has no users: delete it.
-
-### ✅ v1.5.2.10-H — Licence: source available under FSL-1.1-ALv2
-
-**Branch:** `v1.5.23/fsl-licence` · package `1.5.23`.
-
-> **Decided by Jonny, 2026-10-21:** the Functional Source License, Apache 2.0
-> future licence (FSL-1.1-ALv2): the best balance between the cypherpunk ethos
-> and not letting a cloner profit from the work. Anyone may read, audit, run and
-> modify the code except to offer a competing product; each version becomes
-> Apache-2.0 two years after release. Wording: "source available", "fully
-> auditable"; never call SatSend "open source".
-
-- [x] `LICENSE.md`: the official FSL-1.1-ALv2 text, `Copyright 2026 SATSEND LLC`.
-- [x] `package.json` `"license": "FSL-1.1-ALv2"`; README Licence section.
-- [x] Homepage highlight "Fully auditable"; FAQ "Can I see SatSend's code?"
-      (links fsl.software); footer Developers: "Licence (FSL)".
-- [x] Security page wording: done in v1.5.2.4-H (v1.5.25).
 
 ### ⏳ v1.5.8-H — Form SATSEND LLC and give it the code (**pre-launch**)
 
@@ -1967,402 +1786,12 @@ The Vercel project `satsendofficial` is linked and deployed. Use this checklist 
 
 ---
 
-## Appendix A — Hardening execution detail (folded in from the former HARDENING-ROADMAP.md)
+## Appendix A — Hardening execution detail (archived)
 
-> **`ROADMAP.md` is the single source of truth for sequence.** Every item below
-> is listed there (as `v1.4.NN-H`) in the order to do it. This document holds only
-> the detailed numbered steps for each item — open the matching S-number or -H
-> version here when you start it. If this doc and `ROADMAP.md` ever disagree on
-> *what's next*, `ROADMAP.md` wins.
-
-This turns the findings in Appendix B into sequenced,
-modular work. It is written to be executed one branch at a time by a model that
-follows steps literally. **Do the phases in order.** Phase 0 and Phase 1 are
-launch-blockers and money-safety; do not deploy to mainnet or invite any user
-until they are green.
-
-## How to use this document (rules for the implementing model)
-
-1. **One version = one branch = one PR**, per the `git-workflow` skill. Branch
-   names are given per item. Never commit to `main`/`master`.
-2. **Before writing code on an item, invoke the `next-feature` planning gate**:
-   read the item, produce the plan, STOP, and wait for the user's go-ahead.
-3. **Every item ends green**: `npm run test:run` (0 failures), `npx tsc --noEmit`
-   (0 errors), `npm run lint` (0 errors). If the suite is red when you start,
-   fix Phase 0 item S0 first — do not add work on top of a red suite.
-4. **Migrations**: the next number is `max(existing) + 1`. List
-   `supabase/migrations/` and verify ordering before writing. Apply to the remote
-   with the `supabase-migrate` skill and confirm success BEFORE opening the PR.
-   Prefer `NOT VALID` + backfill + `VALIDATE CONSTRAINT` over destructive deletes.
-5. **After each merge**: bump `package.json` version to match, add the git tag
-   (`git tag -a vX.Y.Z -m "..."`), update `CHANGELOG.md`, and move the item's
-   section to `ROADMAP-ARCHIVE.md`.
-6. Each item has a **Done when** line. It is not done until that is literally true.
-
----
-
-## PHASE 0 — Stop the bleeding (launch-blockers, do first, in order)
-
-### S0 — Green the build (branch `fix/green-the-build`)
-The suite is red on `main`; nothing else can proceed safely on top of it.
-
-Steps:
-1. In `src/app/(dashboard)/invoices/actions.test.ts`, the 5 failing tests fail
-   because fixture `PUBLISHABLE_INVOICE.due_date = "2026-07-10"` is now in the
-   past. At the top of that test file, freeze time:
-   `beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-06-01T00:00:00Z")))`
-   and `afterEach(() => vi.useRealTimers())`. Confirm the 5 tests pass. (Model on
-   `payment-schedule.test.ts`, which injects a fixed `NOW` correctly.)
-2. Fix the lint error at `src/app/(dashboard)/invoices/columns.tsx:59`: give the
-   component returned by `sortableHeader` a `displayName`, or name the function.
-3. Run all three gates; all must be clean.
-
-**Done when:** `npm run test:run`, `npx tsc --noEmit`, and `npm run lint` all exit
-0 on a fresh checkout.
-
-### S1 — Close the four database exposures (branch `fix/rls-critical-exposures`)
-One migration, four fixes. This is the highest-priority item in the whole
-document. (Findings CRIT-1, CRIT-2, CRIT-3, plus the realtime re-architecture.)
-
-Steps (new migration `00XX_close_anon_exposures.sql`):
-1. `alter view invoice_email_summary set (security_invoker = on);`
-   then `revoke all on invoice_email_summary from anon;`
-2. `alter table webhook_deliveries enable row level security;` (no policies —
-   the service role bypasses RLS; the webhook handler keeps working).
-3. Replace the blanket anon policy. First drop it:
-   `drop policy "anon_select_non_draft" on invoices;`
-   Then re-architect the payer-page realtime so it no longer needs anon table
-   reads. Preferred approach: publish status changes from the server over a
-   Supabase **broadcast** channel keyed on the invoice id, from a trigger on
-   `invoices` (or from the cron/fast-path after a status write). Update
-   `src/app/invoice/[id]/use-public-invoice-realtime.ts` to subscribe to that
-   broadcast channel instead of `postgres_changes`. (If broadcast is too big a
-   step for this branch, ship steps 1-2 immediately as their own PR and do the
-   anon-policy replacement in a fast follow — but steps 1-2 must not wait.)
-4. Reduce the realtime blast radius:
-   `alter publication supabase_realtime drop table public.invoices;`
-   `alter publication supabase_realtime add table public.invoices with (publish = 'insert,update');`
-   and revert to `alter table public.invoices replica identity default;`
-   (nothing in the app reads `payload.old`; confirm with a grep for `payload.old`
-   before shipping).
-5. In `src/lib/invoice-public.ts`, stop returning `access_code` and `user_id` to
-   the client component — select explicit columns or strip them before crossing
-   the boundary.
-6. Add `import "server-only";` to the top of `src/lib/supabase/admin.ts`, and fix
-   `src/app/invoice/[id]/invoice-payment-view.tsx` to `import type { Invoice }`.
-7. Verify: with the anon key, `GET /rest/v1/invoice_email_summary?select=*`,
-   `GET /rest/v1/invoices?select=*`, and any `webhook_deliveries` read all return
-   403/empty. Run `supabase db lint` and confirm the security-definer-view and
-   rls-disabled advisors no longer fire.
-
-**Done when:** no anonymous request with the public key can read any invoice,
-summary, or webhook row; the payer page still updates live; `supabase db lint` is
-clean of those rules.
-
-### S2 — Fix payment forgery + verify amount (branch `v1.4.19/payment-amount-awareness`)
-This is CRIT-4 plus the existing roadmap item v1.4.19, which belong together —
-implement them as one branch. The v1.4.19 spec (schema, `decidePaymentOutcome`,
-tolerance band, UI, tests) is already written in `ROADMAP.md` and is good; follow
-it, and additionally:
-
-1. In `src/app/api/invoices/[id]/payment-status/route.ts`, **delete the synthetic
-   tx**. Pass the real `tx` fetched on line 62 into the scheduler so
-   `status.confirmed` comes from mempool.space, not the request body. Treat the
-   client POST purely as a "check now" hint.
-2. Persist `expected_sats` (and the price + timestamp used) on the invoice at
-   publish time, so detection has a fixed reference amount (finding M-MONEY-1).
-   This is the "snapshot the quote" work; do it here since v1.4.19 needs the
-   reference value anyway.
-3. In detection, sum the vout values paying the invoice address and require
-   `received >= expected * (1 - tolerance)` before `paid`; below that, the
-   `underpaid` status from the v1.4.19 spec.
-4. Require the access-code cookie on the payment-status route (reuse
-   `isAccessCodeValid`); return 404 otherwise.
-5. Require a confirmation-depth threshold (tip height − tx block height ≥ N)
-   before `paid`, not just `confirmed: true`.
-
-**Done when:** a POST with a real 1-sat unconfirmed tx and `status:"paid"` cannot
-move the invoice past `payment_detected`, and cannot mark it `paid`; a
-below-tolerance payment lands on `underpaid`; the amount and price used are
-persisted; all v1.4.19 tests pass plus a new regression test for the forgery
-POST.
-
-### S2.1 — Restore public invoice live updates (branch `fix/public-invoice-realtime-authorization`)
-Manual v1.4.19-H testing found that the public payer page is denied access to
-its own private broadcast channel. The client already calls `setAuth()` before
-subscribing and migrations `0022` through `0025` are applied. The remaining bug
-is the policy from `0023_broadcast_guard_and_authorization.sql`: it checks a
-`topic` field instead of the `realtime.topic()` helper that Supabase uses to
-expose the channel being authorized.
-
-Steps:
-1. Create a new migration that drops and recreates
-   `anon_select_invoice_status_broadcast` on `realtime.messages`. Keep the
-   `to anon` and `extension = 'broadcast'` restrictions, but match
-   `(select realtime.topic())` against the existing `^invoice:[0-9a-fA-F-]{36}$`
-   pattern.
-2. Keep the public client channel private and keep the existing awaited
-   `supabase.realtime.setAuth()` call. This is a database-policy correction, not
-   a reason to weaken the channel or restore anon access to `invoices`.
-3. Add a regression test for the client configuration if needed, then apply the
-   migration to the remote project before opening the PR.
-4. Manually verify with a published invoice left open in a browser. Update that
-   invoice through the service-role helper, confirm the page status changes
-   without a refresh, and confirm the browser console reports `SUBSCRIBED` with
-   no `CHANNEL_ERROR`.
-
-**Done when:** the public payer page receives its own status broadcast without a
-refresh, while anonymous database reads of `invoices` remain blocked.
-
-**Outcome:** shipped in `0026_fix_invoice_realtime_policy.sql`. Step 1 was widened
-beyond the original plan — the policy now covers `to anon, authenticated`, not
-`to anon` alone, because a signed-in owner previewing their own public link
-connects as `authenticated` and the old rule excluded them. Regression guard in
-`src/lib/realtime-policy.test.ts`.
-
-### S2.2 — One writer per database (branch `fix/environment-and-deployment-hygiene`)
-Surfaced during v1.4.19-H manual testing. Two code versions were writing to one
-database. The live production deployment (`v1.4.18/resend-webhook`, built
-2026-05-19, commit `ad677d47`) runs a cron from its own `vercel.json`
-(`"schedule": "* * * * *"`) against the same Supabase project the local dev server
-uses, with code that predates the amount-verification work. Evidence: `f94a5826`
-and `a5c3b5bf` both received a `payment_confirmed` email and reached `paid` with
-`amount_received_*` null and `overpaid` false, confirmed in the same second
-(2026-09-12 00:49:43 — one batch), while the branch's own finalisation
-(`3e4fc221`, 2026-09-11 23:49:06) recorded `amount_received_sats: 1253` and
-`btc_price_at_detection: 77170.58`.
-
-Steps:
-1. Stop the stale writer now: remove the cron from the old production deployment,
-   or delete that deployment, so no pre-fix code can mutate money state.
-2. Give local development its own database (a dedicated Supabase project or a
-   Supabase branch) so test invoices never live in production data and the
-   production cron can never touch them. Split this out only if it grows too large
-   for one PR; the guard in step 3 is the minimum.
-3. Add a single-writer guard: gate `/api/cron/payment-sweep` behind an explicit env
-   flag (e.g. `PAYMENT_SWEEP_ENABLED`) set only in the environment that should
-   sweep, so a stray or stale deployment cannot quietly run the sweep.
-4. Add a pre-merge/deploy checklist line: confirm exactly one live code version
-   targets a given database, and that production is on the current build.
-5. Document the rule in `AGENTS.md` and the manual-test template: local dev must
-   not point at the production database.
-
-**Done when:** a fresh local test invoice is never modified by any other
-environment; its `paid`/`underpaid`/`overpaid` verdict always carries amounts; and
-production is running the current branch with a single sweep owner.
-
-### S3 ✅ — Restore sub-daily detection (branch `v1.4.28/cron-strategy`)
-Decided: external scheduler on Hobby tier (CRIT-5). Also fix the schedule math.
-
-**Implemented (v1.4.28-H):** GitHub Actions workflow (`*/5 * * * *`) + a time-based
-schedule anchored on `published_at` (pre-mempool) / `mempool_seen_at` (post-mempool)
-+ the `published_at` column (migration `0028`) + sweep `.order`/`overdue`/drain/
-`maxDuration`. Live end-to-end check is post-merge (the workflow and the
-`CRON_SECRET` Actions secret only exist on `main`).
-
-Steps:
-1. Keep `vercel.json` — but leave a comment that the daily entry is a Hobby-tier
-   placeholder and the real cadence is external.
-2. Add a GitHub Actions workflow `.github/workflows/payment-sweep.yml` on
-   `schedule: - cron: "* * * * *"` (GitHub's minimum effective cadence is ~5 min;
-   accept that, or use cron-job.org for true 1-min) that does
-   `curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://<prod-domain>/api/cron/payment-sweep`.
-   Add `CRON_SECRET` to the repo's Actions secrets.
-3. In `payment-schedule.ts`, make the schedule **time-based, not attempt-count
-   based**: derive the current stage from elapsed time since publish (pre-mempool)
-   or since `mempool_seen_at` (post-mempool), so a missed or sparse tick doesn't
-   burn a stage. Keep the same delay tables as the boundaries.
-4. In the sweep route, add `.order("next_check_at", { ascending: true })`, include
-   `overdue` in the status filter (M-DB-2), loop until the due queue drains
-   (paginate past `BATCH_SIZE`), and add `export const maxDuration = 60`.
-5. Update the route header comment, the README latency claims, and the v1.4.1
-   roadmap note to describe the external-cron reality.
-
-**Done when:** an abandoned testnet invoice (payer closes the tab) transitions
-`pending → payment_detected → paid` within minutes via the external scheduler,
-with no dependence on `stage_attempt` exhaustion, and overdue invoices still get
-checked.
-
-### S4 — DB defends money state (branch `fix/db-money-invariants`)
-Findings H-DB-1, H-DB-2. One migration.
-
-Steps (new migration, add constraints `NOT VALID` then validate):
-1. `amounts_non_negative` (subtotal/tax/total ≥ 0); `tax_percent_range` (0-100);
-   `currency_whitelist` (start `('USD')`, widen when v2.12 lands);
-   `totals_consistent` (`total_fiat = round(subtotal_fiat + tax_fiat, 2)`).
-2. `line_items` shape: an `immutable` helper function `line_items_valid(jsonb)`
-   asserting array-of-objects with numeric `quantity`/`unit_price`, wired into a
-   CHECK.
-3. Immutability trigger: block UPDATE of `total_fiat`/`subtotal_fiat`/`tax_fiat`/
-   `line_items`/`currency`/`btc_address` when `old.status in ('paid','payment_detected')`.
-4. Delete-guard trigger: `raise exception` on DELETE when `old.status <> 'draft'`.
-5. Add a status guard to `bulkDelete` in
-   `src/app/(dashboard)/invoices/bulk-actions.ts` (draft-only) so the UI matches.
-6. Reconcile any existing rows that would violate the new constraints *before*
-   `VALIDATE` — report them, don't blind-delete (contrast the 0018-0020 pattern).
-
-**Done when:** a PATCH to a paid invoice's `total_fiat` is rejected by the DB, a
-non-draft delete is rejected, and negative/ inconsistent amounts cannot be
-written.
-
-**End of Phase 0 = safe to run on mainnet and invite users.** Before flipping
-`NEXT_PUBLIC_BTC_NETWORK=mainnet`, do the outstanding **mainnet dry-run** (publish
-an invoice to a real receive address, pay a small real amount, confirm the full
-`pending → payment_detected → paid` flow through the external cron) — this has
-never succeeded and is the single highest-risk unverified path.
-
----
-
-## PHASE 1 — Correctness and hygiene (before real volume)
-
-Order within the phase is flexible; each is its own branch.
-
-- **v1.4.x/detection-robustness** — M-DB-1 (cron CAS `.select("id")` + skip side
-  effects on empty; optional unique index on `email_events`), M-DB-3 (`markUnpaid`
-  / `bulkUnarchive` reset schedule columns + clear `btc_txid`), remainder of
-  M-MONEY-2 (the client-crash / dead-poll-loop half already shipped 2026-07-27 —
-  `fetchAddressTxs` now try/catches and returns `[]`; still needed here: give the
-  cron a way to tell "mempool.space is down" apart from "no tx yet" so an outage
-  doesn't burn a `stage_attempt`, plus `AbortSignal.timeout`. See the M-MONEY-2
-  update in Appendix B),
-  M-MONEY-3 (pick confirmed-then-unconfirmed tx), M-MONEY-5 (freshness fails
-  closed). Also the mempool.space client WebSocket in `payment-watcher.tsx` never
-  reconnects after a close/error (its `onclose` is an intentional no-op), so the
-  fastest detection path dies for the rest of the page load once mempool.space
-  drops the socket — add bounded reconnect/backoff. And the M-MONEY-4 remainder:
-  a seen tx that disappears (RBF/eviction) leaves the invoice stuck in
-  `payment_detected`; add a bounded revert-to-pending. Bundle these — they all
-  touch the detection path.
-- **v1.4.x/rls-and-indexes** — M-DB-4 (`pre_archive_status` → enum + CHECK),
-  M-DB-5 (enumerate the view's columns), M-DB-6 (`user_id` index + wrap
-  `auth.uid()`), M-DB-7 (webhook dedupe: `23505`-only + retention sweep),
-  `email_events.updated_at` trigger, `(user_id, invoice_number)` uniqueness.
-- **fix/proxy-and-boundaries** — H-FE-2 (`proxyConfig` → `config`), H-FE-4 (root
-  `error.tsx` + `not-found.tsx`, dashboard/invoice `loading.tsx`), M-FE-4 (proxy
-  `getSession` → `getUser`), M-FE-5 (security headers in `next.config.ts`).
-- **fix/public-endpoint-hardening** — H-SEC-1 (access-code check on the public PDF
-  route), M-FE-6 (cap `line_items` length, cache PDF by `updated_at`), the
-  `btc-price` currency allowlist, `timingSafeEqual` for `CRON_SECRET`, `secure`
-  cookie flag.
-- **fix/rate-limiting** — H-SEC-2 + H-SEC-3 + M-FE-6 abuse surface. Vercel WAF
-  rate-limit rules give immediate coverage with no code (access-code verify, email
-  send, PDF route); add server-side `client_email` validation and a per-user daily
-  send cap; enforce a minimum access-code length and store a hash.
-
----
-
-## PHASE 2 — Structural single-sources-of-truth (pays for itself over time)
-
-- **A-1: Generate Supabase types** (branch `chore/supabase-types`). H-FE-5. Run
-  `supabase gen types typescript` into `src/lib/database.types.ts`, thread the
-  `Database` generic through `server.ts`/`client.ts`/`admin.ts`, derive the
-  `Invoice`/`InvoiceRow` types from it, delete the hand-declared duplicates. Add a
-  hook/CI step so the file regenerates on migration change.
-- **A-2: Adopt Zod + typed action results** (branch `refactor/zod-validation`).
-  H-FE-3, M-FE-2. Introduce one `invoiceSchema` in `src/lib/invoices/schema.ts`
-  imported by both `invoice-form.tsx` and the server actions; convert action
-  validation errors from thrown strings to `{ ok: false, field, message }` return
-  values; collapse the form's three parallel arrays into one `LineItemState[]`.
-- **A-3: Unify realtime + styling sources of truth** (branch
-  `refactor/realtime-and-styling`). M-FE-3 (one `useInvoiceChannel` hook with
-  bounded resubscribe on terminal states), M-MONEY-4 partial (document reorg risk),
-  and pick one color source of truth (derive `brand-colors.ts` from the CSS tokens
-  or add a test that parses `globals.css`). Do the styling half opportunistically
-  during v1.5.
-- **A-4: Integration test layer** (branch `test/supabase-integration`). M-FE-1,
-  H-FE (PRD promise). Stand up the promised integration suite against a real
-  Supabase test instance, starting with address-uniqueness (H-DB-3) and status
-  transitions — exactly where the chain mocks are weakest. Fix H-DB-3 here (the
-  `security definer` boolean RPC + `23505` catch for a friendly message).
-
----
-
-## PHASE 3 — Product roadmap resumes
-
-Once Phase 0-1 are green, resume the existing `ROADMAP.md` queue. The remaining
-UX/feature items (v1.4.20 auto-overdue emails, v1.4.21 watcher dedup, v1.4.22
-activity feed, v1.4.23 marketing landing page [launch-blocking; now v1.5.2-H], v1.4.24 row-action
-availability, v1.4.25 duplicate cleanup, v1.4.26/27 email rework, then v1.5 design
-system, v1.6 BTC discount, v1.7 address fields) are well-specified and unchanged by
-this audit — proceed with them as written. v1.4.19 and v1.4.28 are absorbed into
-Phase 0 above (S2, S3); mark them done there. The v2 growth block stays deferred.
-
----
-
-## Roadmap & docs restructure (do alongside Phase 0)
-
-1. **Split ROADMAP.md** (M-PROC-1). Move every ✅ section (v1.0 through v1.4.18,
-   ~lines 20-1370) into a new `development/ROADMAP-ARCHIVE.md` verbatim. Leave in
-   `ROADMAP.md`: the legend, a ~15-line "shipped so far" index table (version /
-   one-line / PR# / date), the 🔄 and ⏳ sections in full, v1.5-v1.7, the v2 block,
-   Notes, and the Pre-deployment Checklist. Target: comfortably under 2000 lines
-   (the original "< 500" predated the hardening train). `next-feature` reads only
-   `ROADMAP.md` (open items stay there).
-2. **Fix stale markers** (M-PROC-3): flip v1.4.14.1/.2/.3 to ✅; tick the
-   done-but-unchecked test boxes in merged sections.
-3. **One tracker for outstanding verifications** (M-PROC-2): new
-   `development/OUTSTANDING-VERIFICATIONS.md` listing the mainnet dry-run (launch
-   blocker), v1.4.18 TESTS 3/6/7, and the Resend-webhook prod config, each with
-   status and blocking-for. Add a `manual-tests/README.md` index.
-4. **Banner PRD.md** (M-PROC-4) as historical/superseded; finish the rename
-   (M-PROC-5) in PRD.md and the one live ROADMAP line. _(PRD part done
-   2026-10-06: renamed, bannered, archived to `development/archive/PRD.md`.)_
-   Still to do: extend `rename-to-satsend.test.ts` to cover `development/`.
-5. **Add `.env.example`** at root (and `!.env.example` to `.gitignore`) with every
-   var one-line-commented: `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
-   `EMAIL_FROM`, `CRON_SECRET`, `RESEND_WEBHOOK_SECRET`, `NEXT_PUBLIC_BTC_NETWORK`
-   (flag this one — the mainnet detection failure was caused by it pointing at
-   testnet), and the site-URL var.
-6. **Fix version identity** (H-PROC-1): set `package.json` to the current version
-   (`1.4.32` as of this revision — not the stale `1.4.18`), backfill a `v1.4.18`
-   tag on merge commit `6af7c73`, and add "bump + tag on merge" to the git-workflow
-   skill.
-7. **Repo hygiene**: `.DS_Store` was already untracked (nothing to do); prune
-   merged feature branches; note preserved-WIP branches in ROADMAP Notes. **Do NOT
-   delete `master`** — it is an unrelated history (no merge-base with `main`, ~383
-   commits that exist nowhere else). Optionally rename it `archive/pre-restart`.
-
----
-
-## Claude Code workflow: recommended new hooks & skills
-
-The current setup is good (the `next-feature` planning gate and the migration
-nudge are the right instincts). For a solo dev shipping a money app with a weaker
-model, add these — they convert "the model remembered" into "the harness
-enforced."
-
-**Hooks** (in `.claude/settings.json`):
-1. **test-must-pass gate on `git commit`** — block/warn unless `npm run test:run`
-   and `npx tsc --noEmit` exited 0 since the last edit. Highest value; the entire
-   quality gate is currently the model remembering to run tests.
-2. **typecheck-on-Stop** — run `npx tsc --noEmit` on Stop and surface failures, so
-   a session never ends green-looking with a broken build.
-3. **version-sync on `gh pr create`** — verify `CHANGELOG.md` has the branch's
-   version and `package.json` matches. Closes H-PROC-1 permanently.
-4. **roadmap-size tripwire** — warn when `ROADMAP.md` exceeds ~160KB (not the
-   original 40KB, which — like the "< 500 lines" target — predated the hardening
-   train; the live file is ~152KB), so the archive discipline self-enforces.
-
-**Skills**:
-5. **pre-merge-verification** — run the full gate (tests, typecheck, lint, the
-   rename guard, grep for stray `console.log`/`.only`, CHANGELOG entry present,
-   manual-test doc exists) and emit a pass/fail table before every `gh pr create`.
-6. **migration-safety** — codify the 0018/0019 lessons: next number = max+1,
-   `NOT VALID` + validate over destructive delete, apply-to-remote-before-PR,
-   view drop/recreate for `select *` dependents. (The existing migration nudge can
-   trigger it.)
-7. **deploy-checklist** — walk the launch checklist + `vercel env` mirror, confirm
-   the external cron fired, confirm the webhook endpoint is live, before any prod
-   promote.
-
-Also: shrink the two overlapping items — have `write-a-prd` invoke `grill-me`
-rather than restating it — and put a 20-30 line project brief in `CLAUDE.md`/
-`AGENTS.md` (run `npm run test:run` + `npx tsc` before any commit; migrations
-applied to remote before PR; versions come from `ROADMAP.md`; never touch main).
-Keep it short — don't recreate the roadmap context problem.
-
----
+> The step-by-step detail for the 2026-07 hardening train (Phases 0 to 2, all
+> done) was moved verbatim to [`ROADMAP-ARCHIVE.md`](./ROADMAP-ARCHIVE.md) on
+> 2026-10-27, under "Appendix A (archived 2026-10-27)". Appendix B below still
+> holds the findings reference.
 
 ## Appendix B — Findings reference (folded in from the former ARCHITECTURE-AUDIT-2026-07.md)
 

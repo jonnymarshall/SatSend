@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.27 — No payable QR once an invoice is paid (roadmap v1.5.2.13-H).** Once
+  a payment exists (a transaction ID, or a detected / paid / underpaid status),
+  the public invoice shows a "Payment detected", "Paid" or "Underpaid" card with
+  the address, the transaction link and what arrived, instead of a QR code and
+  a live bitcoin amount that changed with the price. The underpaid wording
+  points the client to the sender to settle the rest. A paid invoice no longer
+  asks for a manual amount when the price service is down.
+- Roadmap housekeeping: finished v1.5.2 sections and Appendix A moved to
+  `ROADMAP-ARCHIVE.md`.
+
 ### Docs
 
 - **Roadmap: legal and compliance train (pre-launch).** Terms (v1.5.2.8-H) and

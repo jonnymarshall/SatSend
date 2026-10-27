@@ -19,6 +19,17 @@ function isPayableStatus(s: PublicInvoice["status"]): boolean {
   return s === "pending" || s === "overdue";
 }
 
+// v1.5.27 (roadmap v1.5.2.13-H): once a payment exists the invoice can't be paid
+// again, so the page shows no QR and no live BTC amount. Keyed on the txid (from
+// the server, the watcher or realtime), with the paid statuses as a backstop.
+function hasPayment(s: PublicInvoice["status"], txid: string | null): boolean {
+  return !!txid || s === "payment_detected" || s === "paid" || s === "underpaid";
+}
+
+function satsToBtc(sats: number): string {
+  return (sats / 100_000_000).toFixed(8).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
 interface Props {
   invoice: PublicInvoice;
   btcPrice: number | null;
@@ -59,7 +70,8 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   // detected/paid), so the txid link is visible without an extra click.
   const showPaymentDetails = userRevealedPayment || !isPayableStatus(status);
   const cur = invoice.currency;
-  const showBtc = !!invoice.btc_address && !!btcPrice;
+  const paymentMade = !!invoice.btc_address && hasPayment(status, btcTxid);
+  const showBtc = !!invoice.btc_address && !!btcPrice && !paymentMade;
   const btcAmount = showBtc ? fiatToBtc(invoice.total_fiat, btcPrice!) : null;
   const btcAmountDisplay = btcAmount !== null
     ? btcAmount.toFixed(8).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
@@ -217,20 +229,6 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                       <CopyButton text={invoice.btc_address!} label="Copy BTC address" />
                     </div>
                   </div>
-                  {btcTxid && (
-                    <div className="space-y-1">
-                      <p className={label}>Transaction ID</p>
-                      <a
-                        id="invoice-view--btc-txid"
-                        href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`block py-1.5 text-sm ${txLink}`}
-                      >
-                        {btcTxid}
-                      </a>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
@@ -259,31 +257,97 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
           </p>
         )}
 
-        {invoice.btc_address && !btcPrice && (
+        {paymentMade && (
+          <PaymentReceived invoice={invoice} status={status} btcTxid={btcTxid} label={label} txLink={txLink} />
+        )}
+
+        {invoice.btc_address && !btcPrice && !paymentMade && (
           <Card id="invoice-view--btc-price-error" className="space-y-2">
             <h2 className="font-display tracking-heading text-xl font-semibold">Pay with Bitcoin</h2>
             <p className="text-sm text-(--color-text-secondary)">
               Bitcoin address: <span className="font-mono text-sm break-all text-(--color-ink)">{invoice.btc_address}</span>
             </p>
             <p className="text-sm text-(--color-text-secondary)">BTC price unavailable — please calculate the amount manually.</p>
-            {btcTxid && (
-              <p className="text-sm text-(--color-text-secondary)">
-                Transaction:{" "}
-                <a
-                  id="invoice-view--btc-txid-fallback"
-                  href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={txLink}
-                >
-                  {btcTxid}
-                </a>
-              </p>
-            )}
           </Card>
         )}
 
       </div>
     </main>
+  );
+}
+
+/**
+ * What the payer sees once a payment exists (v1.5.27): no QR, no live amount.
+ * Wording says the bitcoin arrived at the invoice's address, never that SatSend
+ * ("we") received it: SatSend never holds funds (Jonny, 2026-10-27).
+ */
+function PaymentReceived({
+  invoice,
+  status,
+  btcTxid,
+  label,
+  txLink,
+}: {
+  invoice: PublicInvoice;
+  status: PublicInvoice["status"];
+  btcTxid: string | null;
+  label: string;
+  txLink: string;
+}) {
+  const cur = invoice.currency;
+  const sats = invoice.amount_received_sats;
+  const received =
+    sats !== null
+      ? `${satsToBtc(sats)} BTC${invoice.amount_received_fiat !== null ? ` (${fmtCurrency(invoice.amount_received_fiat, cur)})` : ""}`
+      : null;
+  const sender = invoice.your_company || invoice.your_name || "the sender of this invoice";
+  // An archived invoice reads as whatever it was before archiving.
+  const shown = status === "archived" ? (invoice.pre_archive_status ?? status) : status;
+
+  let heading: string;
+  let message: string;
+  if (shown === "underpaid") {
+    heading = "Underpaid";
+    message = received
+      ? `${received} was received to the bitcoin address for this invoice, less than the amount requested. To resolve full settlement of this invoice, reach out to ${sender}.`
+      : `Less than the amount requested was received to the bitcoin address for this invoice. To resolve full settlement of this invoice, reach out to ${sender}.`;
+  } else if (shown === "paid" || shown === "archived") {
+    heading = "Paid";
+    message = received
+      ? `${received} was received to the bitcoin address for this invoice.`
+      : "Payment was received to the bitcoin address for this invoice.";
+  } else {
+    heading = "Payment detected";
+    message =
+      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
+  }
+
+  return (
+    <Card id="invoice-view--payment-received" className="space-y-5">
+      <h2 id="invoice-view--payment-received-heading" className="font-display tracking-heading text-xl font-semibold">
+        {heading}
+      </h2>
+      <p id="invoice-view--payment-received-message" className="text-[15px] leading-[1.55] text-(--color-text-secondary)">
+        {message}
+      </p>
+      <div className="space-y-1">
+        <p className={label}>Address</p>
+        <p id="invoice-view--paid-address" className="min-w-0 font-mono text-sm break-all">{invoice.btc_address}</p>
+      </div>
+      {btcTxid && (
+        <div className="space-y-1">
+          <p className={label}>Transaction ID</p>
+          <a
+            id="invoice-view--btc-txid"
+            href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block py-1.5 text-sm ${txLink}`}
+          >
+            {btcTxid}
+          </a>
+        </div>
+      )}
+    </Card>
   );
 }
