@@ -773,6 +773,50 @@ the real client out).
       guesses don't lock another (unit tests, plus `npm run test:rls` against
       the real test database).
 
+### ⏳ v1.5.2.13-H — Paid invoice: hide the payment QR once a txid exists (**pre-launch**)
+
+**Branch:** `v1.5.27/hide-qr-after-txid` · package `1.5.27` · no migration.
+
+> **Jonny, 2026-10-26:** paid an invoice, left the tab open, and when he came
+> back the QR code had changed. Confirmed in the code, and it still happens after
+> payment.
+>
+> **Cause.** Returning to the tab fires `router.refresh()` on every visibility
+> change (`src/lib/realtime/use-invoice-channel.ts:62`, not gated on payment
+> state). The public page re-fetches the live BTC price on each render
+> (`src/app/invoice/[id]/page.tsx:26-33`; `src/lib/btc-price.ts` caches it for
+> 60s), the view recomputes `btcAmount` and `bip21Uri` from `total_fiat` and the
+> new price (`invoice-payment-view.tsx:62-73`), and `BtcQrCode` re-encodes
+> whenever the URI changes (`src/components/btc-qr-code.tsx:14-28`). A paid
+> invoice auto-reveals the BTC block (`invoice-payment-view.tsx:60`), so it keeps
+> showing a fresh, payable-looking amount and QR for an invoice that is already
+> paid.
+
+**Decision:** once a transaction exists, this invoice cannot be paid again, so
+show no payable QR and no live-recomputed BTC amount. Gate on **`btcTxid`**
+(persisted `btc_txid`), which covers both `payment_detected` and `paid`; do not
+gate on the status string alone.
+
+- [ ] In `invoice-payment-view.tsx`, when `btcTxid` is set: drop the
+      `BtcQrCode`, the "BTC amount"/"at $X/BTC" block, and the copy that implies
+      the client still owes. Keep the address (for reference), the transaction ID
+      link, and the amount-received figures when recorded.
+- [ ] Treat it as a permanent state, not a transient one: the same rule must hold
+      for a txid that arrives mid-session by watcher or realtime UPDATE, and for
+      a paid invoice reopened later from a fresh page load.
+- [ ] Do **not** change the visibility-driven `router.refresh()` (it carries
+      status updates) or the amount shown on the dashboard/PDF. Display-only.
+- [ ] Tests in `invoice-payment-view.test.tsx`: no txid → QR and amount shown;
+      `payment_detected` with a txid → no QR; `paid` → no QR; a txid arriving via
+      the realtime callback hides it in the same session.
+- [ ] Manual: pay a testnet invoice, leave the tab, return after a price move:
+      the QR must not appear or change.
+
+**Done when:** a paid/detected invoice never renders a payment QR or a live BTC
+amount, however and whenever its page is loaded.
+
+---
+
 ### ⏳ v1.5.2.5-H — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
 
@@ -845,6 +889,169 @@ the real client out).
 ### ⏳ v1.5.2.11-H — Phones: invoice list as stacked rows
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
       instead of sideways scrolling. A layout change, so it needs Jonny's decision.
+
+### ⏳ v1.5.2.14-H: Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
+
+**Branch:** `v1.5.28/short-invoice-reference` · package `1.5.28` · new migration
+(next free number, `0037` at time of writing). Renumber the package if another
+item ships between this plan and the branch.
+
+**Context.** Two linked requests from Jonny (2026-10-26):
+
+1. **Shorter links.** The public invoice URL exposes a 36-character UUID
+   (`.../invoice/d646495a-bae1-4a8d-9e23-a82731cd7d20`). It should use the
+   shortest unique alphanumeric identifier we can safely issue, so the link is
+   easy to read, type and share.
+2. **Show it everywhere.** The same identifier should appear on the invoice
+   itself for both the owner and the client, and in every invoice email and
+   PDF, so either side can quote it instead of the owner's own invoice number
+   (which is often unpredictable or inconsistent between suppliers).
+
+**Approach.** Add a public **reference** to each invoice and keep the UUID as
+the internal primary key. The UUID stays behind the scenes (foreign keys,
+`invoice_events`, `email_events`, realtime channels, logs); every client-facing
+surface swaps the UUID for the reference. This gives the short URL and the
+short printed ID without rewriting every foreign key and realtime channel.
+
+> **Why not make the short string the primary key?** It would ripple through
+> every foreign key, event table, realtime policy and later the API, and any
+> future reference change would become a data migration. A unique indexed
+> column achieves the same visible result with a much smaller blast radius. If
+> the actual primary key must change, treat that as a separate, larger item.
+
+**Decision needed before implementation: the label.** "Invoice ID" is out: it
+is the exact collision with the owner's invoice number that this item is meant
+to remove. Options used in industry:
+
+| Label | Notes |
+|---|---|
+| **SatSend reference** | Names the issuer, so it cannot be mistaken for the owner's invoice number or the client's own reference or PO. **Recommended.** |
+| **Reference** / **Invoice reference** | The standard accounting term, but accounting software often uses "Reference" for the client's PO or buyer reference, so it can still collide. Good as shorthand once the context is clearly SatSend. |
+| **SatSend ID** | Makes ownership clear, but "ID" reads technical. |
+| **Reference number** | Explicit but wordier than "Reference". |
+| **Payment reference** | Banking language; risks confusion with the Bitcoin transaction ID. Avoid. |
+| **Invoice ID** | Avoid, for the collision above. |
+
+Pick one label and use it verbatim on the owner page, the client page, the
+PDF, every email, the dashboard list, support copy and the later API field.
+Where both numbers appear together, label them distinctly (for example
+"Invoice number" for the owner's own number and "SatSend reference" for ours)
+so a client cannot mix them up.
+
+**Part A: short reference and short links**
+
+- [ ] **Migration.** Add `invoices.reference text`, nullable at first; backfill
+      every existing row; then add a global unique index and `not null`. New
+      invoices get a reference at creation. Do not remove or rewrite `id`.
+- [ ] **Format.** Fixed-length uppercase Crockford base32. The alphabet leaves
+      out `I`, `L`, `O` and `U`, so it cannot be misread as `1` or `0` when
+      read aloud or copied by hand. **Recommended 8 characters** (about 40
+      bits): short enough to read aloud, long enough that collisions stay rare
+      with a unique index and retry. Six characters (about 30 bits) is the
+      practical floor: it still gives roughly a billion combinations, but the
+      collision rate and the enumeration rate both rise, so use it only if
+      link length matters more than those margins. Confirm 8 versus 10 during
+      planning; do not go below 8 without measuring the retry rate.
+- [ ] **Generation.** Server-side from `crypto.randomBytes`, retrying on a
+      `23505` unique violation. Do not derive it from the UUID or from an
+      increasing counter: that would leak invoice volume and make references
+      predictable.
+- [ ] **Resolver.** One helper (extend `fetchPublicInvoice` or add
+      `fetchInvoiceByIdOrReference`) that matches `reference` first and falls
+      back to `id`. Uppercase the input before lookup, so a hand-typed
+      lowercase reference still works. Every public route uses it:
+      `/invoice/[ref]`, `/api/invoice/[ref]/pdf` and
+      `/api/invoices/[ref]/payment-status`. UUID links already in clients'
+      inboxes keep working; no redirect is needed.
+- [ ] **Access cookie.** Resolve to the invoice's UUID before reading or
+      writing `accessCookieName`, so an invoice unlocked through an old UUID
+      link stays unlocked on the new short link, and the other way round.
+- [ ] **Realtime.** Keep the channel keyed on the UUID, not the reference, so
+      the existing subscriptions and broadcast policy do not change.
+- [ ] **Link builders.** Build new public invoice links from the reference in
+      `src/lib/email/send.ts` and the public PDF route. Pass the reference into
+      the email context instead of reusing `invoiceId` for the URL. The
+      dashboard URL may stay UUID-based (it is not shared with clients); still
+      show the reference there. Decide in the PR whether to switch dashboard
+      URLs too, for consistency.
+- [ ] **PDF filename.** Replace the `...${id.slice(-8)}` fallback in
+      `src/lib/invoices/pdf-filename.ts` with the reference, so an invoice
+      without a number still saves with a readable name.
+
+**Part B: show it on every surface**
+
+- [ ] **Owner invoice page** (`/invoices/[id]`): a labelled reference with a
+      copy button, next to the owner's invoice number.
+- [ ] **Client payment page** (`/invoice/[ref]`): the same label and reference
+      near the heading, quiet enough not to compete with the amount due.
+- [ ] **PDF** (`src/lib/invoices/invoice-pdf.tsx`): print it in the header or
+      meta block alongside, not instead of, the owner's invoice number.
+- [ ] **Emails.** Add the reference to every invoice template that names the
+      invoice: `invoice_published`, `payment_detected_owner`,
+      `payment_detected_payer`, `payment_confirmed_owner`,
+      `payment_confirmed_payer`, and the overdue templates when v1.4.20 lands.
+      Use one shared row/component so the label and formatting cannot drift.
+      Keep the subject line as it is unless testing shows the reference reads
+      better there; do not make the subject longer.
+- [ ] **Invoice list** (`/invoices`): show it in the row, either as a column or
+      under the invoice number. Optional for this item; the required surfaces
+      are the two invoice pages, the emails and the PDF.
+- [ ] **Copy affordance.** One click copies the bare reference (no prefix, no
+      URL) and shows the existing "Link copied"-style notice.
+- [ ] **Docs.** Update `README.md` and any docs that describe the invoice URL
+      shape.
+
+**Security note.** The reference is an identifier, not a secret. Shortening
+it from a UUID raises the theoretical chance of someone finding an invoice by
+trying references. That is acceptable: private invoices still require the
+access code, wrong guesses are rate-limited (v1.5.2.12-H), and invoices
+without a code are already public by link. Do not weaken either control to
+compensate. At 8 characters with the existing 30 requests per 60 seconds per
+IP limit, enumeration is not practical.
+
+**Tests**
+
+- [ ] Format: every generated reference has the agreed length, uses only the
+      Crockford alphabet and is uppercase.
+- [ ] Uniqueness: the unique index rejects a duplicate, and the generator
+      retries with a different value.
+- [ ] Backfill: every existing invoice has a non-null reference and no two
+      share one (test database first; production at merge).
+- [ ] New invoice links in emails contain the reference, not the UUID; the
+      public PDF route builds from the reference.
+- [ ] The resolver accepts both forms; an old UUID link opens the same invoice
+      and the access unlock carries across.
+- [ ] Owner page, client page, PDF and each email template render the agreed
+      label and the reference.
+- [ ] Old UUID links keep working after the migration (regression guard).
+- [ ] The copy button writes the bare reference to the clipboard.
+
+**Manual verification**
+
+- [ ] Create and send a test invoice: the email link is short, opens the
+      invoice, and the same reference appears on the page and in the PDF.
+- [ ] Open an invoice using its old UUID link; it still works.
+- [ ] Enter the access code through the old link, then open the new short
+      link; no second code is asked.
+- [ ] Download the PDF with no invoice number set; the filename contains the
+      reference.
+
+**Out of scope**
+
+- Replacing the UUID primary key or changing foreign keys.
+- Sequential or owner-customisable reference numbers; this is an opaque
+  identifier, not a numbering scheme.
+- Replacing the owner's invoice number. The two coexist, and the owner keeps
+  control of their own number.
+- Pretty links (v2.1) and client pages (v2.3). They should consume the
+  reference once it exists, but they are separate items.
+- API changes (v2.8). The API can accept and return the reference when it is
+  built.
+
+**Done when:** every new invoice has a short, unique, human-readable
+reference; every client-facing link, the owner page, the client page, every
+invoice email and the PDF show it under one agreed label; old UUID links still
+resolve; and no UUID appears in a URL or document a client sees.
 
 ### ⏳ v1.5.3-H — Multi-currency support (moved from v2.12; **pre-launch**)
 
