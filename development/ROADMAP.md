@@ -520,7 +520,7 @@ The list already has one example of the right pattern: **"Send via email"** is g
 
 ---
 
-### ⏳ v1.4.34: Legal & Compliance Bundle (pre-launch, non-urgent)
+### ⏳ v1.4.34 — Legal & Compliance Bundle (pre-launch, non-urgent)
 
 **Branch:** `v1.4.34/legal-compliance-bundle`
 
@@ -560,6 +560,18 @@ are all compliance-shaped and each is individually too small for its own PR.
    DMCA agent with the US Copyright Office (filing fee is currently $6), then add
    the agent name and contact details to the site's copyright/terms page and a
    new `/dmca` policy page.
+
+**Status (2026-10-27, legal and compliance train):**
+- Item 1 (age gate) **moved to v1.5.2.15-H**, combined with agreeing to the
+  Terms at sign-up.
+- Item 2 (fonts) is **probably already met**: `next/font/google` downloads the
+  fonts at build time and serves them from satsend.me. Confirm with a network
+  check (no request to fonts.googleapis.com or fonts.gstatic.com), then tick.
+- Item 3 (session replay): **no analytics or replay tools are loaded**, so close
+  as not applicable once confirmed in the browser.
+- Item 4: also needs **opt-in consent** for marketing emails (UK/EU rules),
+  recorded with a date, not just an unsubscribe link.
+- Item 5 is covered by v1.5.4-H (card payments).
 
 **Notes**
 - Items 4 and 5 depend on surfaces that do not exist yet (marketing email, the
@@ -817,19 +829,223 @@ amount, however and whenever its page is loaded.
 
 ---
 
+## Legal and compliance train (**pre-launch**, next after v1.5.2.13-H)
+
+> **Jonny, 2026-10-27:** "I want to make sure I am maximally covered for legal
+> compliance", with a dedicated Terms page and a Legal page, advanced to the
+> soonest reasonable opportunity. Sources: a conversation with Gemini about
+> non-custodial bitcoin invoicing, two short videos on launch security and
+> compliance, and what Claude knows of the codebase. Claude drafts; **none of it
+> is legal advice**, and a qualified lawyer reviews Terms and Privacy before Pro
+> takes money (in v1.5.2.8-H).
+>
+> Already covered elsewhere, so not repeated here: row level security on every
+> table (v1.4.29-H; Supabase's advisor shows none missing), sessions in cookies
+> not localStorage (`@supabase/ssr`), no admin role anywhere in the client, no
+> passwords (email links only), rate limits on sign-up checks and access codes
+> (v1.5.15, v1.5.26). Already queued in v1.4.34: marketing-email unsubscribe
+> and postal address, renewal terms, DMCA agent. Not applicable: SMS consent
+> (SatSend sends no texts), password rules (no passwords).
+
+**Compliance guardrails (never build without legal review first).** SatSend
+stays a software provider, not a money transmitter, as long as it never touches
+users' money. So, without a lawyer's sign-off, never build: holding or passing
+on funds (even briefly), balances or wallets on SatSend, escrow, taking a fee
+or percentage out of a payment, swapping currencies for users, or custodial
+Lightning (any future Lightning support pays to the user's own node or
+provider). Pro is a flat subscription paid to SatSend, kept apart from users'
+payments; that is safe.
+
+### ⏳ v1.5.2.8-H — Terms of service (`/terms`) (**pre-launch**, moved up)
+
+> Was a one-line placeholder. **Must be live before Pro**, ideally before launch.
+
+- [ ] **Inputs from Jonny before drafting:** operator name (SATSEND LLC once
+      formed, v1.5.8-H) and registered address; governing law and courts; legal
+      and support email; minimum age (recommend **18**, as a business tool);
+      which countries SatSend serves.
+- [ ] **What SatSend is:** invoicing software on a flat subscription. Not a
+      bank, payment processor, money transmitter, escrow agent, exchange or
+      financial adviser. Never holds, receives, sends or routes funds; clients
+      pay the user's own address directly.
+- [ ] **The user's responsibilities:** the receiving address is theirs and
+      correct; they keep their own keys; bitcoin payments can't be reversed;
+      SatSend can't recover funds sent to a wrong address, wrong network or
+      lost wallet.
+- [ ] **Exchange rates:** the bitcoin amount uses outside price feeds at the
+      moment the invoice is viewed; prices move; the 5% tolerance rule and what
+      Underpaid / Overpaid mean; no guarantee the rate is exact.
+- [ ] **Payment tracking:** statuses come from outside blockchain services
+      (mempool.space), may be late or wrong, and "Paid" is information, not a
+      guarantee; check your own wallet. No liability for outages of outside
+      services.
+- [ ] **Taxes and compliance are the user's:** sales tax / VAT on their
+      invoices, income tax, any licences. SatSend gives no tax, legal or
+      financial advice.
+- [ ] **Acceptable use:** no illegal goods or services, fraud, impersonating
+      another person or company, phishing, spam, or sanctioned people and
+      places. SatSend may suspend invoices or accounts that break this
+      (v1.5.2.16-H builds the tools).
+- [ ] **Pro:** price; monthly/yearly; card renews until turned off, bitcoin
+      doesn't; cancelling; refunds within 15 days for card and bitcoin (and how
+      a bitcoin refund is valued: the dollar amount paid, at the rate on the day
+      of the refund); fair-use limit (500 saved clients); price changes with
+      notice; what happens when Pro ends (v1.5.6-H).
+- [ ] **The usual protections:** service "as is"; no warranty of uptime;
+      liability capped (e.g. to fees paid in the last 12 months); user
+      indemnifies SatSend for their invoices and dealings with clients;
+      suspension and termination; changes to the terms with notice by email;
+      the source code's FSL licence is separate from the right to use the
+      hosted service.
+- [ ] **Payers (the user's clients)** see invoices without an account: a short
+      "Using this invoice" section they're linked to (v1.5.2.15-H).
+- [ ] **Lawyer review** before Pro takes money (budget it), then publish. Keep
+      a dated version history at the bottom of the page.
+
+### ⏳ v1.5.2.7-H — Privacy policy (`/privacy`) (**pre-launch**, moved up)
+
+> Was a one-line placeholder. **Must be live before Pro.** Drafted from what the
+> code actually stores and sends; same lawyer review as v1.5.2.8-H.
+
+- [ ] **What's collected and why:** account email; invoice contents the user
+      chooses to add (their name, company, address, tax ID; their client's
+      details); receiving addresses; access codes; sign-in and email-delivery
+      records; scrambled connection fingerprints for rate limits (never raw IPs
+      in the database; Vercel keeps request logs).
+- [ ] **Who it's shared with** (sub-processors): Supabase (database, sign-in),
+      Vercel (hosting), Resend (email), mempool.space (address lookups),
+      Coinbase / CoinGecko (prices; no personal data sent), cron-job.org and
+      GitHub Actions (timers; no personal data), the card provider once chosen.
+      Where each stores data.
+- [ ] **Clients' data:** for the details users enter about their clients,
+      SatSend acts for the user (a "processor"); say so, and offer a data
+      processing addendum for business users who need one (v1.5.2.20-H).
+- [ ] **Cookies:** only essential ones (sign-in, access-code unlock); no
+      analytics or advertising, so no cookie banner. Re-check if that changes.
+- [ ] **Rights and how to use them:** access, correction, export, deletion
+      (v1.5.7-H), objection; how to complain to a regulator.
+- [ ] **Retention:** how long each kind of data is kept (v1.5.2.20-H sets the
+      numbers).
+- [ ] **International transfers, children (18+ only), changes, contact.**
+
+### ⏳ v1.5.2.15-H — Legal page (`/legal`), agreeing at sign-up, and notices for payers (**pre-launch**)
+
+- [ ] **`/legal`**: one page linking Terms, Privacy, Acceptable use (a section
+      of the Terms), Cookies (a section of Privacy), DMCA (v1.4.34), Licence
+      (FSL), Security, Accessibility statement (v1.5.2.19-H), and the company's
+      details (legal name, registered address, contact). Footer: the "Legal"
+      heading links to it.
+- [ ] **Sign-up:** "I'm 18 or over and agree to the Terms and Privacy policy",
+      required (moves v1.4.34 item 1 here). Record which terms version was
+      accepted and when (migration). When the terms change materially, email
+      users and ask again at next sign-in.
+- [ ] **Invoice pages, PDFs and invoice emails (payer side):** a short footer:
+      "SatSend provides the software only. You pay [sender] directly and SatSend
+      never holds the money. Bitcoin payments can't be reversed: check the
+      address matches what [sender] gave you." Plus links to Terms, Privacy and
+      "Report this invoice" (v1.5.2.16-H). Near the amount: "Worked out at
+      today's rate when you opened this invoice."
+- [ ] Tests: sign-up can't complete without the box; the acceptance record is
+      written; every public invoice view and email carries the footer.
+
+### ⏳ v1.5.2.16-H — Abuse and fraud handling (**pre-launch**)
+
+> A scammer could use SatSend to send convincing invoices pretending to be
+> another company, or to send spam from SatSend's email domain. Both harm the
+> people paying and SatSend's email reputation.
+
+- [ ] "Report this invoice" on every public invoice: a short form (reason,
+      optional contact), rate-limited, emailed to the support inbox.
+- [ ] A way to switch off one invoice or a whole account, run by Jonny from a
+      protected script or the database (server-side only; no admin screens in
+      the app). A switched-off invoice shows "This invoice is no longer
+      available."
+- [ ] A daily cap on invoice emails per account (Free and Pro), so SatSend
+      can't be used to blast emails. Generous for real use.
+- [ ] Written steps for handling a report (check, switch off, reply, keep a
+      record), linked from the Terms' acceptable-use section.
+
+### ⏳ v1.5.2.17-H — Security launch checks (**pre-launch**)
+
+> From Supabase's security advisor on production (2026-10-27) and the launch
+> security checklist. Small fixes plus settings.
+
+- [ ] **Migration:** revoke `EXECUTE` on `broadcast_invoice_status_change()`
+      from `anon` and `authenticated` (it's a trigger function, callable over
+      the API today; harmless in practice, but should be closed). Set
+      `search_path = ''` on `set_updated_at`, `line_items_valid`,
+      `protect_paid_invoice_fields` and `block_non_draft_delete`. Re-run the
+      advisor: only the deliberate "RLS on, no policies" notices remain.
+- [ ] **Supabase Auth settings** (Jonny, in the dashboard, Claude lists the
+      exact switches): turn **off email + password sign-in** (SatSend only uses
+      email links, so a password route is an unused way in; the advisor's
+      "leaked password protection" warning then doesn't apply); confirm the
+      email-link rate limits and link expiry; production site URL and redirect
+      list only.
+- [ ] **Stricter Content-Security-Policy** (deferred from v1.4.24-H): limits
+      which scripts can run, the main defence against script injection stealing
+      a signed-in session. Must allow the live mempool.space and Supabase
+      connections, so test payment updates end to end.
+- [ ] **`/.well-known/security.txt`** pointing at the contact route the
+      Security page names.
+- [ ] **Decide:** optional two-factor sign-in (an authenticator app) for
+      accounts. An email takeover could otherwise change the address on new
+      invoices. Recommend: after launch, as its own item.
+- [ ] Add "run the Supabase security advisor" to the `migration-safety` skill's
+      after-applying steps.
+
+### ⏳ v1.5.2.18-H — Commercial hosting, outside services' terms and spending caps (**pre-launch, before Pro**)
+
+- [ ] **Vercel:** the Hobby plan is for personal, non-commercial use only.
+      Move to Pro before charging for Pro (ideally at launch). Then turn on
+      **Spend Management with a hard pause** so an attack or bug can't run up a
+      bill. Check the firewall rule carries over and add any extra rules Pro
+      allows.
+- [ ] **Supabase:** move to Pro for daily backups and no pausing; keep the
+      **spend cap on**; set usage alerts.
+- [ ] **Outside services' terms for commercial use:** mempool.space public API
+      (fair-use limits; consider their paid plan or a fallback), CoinGecko
+      (free plan terms and attribution), Coinbase price API, cron-job.org,
+      Resend (sending limits). Record each answer in the roadmap.
+- [ ] **Runaway costs:** confirm nothing can call itself in a loop (the sweep,
+      webhooks, emails), every scheduled job has a time and size limit, and
+      billing alerts go to Jonny's email.
+
+### ⏳ v1.5.2.19-H — Accessibility (WCAG 2.2 AA) and an accessibility statement (**pre-launch**)
+
+> Accessibility lawsuits are common against small sites too. The design system
+> already uses focus rings and labels; this checks it properly.
+
+- [ ] Automated checks (axe) in the test suite for the homepage, marketing
+      pages, sign-up, dashboard, invoice form and public invoice page.
+- [ ] Keyboard-only pass of every main flow (create, send, pay view, access
+      code, settings); fix anything unreachable or hidden focus.
+- [ ] Colour contrast, especially amber on light backgrounds; alt text on
+      every meaningful image (the QR code's alt text says what it's for).
+- [ ] Accessibility statement on `/legal`: the standard aimed for, known gaps,
+      how to report a problem.
+
+### ⏳ v1.5.2.20-H — Data protection housekeeping (**pre-launch, before Pro**)
+
+- [ ] Accept the data processing agreements of Supabase, Vercel and Resend
+      (and the card provider), and note each one's data region.
+- [ ] Retention: decide how long to keep email-delivery records, webhook
+      records and deleted-account leftovers; a scheduled clean-up for each.
+- [ ] **Export:** a user can download all their invoices (CSV, plus PDFs) from
+      settings, which covers the right to a copy of their data and helps before
+      account deletion (v1.5.7-H).
+- [ ] A data processing addendum for business users (template, linked from
+      Privacy).
+- [ ] A short breach-response runbook: who checks what, how to rotate keys,
+      and the 72-hour notification rule under UK/EU GDPR.
+
+---
+
 ### ⏳ v1.5.2.5-H — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
 
 ### ⏳ v1.5.2.6-H — Contact page (`/contact`)
 - [ ] How to get in touch. **Needs the support email address from Jonny.**
-
-### ⏳ v1.5.2.7-H — Privacy policy (`/privacy`)
-- [ ] Drafted from what SatSend actually stores and sends; Jonny reviews (ideally
-      a qualified person too). Coordinate with v1.4.34. **Must be live before Pro.**
-
-### ⏳ v1.5.2.8-H — Terms of service (`/terms`)
-- [ ] As above. Include the Pro fair-use limit (500 saved clients) and bitcoin
-      payment terms. **Must be live before Pro.**
 
 ### ⏳ v1.5.2.9-H — SatSend accounts on X, LinkedIn and GitHub
 - [ ] Jonny creates the accounts (a GitHub organisation for the repo).
@@ -873,6 +1089,11 @@ amount, however and whenever its page is loaded.
       covering everything written before it was formed.
 - [ ] Use the LLC for the card-payment provider (v1.5.4-H), the privacy policy
       and terms (v1.5.2.7-H, v1.5.2.8-H).
+- [ ] **Added 2026-10-27 (legal and compliance train):** a trademark search for
+      "SatSend" before launch (and consider registering it); an accountant for
+      the LLC's tax filings; consider professional liability (errors and
+      omissions) and cyber insurance; keep the LLC's money separate from
+      personal money so the LLC protects you.
 
 ### ⏳ v1.5.7-H — Account deletion (**pre-launch**)
 
@@ -890,7 +1111,7 @@ amount, however and whenever its page is loaded.
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
       instead of sideways scrolling. A layout change, so it needs Jonny's decision.
 
-### ⏳ v1.5.2.14-H: Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
+### ⏳ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
 
 **Branch:** `v1.5.28/short-invoice-reference` · package `1.5.28` · new migration
 (next free number, `0037` at time of writing). Renumber the package if another
@@ -1086,6 +1307,14 @@ resolve; and no UUID appears in a URL or document a client sees.
 - [ ] Refunds: on request within 15 days of paying (the /pricing FAQ promises
       this), for card and bitcoin. Decide how a bitcoin refund is sent.
 - [ ] Prices: $10/month or $100/year (2 months free), the same for both rails.
+- [ ] **Tax on SatSend's own sales** (legal and compliance train, 2026-10-27):
+      selling subscriptions worldwide brings VAT / sales tax duties. A merchant
+      of record collects and pays these for card sales; bitcoin sales of Pro
+      still owe them, so ask an accountant how to handle those (or route Pro
+      through the merchant of record only, with bitcoin as a manual exception).
+- [ ] Annual renewals: email a reminder before the renewal date, and make
+      cancelling online as easy as subscribing (auto-renewal laws, e.g.
+      California).
 
 ### ⏳ v1.5.5-H — Consider free trials of Pro (**decide before launch**)
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Docs
+
+- **Roadmap: legal and compliance train (pre-launch).** Terms (v1.5.2.8-H) and
+  Privacy (v1.5.2.7-H) expanded and moved up to follow v1.5.2.13-H, plus new
+  items: `/legal` page with agreeing at sign-up and payer notices (v1.5.2.15-H),
+  abuse and fraud handling (v1.5.2.16-H), security launch checks from
+  Supabase's advisor (v1.5.2.17-H), commercial hosting and spending caps
+  (v1.5.2.18-H), accessibility (v1.5.2.19-H) and data protection housekeeping
+  (v1.5.2.20-H). Compliance guardrails recorded; v1.4.34, v1.5.4-H and v1.5.8-H
+  annotated.
+
 ### Security
 
 - **v1.5.26 — Limit wrong access-code guesses (roadmap v1.5.2.12-H).** 5 wrong
