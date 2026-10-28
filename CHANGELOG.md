@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   next: none when paid; "To resolve full settlement of this invoice, reach out
   to [Sender]." when underpaid; "To resolve overpayment of this invoice, reach
   out to [Sender]." when overpaid.
+- **v1.5.27 — The PDF no longer prints a payable QR once paid.** Underpaid
+  invoices, archived paid ones, and any invoice with a transaction now get the
+  paid panel instead of "Pay with Bitcoin" and its QR code.
 
 ### Fixed
 

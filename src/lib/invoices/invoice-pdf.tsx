@@ -195,8 +195,11 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
   const title = invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice";
   // A detected (still unconfirmed) payment already has its transaction, so it
   // gets the paid panel, marked "(unconfirmed)".
-  const isPaid = invoice.status === "paid";
-  const isDetected = invoice.status === "payment_detected";
+  // v1.5.27: any sign of a payment (a txid, or a paid status, archived ones
+  // read as what they were) means no payable QR, as on the invoice page.
+  const shown = invoice.status === "archived" ? (invoice.pre_archive_status ?? invoice.status) : invoice.status;
+  const isDetected = shown === "payment_detected";
+  const isPaid = !!invoice.btc_txid || isDetected || shown === "paid" || shown === "underpaid";
 
   return (
     <Document title={title} author={invoice.your_name ?? undefined} creator="SatSend" producer="SatSend">
@@ -280,10 +283,10 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
           </View>
         </View>
 
-        {(isPaid || isDetected) && invoice.btc_address ? (
+        {isPaid && invoice.btc_address ? (
           <View style={styles.btc} wrap={false}>
             <View style={styles.btcInfo}>
-              <Text style={styles.btcTitle}>{isDetected ? "Paid in bitcoin (unconfirmed)" : "Paid in bitcoin"}</Text>
+              <Text style={styles.btcTitle}>{isDetected ? "Paid in bitcoin (unconfirmed)" : shown === "underpaid" ? "Paid in bitcoin (underpaid)" : "Paid in bitcoin"}</Text>
               <Text style={styles.label}>Bitcoin address</Text>
               <Text style={styles.mono}>{invoice.btc_address}</Text>
               {invoice.btc_txid ? (

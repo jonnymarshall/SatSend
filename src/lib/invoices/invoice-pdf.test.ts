@@ -161,6 +161,18 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     expect(text).not.toContain("does not encode the amount");
   });
 
+  // v1.5.27: never a payable QR once a payment exists, on the PDF as on the page.
+  it.each([
+    ["underpaid", { status: "underpaid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+    ["archived after paying", { status: "archived" as const, pre_archive_status: "paid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+    ["pending with a transaction", { status: "pending" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+  ])("an invoice %s shows the paid panel, never the payment instructions", async (_label, patch) => {
+    const text = await textFromPdf({ ...baseInvoice, ...patch });
+    expect(text).toContain("Paid in bitcoin");
+    expect(text).not.toContain("Pay with Bitcoin");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
   it("every PDF links to the invoice on SatSend", async () => {
     for (const status of ["pending", "payment_detected", "paid"] as const) {
       const text = await textFromPdf({ ...baseInvoice, status, btc_txid: "abc" });
