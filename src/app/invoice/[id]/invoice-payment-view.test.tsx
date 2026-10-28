@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { InvoicePaymentView } from "./invoice-payment-view";
 import type { Invoice } from "@/lib/invoice-public";
 
@@ -43,7 +43,25 @@ vi.mock("./use-public-invoice-realtime", () => ({
 vi.mock("@/components/btc-qr-code", () => ({ BtcQrCode: () => <div data-testid="btc-qr" /> }));
 vi.mock("./mark-sent-button", () => ({ MarkSentButton: () => null }));
 
+// v1.5.29: "Pay now in Bitcoin" asks the server for a quote. 1,000,000 sats =
+// 0.01 BTC = $500 at $50,000/BTC, held for 30 minutes.
+const mockFetch = vi.fn();
+function quoteResponse(over: Partial<{ amountSats: number; btcPrice: number; expiresAt: string }> = {}) {
+  return {
+    ok: true,
+    json: async () => ({
+      amountSats: 1_000_000,
+      btcPrice: 50_000,
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      ...over,
+    }),
+  };
+}
+
 beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockImplementation(async () => quoteResponse());
+  vi.stubGlobal("fetch", mockFetch);
   capturedWatcherOnStatusChange = null;
   capturedWatcherPaymentRevealed = undefined;
   capturedWatcherOverpaid = undefined;
@@ -91,6 +109,9 @@ const BASE_INVOICE: Invoice = {
   send_method: null,
   sent_at: null,
   stage_attempt: 0,
+  btc_price_at_seen: null,
+  slippage_tolerance_fiat: null,
+  payment_quote_id: null,
 };
 
 describe("InvoicePaymentView — download PDF", () => {
@@ -141,14 +162,64 @@ describe("InvoicePaymentView — BTC reveal", () => {
     expect(screen.queryByTestId("btc-qr")).not.toBeInTheDocument();
   });
 
-  it("reveals QR code + address after clicking 'Pay now in Bitcoin'", () => {
+  it("reveals QR code + address after clicking 'Pay now in Bitcoin'", async () => {
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
-    expect(screen.getByTestId("btc-qr")).toBeInTheDocument();
+    expect(await screen.findByTestId("btc-qr")).toBeInTheDocument();
     expect(screen.getByText(/tb1qtarget/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /pay now in bitcoin/i })).not.toBeInTheDocument();
   });
 
+  // v1.5.29 (roadmap v1.5.2.22-H): locked quotes.
+  it("doesn't ask for a quote until the client clicks", () => {
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("clicking asks the server for a quote and shows its amount and price, not one worked out on the page", async () => {
+    mockFetch.mockImplementation(async () => quoteResponse({ amountSats: 999_000, btcPrice: 50_050 }));
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText("0.00999 BTC")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("/api/invoices/inv-1/quote", { method: "POST" });
+    expect(screen.getByText(/\$50,050\.00\/BTC/)).toBeInTheDocument();
+  });
+
+  it("shows no QR while the quote is on its way", () => {
+    mockFetch.mockImplementation(() => new Promise(() => {}));
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(screen.queryByTestId("btc-qr")).not.toBeInTheDocument();
+    expect(screen.getByText(/getting the amount/i)).toBeInTheDocument();
+  });
+
+  it("says how long the amount is held, and links to how payments are settled", async () => {
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText(/this amount is held until/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /how payments are settled/i })).toHaveAttribute("href", "/payment-settlement");
+  });
+
+  it("asks for a fresh quote when the held amount expires", async () => {
+    mockFetch
+      .mockImplementationOnce(async () => quoteResponse({ expiresAt: new Date(Date.now() + 50).toISOString() }))
+      .mockImplementation(async () => quoteResponse({ amountSats: 1_100_000 }));
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText("0.011 BTC")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("if the quote can't be had, says so, shows no QR, and can try again", async () => {
+    mockFetch.mockImplementationOnce(async () => ({ ok: false, json: async () => ({}) }));
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText(/couldn't get the bitcoin amount/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("btc-qr")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(await screen.findByTestId("btc-qr")).toBeInTheDocument();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+  });
 });
 
 describe("InvoicePaymentView — copy buttons", () => {
@@ -170,7 +241,7 @@ describe("InvoicePaymentView — copy buttons", () => {
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
 
-    const btn = screen.getByRole("button", { name: /copy btc amount/i });
+    const btn = await screen.findByRole("button", { name: /copy btc amount/i });
     fireEvent.click(btn);
 
     expect(writeText).toHaveBeenCalledWith("0.01");
@@ -181,7 +252,7 @@ describe("InvoicePaymentView — copy buttons", () => {
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
 
-    const btn = screen.getByRole("button", { name: /copy btc address/i });
+    const btn = await screen.findByRole("button", { name: /copy btc address/i });
     fireEvent.click(btn);
 
     expect(writeText).toHaveBeenCalledWith("tb1qtarget");
@@ -270,10 +341,10 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     expect(screen.queryByText(/pay with bitcoin/i)).not.toBeInTheDocument();
   };
 
-  it("an unpaid invoice still offers the QR and amount", () => {
+  it("an unpaid invoice still offers the QR and amount", async () => {
     render(<InvoicePaymentView invoice={PENDING} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
-    expect(screen.getByTestId("btc-qr")).toBeInTheDocument();
+    expect(await screen.findByTestId("btc-qr")).toBeInTheDocument();
     expect(screen.getByText("0.01 BTC")).toBeInTheDocument();
   });
 
@@ -322,18 +393,19 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     expect(screen.getByRole("link", { name: "txid-1" })).toBeInTheDocument();
   });
 
-  it("a txid arriving by the watcher hides an open QR in the same visit", () => {
+  it("a txid arriving by the watcher hides an open QR in the same visit", async () => {
     render(<InvoicePaymentView invoice={PENDING} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
-    expect(screen.getByTestId("btc-qr")).toBeInTheDocument();
+    expect(await screen.findByTestId("btc-qr")).toBeInTheDocument();
     act(() => capturedWatcherOnStatusChange?.("payment_detected", "txid-w"));
     expectNothingPayable();
     expect(screen.getByRole("link", { name: "txid-w" })).toBeInTheDocument();
   });
 
-  it("a txid arriving by realtime hides an open QR in the same visit", () => {
+  it("a txid arriving by realtime hides an open QR in the same visit", async () => {
     render(<InvoicePaymentView invoice={PENDING} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    await screen.findByTestId("btc-qr");
     act(() => capturedRealtimeOnUpdate?.({ id: "inv-1", status: "payment_detected", btc_txid: "txid-r" }));
     expectNothingPayable();
   });
@@ -376,61 +448,64 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("outstanding")).toContain("$0.00");
   });
 
-  it("paid within the 5% allowance still shows nothing outstanding", () => {
+  it("paid within the Slippage Tolerance still shows nothing outstanding", () => {
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 98 }} btcPrice={50000} />);
     expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
   });
 
   // Jonny, 2026-10-27: a visible gap above "Outstanding $0.00" looks like a
-  // maths mistake, so a paid-within-the-allowance gap gets its own row.
-  it("paid a little over: an exchange rate difference row explains the gap", () => {
+  // maths mistake, so a paid-within-the-Slippage-Tolerance gap gets its own row.
+  it("paid a little over: a Settlement Variance row explains the gap", () => {
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 100.125 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toMatch(/^Exchange Rate Variance\+\$0\.13$/);
+    expect(sumRow("variance")).toMatch(/^Settlement Variance\+\$0\.13$/);
     expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
   });
 
   it("the variance has a help button explaining it, for clients who wonder (Jonny, 2026-10-27)", async () => {
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 100.75 }} btcPrice={50000} />);
-    const help = screen.getByRole("button", { name: /what is exchange rate variance/i });
+    const help = screen.getByRole("button", { name: /what is settlement variance/i });
     fireEvent.click(help);
     expect(await screen.findByText(/counts as paid in full/i)).toBeInTheDocument();
+    // v1.5.29: names this invoice's Slippage Tolerance (5% of $100 for one judged before it).
+    expect(screen.getByText(/slippage tolerance of \$5\.00/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /how payments are settled/i })).toHaveAttribute("href", "/payment-settlement");
     expect(document.body.textContent).not.toMatch(/\bwe\b/i);
   });
 
   it("paid a little under: the difference shows as negative", () => {
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 98 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toMatch(/−\$2\.00$/);
+    expect(sumRow("variance")).toMatch(/−\$2\.00$/);
   });
 
-  // A gap beyond the allowance on a paid invoice isn't exchange rate movement:
+  // A gap beyond the Slippage Tolerance on a paid invoice isn't exchange rate movement:
   // the sender marked it paid by hand (e.g. an underpaid invoice settled some
   // other way). Calling it a variance would be untrue.
-  it("a paid invoice with a gap beyond the allowance shows no variance row and says the sender marked it paid", () => {
+  it("a paid invoice with a gap beyond the Slippage Tolerance shows no variance row and says the sender marked it paid", () => {
     const { container } = render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 61.5 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("variance")).toBeUndefined();
     expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
     expect(container.textContent).toContain("Marked as paid by Maya Design Ltd.");
   });
 
-  it("the variance row stops exactly at the allowance edge", () => {
+  it("the variance row stops exactly at the Slippage Tolerance edge", () => {
     const { unmount } = render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 105 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toMatch(/\+\$5\.00$/);
+    expect(sumRow("variance")).toMatch(/\+\$5\.00$/);
     unmount();
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 105.01 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("variance")).toBeUndefined();
   });
 
-  it("an exact payment has no exchange rate row", () => {
+  it("an exact payment has no Settlement Variance row", () => {
     render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
-    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("variance")).toBeUndefined();
   });
 
   it("underpaid and overpaid don't get the row (their Outstanding is the real gap)", () => {
     const { unmount } = render(<InvoicePaymentView invoice={UNDERPAID} btcPrice={50000} />);
-    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("variance")).toBeUndefined();
     unmount();
     render(<InvoicePaymentView invoice={OVERPAID} btcPrice={50000} />);
-    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("variance")).toBeUndefined();
   });
 
   it("overpaid: its own state, the sums, and the approved wording", () => {

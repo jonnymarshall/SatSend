@@ -39,6 +39,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_code_attempts: {
+        Row: {
+          client_key: string
+          created_at: string
+          id: number
+          invoice_id: string
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          id?: never
+          invoice_id: string
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          id?: never
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_code_attempts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_email_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_code_attempts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_events: {
         Row: {
           created_at: string
@@ -132,6 +168,54 @@ export type Database = {
           },
         ]
       }
+      invoice_quotes: {
+        Row: {
+          amount_sats: number
+          btc_price: number
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          invoice_id: string
+          total_fiat: number
+        }
+        Insert: {
+          amount_sats: number
+          btc_price: number
+          created_at?: string
+          currency: string
+          expires_at: string
+          id?: string
+          invoice_id: string
+          total_fiat: number
+        }
+        Update: {
+          amount_sats?: number
+          btc_price?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          id?: string
+          invoice_id?: string
+          total_fiat?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_quotes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_email_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_quotes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           access_code: string | null
@@ -139,6 +223,7 @@ export type Database = {
           amount_received_sats: number | null
           btc_address: string | null
           btc_price_at_detection: number | null
+          btc_price_at_seen: number | null
           btc_txid: string | null
           client_address: string | null
           client_company: string | null
@@ -156,12 +241,14 @@ export type Database = {
           next_check_at: string | null
           overpaid: boolean
           payment_confirmed_at: string | null
+          payment_quote_id: string | null
           pre_archive_status:
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at: string | null
           send_method: string | null
           sent_at: string | null
+          slippage_tolerance_fiat: number | null
           stage_attempt: number
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal_fiat: number
@@ -182,6 +269,7 @@ export type Database = {
           amount_received_sats?: number | null
           btc_address?: string | null
           btc_price_at_detection?: number | null
+          btc_price_at_seen?: number | null
           btc_txid?: string | null
           client_address?: string | null
           client_company?: string | null
@@ -199,12 +287,14 @@ export type Database = {
           next_check_at?: string | null
           overpaid?: boolean
           payment_confirmed_at?: string | null
+          payment_quote_id?: string | null
           pre_archive_status?:
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at?: string | null
           send_method?: string | null
           sent_at?: string | null
+          slippage_tolerance_fiat?: number | null
           stage_attempt?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_fiat?: number
@@ -225,6 +315,7 @@ export type Database = {
           amount_received_sats?: number | null
           btc_address?: string | null
           btc_price_at_detection?: number | null
+          btc_price_at_seen?: number | null
           btc_txid?: string | null
           client_address?: string | null
           client_company?: string | null
@@ -242,12 +333,14 @@ export type Database = {
           next_check_at?: string | null
           overpaid?: boolean
           payment_confirmed_at?: string | null
+          payment_quote_id?: string | null
           pre_archive_status?:
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at?: string | null
           send_method?: string | null
           sent_at?: string | null
+          slippage_tolerance_fiat?: number | null
           stage_attempt?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_fiat?: number
@@ -262,33 +355,12 @@ export type Database = {
           your_name?: string | null
           your_tax_id?: string | null
         }
-        Relationships: []
-      }
-      access_code_attempts: {
-        Row: {
-          client_key: string
-          created_at: string
-          id: number
-          invoice_id: string
-        }
-        Insert: {
-          client_key: string
-          created_at?: string
-          id?: never
-          invoice_id: string
-        }
-        Update: {
-          client_key?: string
-          created_at?: string
-          id?: never
-          invoice_id?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "access_code_attempts_invoice_id_fkey"
-            columns: ["invoice_id"]
+            foreignKeyName: "invoices_payment_quote_id_fkey"
+            columns: ["payment_quote_id"]
             isOneToOne: false
-            referencedRelation: "invoices"
+            referencedRelation: "invoice_quotes"
             referencedColumns: ["id"]
           },
         ]
@@ -391,10 +463,38 @@ export type Database = {
           p_client_key: string
           p_invoice_id: string
           p_limit: number
-          p_wrong: boolean
           p_window_seconds: number
+          p_wrong: boolean
         }
         Returns: boolean
+      }
+      take_invoice_quote: {
+        Args: {
+          p_amount_sats: number
+          p_btc_price: number
+          p_currency: string
+          p_invoice_id: string
+          p_keep_seconds: number
+          p_reuse_seconds: number
+          p_total_fiat: number
+          p_valid_seconds: number
+        }
+        Returns: {
+          amount_sats: number
+          btc_price: number
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          invoice_id: string
+          total_fiat: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invoice_quotes"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       take_signup_check: {
         Args: {

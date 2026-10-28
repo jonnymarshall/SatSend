@@ -1,5 +1,5 @@
 import type { Invoice } from "@/lib/invoice-public";
-import { isWithinAllowance } from "./payment-schedule";
+import { isWithinSlippageTolerance } from "./payment-schedule";
 
 /**
  * The payment block, worked out once (v1.5.28, roadmap v1.5.2.21-H): the state,
@@ -26,6 +26,7 @@ export type PaymentSummaryInvoice = Pick<
   | "amount_received_fiat"
   | "payment_confirmed_at"
   | "mempool_seen_at"
+  | "slippage_tolerance_fiat"
   | "your_company"
   | "your_name"
   | "client_company"
@@ -36,8 +37,10 @@ export interface PaymentSums {
   requested: string;
   received: string;
   receivedBtc: string | null;
-  /** "+$0.75" / "−$2.00" for a paid invoice inside the allowance, else null. */
-  rateVariance: string | null;
+  /** "+$0.75" / "−$0.50" for a paid invoice inside the Slippage Tolerance, else null. */
+  settlementVariance: string | null;
+  /** The Slippage Tolerance the invoice was judged with, "$1.00". */
+  slippageTolerance: string;
   /** "$0.00" paid, "$38.50" underpaid, "−$12.00" overpaid. */
   outstanding: string;
 }
@@ -57,11 +60,19 @@ const HEADINGS: Record<PaymentState, string> = {
   overpaid: "Overpaid",
 };
 
-/** What "Exchange Rate Variance" means: the page's help pop-up, the emails' and PDF's note. */
-export const RATE_VARIANCE_EXPLAINED = [
-  "The bitcoin amount was set by the exchange rate at the time of payment. The value shown here uses the rate when the payment confirmed, a little later, so the two can differ slightly.",
-  "A small difference like this counts as paid in full, so nothing is outstanding.",
-] as const;
+/**
+ * What "Settlement Variance" means (v1.5.29, Jonny's names): the page's help
+ * pop-up, and the emails' and PDF's note. Takes the invoice's Slippage Tolerance.
+ */
+export function settlementVarianceExplained(slippageTolerance: string): [string, string] {
+  return [
+    "The small difference between the amount requested and the amount that arrived, usually from wallet or exchange fees, rounding, or a change in the bitcoin price.",
+    `It's within this invoice's Slippage Tolerance of ${slippageTolerance}, so it counts as paid in full and nothing is outstanding.`,
+  ];
+}
+
+/** Invoices judged before v1.5.29 recorded no tolerance; they were judged at 5% either way. */
+const LEGACY_SLIPPAGE_TOLERANCE_RATE = 0.05;
 
 export const DETECTED_MESSAGE =
   "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
@@ -137,14 +148,18 @@ export function paymentSummary(
   const client = invoice.client_company || invoice.client_name || "your client";
   const reachOut = audience === "client" ? sender : client;
 
-  // A paid invoice with no amount recorded, or a gap beyond the allowance, was
-  // marked paid by the sender by hand (say, an underpaid invoice settled some
-  // other way). Calling that gap exchange rate movement would be untrue.
-  const markedPaidBySender = state === "paid" && (fiat === null || !isWithinAllowance(fiat, invoice.total_fiat));
+  const tolerance = invoice.slippage_tolerance_fiat ?? invoice.total_fiat * LEGACY_SLIPPAGE_TOLERANCE_RATE;
+
+  // A paid invoice with no amount recorded, or a gap beyond the Slippage
+  // Tolerance it was judged with, was marked paid by the sender by hand (say, an
+  // underpaid invoice settled some other way). Calling that gap a Settlement
+  // Variance would be untrue.
+  const markedPaidBySender =
+    state === "paid" && (fiat === null || !isWithinSlippageTolerance(fiat, invoice.total_fiat, tolerance));
 
   let sums: PaymentSums | null = null;
   if (fiat !== null && state !== "payment_detected") {
-    // What's still owed: nothing once paid (within the allowance counts as in
+    // What's still owed: nothing once paid (within the Slippage Tolerance counts as in
     // full), the rest when underpaid, below zero when overpaid (Jonny, 2026-10-27).
     const outstanding = state === "paid" ? 0 : invoice.total_fiat - fiat;
     // Worked out from the rounded cents the rows show, so Requested + this row
@@ -155,7 +170,8 @@ export function paymentSummary(
       requested: fmtCurrency(invoice.total_fiat, cur),
       received: fmtCurrency(fiat, cur),
       receivedBtc: sats !== null ? `${satsToBtc(sats)} BTC` : null,
-      rateVariance: variance !== 0 ? fmtSigned(variance, cur, true) : null,
+      settlementVariance: variance !== 0 ? fmtSigned(variance, cur, true) : null,
+      slippageTolerance: fmtCurrency(tolerance, cur),
       outstanding: fmtSigned(outstanding, cur, false),
     };
   }

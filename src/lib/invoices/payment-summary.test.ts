@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { paymentSummary, hasPayment, formatPaymentTime, shortTxid, type PaymentSummaryInvoice } from "./payment-summary";
+import {
+  paymentSummary,
+  hasPayment,
+  formatPaymentTime,
+  settlementVarianceExplained,
+  shortTxid,
+  type PaymentSummaryInvoice,
+} from "./payment-summary";
 
 // v1.5.28: one source for the payment block, read by the invoice page, the four
 // payment emails and the PDF, so they can't drift apart.
@@ -14,6 +21,8 @@ const PAID: PaymentSummaryInvoice = {
   amount_received_fiat: 100,
   payment_confirmed_at: "2026-10-27T12:32:00Z",
   mempool_seen_at: "2026-10-27T12:18:00Z",
+  // v1.5.29: judged with a Slippage Tolerance of 1% of $100.
+  slippage_tolerance_fiat: 1,
   your_company: "Maya Design Ltd",
   your_name: "Maya",
   client_company: null,
@@ -29,21 +38,43 @@ describe("paymentSummary", () => {
       requested: "$100.00",
       received: "$100.00",
       receivedBtc: "0.002 BTC",
-      rateVariance: null,
+      settlementVariance: null,
+      slippageTolerance: "$1.00",
       outstanding: "$0.00",
     });
     expect(s.message).toBeNull();
     expect(s.time).toEqual({ label: "Paid on", iso: "2026-10-27T12:32:00Z" });
   });
 
-  it("paid within the allowance: the gap shows as an Exchange Rate Variance", () => {
-    expect(paymentSummary({ ...PAID, amount_received_fiat: 100.75 }, { audience: "client" }).sums?.rateVariance).toBe("+$0.75");
-    expect(paymentSummary({ ...PAID, amount_received_fiat: 98 }, { audience: "client" }).sums?.rateVariance).toBe("−$2.00");
+  it("paid within the Slippage Tolerance: the gap shows as a Settlement Variance", () => {
+    expect(paymentSummary({ ...PAID, amount_received_fiat: 100.75 }, { audience: "client" }).sums?.settlementVariance).toBe("+$0.75");
+    expect(paymentSummary({ ...PAID, amount_received_fiat: 99.5 }, { audience: "client" }).sums?.settlementVariance).toBe("−$0.50");
   });
 
-  it("paid beyond the allowance: no variance; the sender marked it paid", () => {
+  it("uses the Slippage Tolerance the invoice was judged with (v1.5.29)", () => {
+    // $1.00 on this invoice: $2 short is beyond it, so it was marked paid by hand.
+    const tight = paymentSummary({ ...PAID, amount_received_fiat: 98 }, { audience: "client" });
+    expect(tight.sums?.settlementVariance).toBeNull();
+    expect(tight.message).toBe("Marked as paid by Maya Design Ltd.");
+  });
+
+  it("an invoice judged before v1.5.29 keeps the 5% it was judged with", () => {
+    const legacy = paymentSummary({ ...PAID, slippage_tolerance_fiat: null, amount_received_fiat: 98 }, { audience: "client" });
+    expect(legacy.sums?.settlementVariance).toBe("−$2.00");
+    expect(legacy.sums?.slippageTolerance).toBe("$5.00");
+    expect(legacy.message).toBeNull();
+  });
+
+  it("explains the Settlement Variance with the invoice's own Slippage Tolerance, never saying 'we'", () => {
+    const lines = settlementVarianceExplained("$1.00");
+    expect(lines.join(" ")).toContain("Slippage Tolerance of $1.00");
+    expect(lines.join(" ")).toContain("counts as paid in full");
+    expect(lines.join(" ")).not.toMatch(/\bwe\b/i);
+  });
+
+  it("paid beyond the Slippage Tolerance: no variance; the sender marked it paid", () => {
     const client = paymentSummary({ ...PAID, amount_received_fiat: 61.5 }, { audience: "client" });
-    expect(client.sums?.rateVariance).toBeNull();
+    expect(client.sums?.settlementVariance).toBeNull();
     expect(client.sums?.outstanding).toBe("$0.00");
     expect(client.message).toBe("Marked as paid by Maya Design Ltd.");
     expect(paymentSummary({ ...PAID, amount_received_fiat: 61.5 }, { audience: "sender" }).message).toBe("Marked as paid by you.");

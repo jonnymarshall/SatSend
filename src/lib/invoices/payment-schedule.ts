@@ -1,4 +1,5 @@
 import { txPaysToAddress, confirmationDepth, type MempoolTx } from "@/lib/mempool";
+import { matchQuote, type PaymentQuote } from "./quotes";
 
 // Payment polling schedule.
 //
@@ -43,17 +44,35 @@ const POST_MEMPOOL_INTERVALS_MS: readonly number[] = POST_MEMPOOL_STAGES.flatMap
 // whose tx disappears sits in `payment_detected` forever. (v1.4.22-H / M-MONEY-4)
 export const REVERT_TO_PENDING_AFTER_MS = 60 * 60_000;
 
-// Coverage is judged in fiat, priced at the moment the payment is confirmed —
-// never at publish time. A price fixed at publish would drift against the
-// invoice's actual fiat total as BTC moves, making "did they pay enough" wrong
-// by however much the price changed. See v1.4.19-H (S2) planning discussion.
-const UNDERPAID_COVERAGE = 0.95;
-const OVERPAID_COVERAGE = 1.05;
+// The Slippage Tolerance (v1.5.29, roadmap v1.5.2.22-H): how far a payment can
+// be from what was asked and still count as paid in full, either way. 1% of the
+// total, capped at $25 (Jonny, 2026-10-28). It was 5% while payments were valued
+// at the price when they confirmed; locked quotes take price movement out, so
+// what's left is mostly fees and rounding.
+//
+// The amount is judged against the quote the client was shown (in bitcoin, so
+// price movement drops out). With no matching quote, the payment is valued at
+// the price when it was first seen, never at publish time: a price fixed at
+// publish would drift against the invoice's fiat total as BTC moves.
+const SLIPPAGE_TOLERANCE_RATE = 0.01;
+const SLIPPAGE_TOLERANCE_CAP = 25;
 
-/** True when a payment counts as paid in full: 95% to 105% of the total. */
-export function isWithinAllowance(receivedFiat: number, totalFiat: number): boolean {
-  const coverage = receivedFiat / totalFiat;
-  return coverage >= UNDERPAID_COVERAGE && coverage <= OVERPAID_COVERAGE;
+/** The Slippage Tolerance for an invoice total, in the invoice's currency. */
+export function slippageToleranceFiat(totalFiat: number): number {
+  return Math.min(Math.round(totalFiat * SLIPPAGE_TOLERANCE_RATE * 100) / 100, SLIPPAGE_TOLERANCE_CAP);
+}
+
+/**
+ * True when a payment counts as paid in full. `tolerance` is the one the
+ * invoice was judged with; invoices judged before v1.5.29 pass 5% of the total.
+ */
+export function isWithinSlippageTolerance(
+  receivedFiat: number,
+  totalFiat: number,
+  tolerance: number = slippageToleranceFiat(totalFiat),
+): boolean {
+  // A hair of slack so cents that are exactly on the edge aren't lost to floating point.
+  return Math.abs(receivedFiat - totalFiat) <= tolerance + 1e-9;
 }
 
 // mempool.space (and esplora-style APIs generally) only report whether a tx
@@ -71,6 +90,10 @@ export interface ScheduleInput {
   published_at: string | null;
   stage_attempt: number;
   total_fiat: number;
+  /** The price when the payment was first seen (v1.5.29). */
+  btc_price_at_seen?: number | null;
+  /** The quotes the client was shown for this invoice (v1.5.29). */
+  quotes?: readonly PaymentQuote[];
 }
 
 // The caller fetches these (live BTC price, current chain tip) and passes
@@ -99,6 +122,12 @@ export interface ScheduleDecision {
   // When a paid/underpaid verdict's tx confirmed: the block's own time, else
   // now. Null for every other decision. Shown to the payer (v1.5.27).
   confirmedAt: string | null;
+  // v1.5.29: the price when the payment was first seen (recorded at the first
+  // sighting, carried after, cleared on a revert); the quote the verdict used;
+  // and the Slippage Tolerance it was judged with. The last two only on a verdict.
+  btcPriceAtSeen: number | null;
+  paymentQuoteId: string | null;
+  slippageToleranceFiat: number | null;
 }
 
 const NO_VERDICT = {
@@ -108,6 +137,8 @@ const NO_VERDICT = {
   overpaid: false,
   revertToPending: false,
   confirmedAt: null,
+  paymentQuoteId: null,
+  slippageToleranceFiat: null,
 } as const;
 
 function sumVouts(tx: MempoolTx, address: string): number {
@@ -189,30 +220,45 @@ export function decidePaymentSchedule(
 
   if (paying) {
     const depth = confirmationDepth(price.tipHeight, paying.status.block_height);
+    const receivedSats = sumVouts(paying, input.btc_address);
+    const priceAtSeen = input.btc_price_at_seen ?? (input.mempool_seen_at === null ? price.btcPrice : null);
+    // When the payment was made, as near as SatSend can tell: when it was first
+    // seen, or the block's time if that's earlier.
+    const seenMs = input.mempool_seen_at ? Date.parse(input.mempool_seen_at) : now.getTime();
+    const paidAt = new Date(
+      paying.status.block_time ? Math.min(seenMs, paying.status.block_time * 1000) : seenMs,
+    );
+    const quote = matchQuote(input.quotes ?? [], receivedSats, paidAt);
+    const valuePrice = quote?.btc_price ?? priceAtSeen ?? price.btcPrice;
     const finalized =
       paying.status.confirmed &&
       depth !== null &&
       depth >= CONFIRMATION_DEPTH_REQUIRED &&
-      price.btcPrice !== null;
+      valuePrice !== null;
 
     if (finalized) {
-      const receivedSats = sumVouts(paying, input.btc_address);
-      const receivedFiat = (receivedSats * price.btcPrice!) / 1e8;
-      const coverage = receivedFiat / input.total_fiat;
+      const tolerance = slippageToleranceFiat(input.total_fiat);
+      const receivedFiat = (receivedSats * valuePrice!) / 1e8;
+      // Against a quote, the gap is measured in bitcoin and turned into money
+      // at the quoted price; otherwise in money against the total.
+      const gap = quote ? ((receivedSats - quote.amount_sats) * quote.btc_price) / 1e8 : receivedFiat - input.total_fiat;
       return {
-        newStatus: coverage < UNDERPAID_COVERAGE ? "underpaid" : "paid",
+        newStatus: gap < -tolerance - 1e-9 ? "underpaid" : "paid",
         newMempoolSeenAt: input.mempool_seen_at ?? now.toISOString(),
         newStageAttempt: input.stage_attempt,
         newNextCheckAt: null,
         detectedTxid: paying.txid,
         amountReceivedSats: receivedSats,
-        btcPriceAtDetection: price.btcPrice,
-        amountReceivedFiat: receivedFiat,
-        overpaid: coverage > OVERPAID_COVERAGE,
+        btcPriceAtDetection: valuePrice,
+        amountReceivedFiat: quote && receivedSats === quote.amount_sats ? input.total_fiat : receivedFiat,
+        overpaid: gap > tolerance + 1e-9,
         revertToPending: false,
         confirmedAt: paying.status.block_time
           ? new Date(paying.status.block_time * 1000).toISOString()
           : now.toISOString(),
+        btcPriceAtSeen: priceAtSeen,
+        paymentQuoteId: quote?.id ?? null,
+        slippageToleranceFiat: tolerance,
       };
     }
 
@@ -227,6 +273,7 @@ export function decidePaymentSchedule(
         newNextCheckAt: boundary === null ? null : addIso(now, boundary),
         detectedTxid: paying.txid,
         ...NO_VERDICT,
+        btcPriceAtSeen: price.btcPrice,
       };
     }
 
@@ -242,6 +289,7 @@ export function decidePaymentSchedule(
       newNextCheckAt: boundary === null ? null : addIso(seenAt, boundary),
       detectedTxid: null,
       ...NO_VERDICT,
+      btcPriceAtSeen: input.btc_price_at_seen ?? null,
     };
   }
 
@@ -260,6 +308,7 @@ export function decidePaymentSchedule(
         newNextCheckAt: addIso(now, PRE_MEMPOOL_DELAYS_MS[0]),
         detectedTxid: null,
         ...NO_VERDICT,
+        btcPriceAtSeen: null,
       };
     }
 
@@ -276,6 +325,7 @@ export function decidePaymentSchedule(
       newNextCheckAt: boundary === null ? null : addIso(anchorDate, boundary),
       detectedTxid: null,
       ...NO_VERDICT,
+      btcPriceAtSeen: null,
     };
   }
 
@@ -299,6 +349,9 @@ export function decidePaymentSchedule(
       overpaid: false,
       revertToPending: true,
       confirmedAt: null,
+      btcPriceAtSeen: null,
+      paymentQuoteId: null,
+      slippageToleranceFiat: null,
     };
   }
 
@@ -310,5 +363,6 @@ export function decidePaymentSchedule(
     newNextCheckAt: boundary === null ? null : addIso(seenAt, boundary),
     detectedTxid: null,
     ...NO_VERDICT,
+    btcPriceAtSeen: input.btc_price_at_seen ?? null,
   };
 }

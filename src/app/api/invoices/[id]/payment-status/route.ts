@@ -6,7 +6,7 @@ import { fetchTx, fetchTipHeight, txPaysToAddress } from "@/lib/mempool";
 import { fetchBtcPrice } from "@/lib/btc-price";
 import { hasAccess, accessCookieName } from "@/lib/access-code";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
-import { paymentAfterDecision } from "@/lib/invoices/check-invoice-payment";
+import { decisionColumns, loadQuotes, paymentAfterDecision } from "@/lib/invoices/check-invoice-payment";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 
 const STATUS_ORDER: Record<string, number> = {
@@ -43,7 +43,7 @@ export async function POST(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, btc_address, status, user_id, invoice_number, client_name, client_company, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code"
+      "id, btc_address, status, user_id, invoice_number, client_name, client_company, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code, btc_price_at_seen"
     )
     .eq("id", id)
     .single();
@@ -83,6 +83,12 @@ export async function POST(
     // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
   }
   const tipHeight = await fetchTipHeight();
+  // The quotes the client was shown (v1.5.29). Without them the payment could
+  // be judged against the wrong price, so don't judge it now.
+  const quotes = tx.status.confirmed ? await loadQuotes(supabase, id) : [];
+  if (quotes === null) {
+    return NextResponse.json({ error: "Try again shortly" }, { status: 503 });
+  }
 
   const decision = decidePaymentSchedule(
     {
@@ -92,6 +98,8 @@ export async function POST(
       published_at: invoice.published_at,
       stage_attempt: invoice.stage_attempt,
       total_fiat: invoice.total_fiat,
+      btc_price_at_seen: invoice.btc_price_at_seen,
+      quotes,
     },
     [tx],
     new Date(),
@@ -100,18 +108,7 @@ export async function POST(
 
   const { data: updated, error: updateError } = await supabase
     .from("invoices")
-    .update({
-      status: decision.newStatus,
-      btc_txid: decision.detectedTxid ?? txid,
-      mempool_seen_at: decision.newMempoolSeenAt,
-      stage_attempt: decision.newStageAttempt,
-      next_check_at: decision.newNextCheckAt,
-      amount_received_sats: decision.amountReceivedSats,
-      btc_price_at_detection: decision.btcPriceAtDetection,
-      amount_received_fiat: decision.amountReceivedFiat,
-      overpaid: decision.overpaid,
-      payment_confirmed_at: decision.confirmedAt,
-    })
+    .update({ ...decisionColumns(decision), btc_txid: decision.detectedTxid ?? txid })
     .eq("id", id)
     .eq("status", invoice.status)
     .select("status")

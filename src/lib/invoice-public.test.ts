@@ -41,6 +41,9 @@ const baseInvoice: Invoice = {
   send_method: null,
   sent_at: null,
   stage_attempt: 0,
+  btc_price_at_seen: null,
+  slippage_tolerance_fiat: null,
+  payment_quote_id: null,
 };
 
 describe("toPublicInvoice", () => {
