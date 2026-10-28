@@ -452,7 +452,7 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     );
     expect(block()).toHaveAttribute("data-state", "payment_detected");
     expect(screen.getByText("Seen at")).toBeInTheDocument();
-    expect(screen.getByText(/usually around 10 minutes\.$/)).toBeInTheDocument();
+    expect(screen.getByText(/usually within about 20 minutes\.$/)).toBeInTheDocument();
   });
 
   it("a paid invoice from before confirmation times were kept falls back to when it was seen", () => {

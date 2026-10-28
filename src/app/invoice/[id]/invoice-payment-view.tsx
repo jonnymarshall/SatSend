@@ -411,7 +411,7 @@ function PaymentReceived({
     message = `To resolve overpayment of this invoice, reach out to ${sender}.`;
   } else if (state === "payment_detected") {
     message =
-      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually around 10 minutes.";
+      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
   }
 
   const confirmedAt = state === "payment_detected" ? null : invoice.payment_confirmed_at;
