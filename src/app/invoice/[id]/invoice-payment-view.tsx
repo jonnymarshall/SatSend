@@ -338,7 +338,8 @@ function fmtDateTime(iso: string, timeZone: string): string {
 /**
  * Explains the Exchange Rate Variance row (Jonny, 2026-10-27). A button, so it
  * works by tap, click and keyboard as well as hover (hover alone fails on
- * phones). 24px target, the WCAG 2.2 minimum.
+ * phones). 24px target, the WCAG 2.2 minimum. Hover and open take Paid's green,
+ * the only state that shows this row (Jonny, 2026-10-27).
  */
 function RateVarianceHelp() {
   return (
@@ -348,7 +349,7 @@ function RateVarianceHelp() {
         openOnHover
         delay={150}
         aria-label="What is Exchange Rate Variance?"
-        className="-my-1 inline-flex size-6 cursor-help items-center justify-center rounded-full text-(--color-ink)/50 transition-colors hover:text-(--color-ink) focus-visible:text-(--color-ink) focus-visible:outline-2 focus-visible:outline-(--color-brand)"
+        className="-my-1 inline-flex size-6 cursor-help items-center justify-center rounded-full text-(--color-ink)/50 transition-colors hover:text-(--color-success-text) focus-visible:text-(--color-success-text) data-[popup-open]:text-(--color-success-text) focus-visible:outline-2 focus-visible:outline-(--color-brand)"
       >
         <CircleHelp aria-hidden className="size-4" />
       </PopoverTrigger>
