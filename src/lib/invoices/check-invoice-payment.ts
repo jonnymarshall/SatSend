@@ -2,7 +2,8 @@ import { fetchAddressTxs } from "@/lib/mempool";
 import { addressNetworkError } from "@/lib/btc-network";
 import { isValidBtcAddress } from "@/lib/invoices";
 import { fetchBtcPrice } from "@/lib/btc-price";
-import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
+import { decidePaymentSchedule, type ScheduleDecision } from "@/lib/invoices/payment-schedule";
+import type { PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Invoice } from "@/lib/invoice-public";
@@ -27,6 +28,7 @@ export type CheckableInvoice = Pick<
   | "stage_attempt"
   | "invoice_number"
   | "client_name"
+  | "client_company"
   | "client_email"
   | "total_fiat"
   | "currency"
@@ -37,9 +39,35 @@ export type CheckableInvoice = Pick<
 > & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
 
 export const CHECKABLE_COLUMNS =
-  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email";
+  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_company, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email";
 
 export const CHECKABLE_STATUSES = ["pending", "payment_detected", "overdue"] as const;
+
+/**
+ * The invoice as it stands after a decision, for the payment emails' block
+ * (v1.5.28). Built from the decision because the emails go out before anything
+ * re-reads the row.
+ */
+export function paymentAfterDecision(
+  inv: Pick<Invoice, "total_fiat" | "currency" | "your_company" | "your_name" | "client_company" | "client_name">,
+  decision: ScheduleDecision,
+): PaymentSummaryInvoice {
+  return {
+    status: decision.newStatus,
+    pre_archive_status: null,
+    overpaid: decision.overpaid,
+    total_fiat: inv.total_fiat,
+    currency: inv.currency,
+    amount_received_sats: decision.amountReceivedSats,
+    amount_received_fiat: decision.amountReceivedFiat,
+    payment_confirmed_at: decision.confirmedAt,
+    mempool_seen_at: decision.newMempoolSeenAt,
+    your_company: inv.your_company,
+    your_name: inv.your_name,
+    client_company: inv.client_company,
+    client_name: inv.client_name,
+  };
+}
 
 export type CheckOutcome =
   | "transitioned" // a payment moved the status on (emails sent)
@@ -174,14 +202,11 @@ export async function checkInvoicePayment(
           totalFiat: inv.total_fiat,
           currency: inv.currency,
           txid: decision.detectedTxid,
+          btcAddress: inv.btc_address,
+          payment: paymentAfterDecision(inv, decision),
         };
         if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
-          await sendPaymentConfirmedEmail({
-            ...emailArgs,
-            status: decision.newStatus,
-            amountReceivedFiat: decision.amountReceivedFiat,
-            overpaid: decision.overpaid,
-          });
+          await sendPaymentConfirmedEmail(emailArgs);
         } else {
           await sendPaymentDetectedEmail(emailArgs);
         }

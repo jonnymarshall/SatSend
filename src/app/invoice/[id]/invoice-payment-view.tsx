@@ -17,21 +17,17 @@ import { LogoHomeLink } from "@/components/brand/logo-home-link";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
-import { isWithinAllowance } from "@/lib/invoices/payment-schedule";
+import {
+  RATE_VARIANCE_EXPLAINED,
+  formatPaymentTime,
+  hasPayment,
+  paymentSummary,
+  shortTxid,
+  type PaymentState,
+} from "@/lib/invoices/payment-summary";
 
 function isPayableStatus(s: PublicInvoice["status"]): boolean {
   return s === "pending" || s === "overdue";
-}
-
-// v1.5.27 (roadmap v1.5.2.13-H): once a payment exists the invoice can't be paid
-// again, so the page shows no QR and no live BTC amount. Keyed on the txid (from
-// the server, the watcher or realtime), with the paid statuses as a backstop.
-function hasPayment(s: PublicInvoice["status"], txid: string | null): boolean {
-  return !!txid || s === "payment_detected" || s === "paid" || s === "underpaid";
-}
-
-function satsToBtc(sats: number): string {
-  return (sats / 100_000_000).toFixed(8).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 interface Props {
@@ -289,28 +285,15 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   );
 }
 
-type PaymentState = "payment_detected" | "paid" | "underpaid" | "overpaid";
-
 // One look per state (v1.5.27): the same colours as the status badges, plus an
-// icon, so the state reads at a glance without the text.
-const STATE_LOOK: Record<PaymentState, { heading: string; Icon: LucideIcon; soft: string; text: string }> = {
-  payment_detected: { heading: "Payment detected", Icon: Clock, soft: "bg-(--color-detected-soft)", text: "text-(--color-detected-text)" },
-  paid: { heading: "Paid", Icon: CircleCheck, soft: "bg-(--color-success-soft)", text: "text-(--color-success-text)" },
-  underpaid: { heading: "Underpaid", Icon: TriangleAlert, soft: "bg-(--color-warning-soft)", text: "text-(--color-warning-text)" },
-  overpaid: { heading: "Overpaid", Icon: CirclePlus, soft: "bg-(--color-sent-soft)", text: "text-(--color-sent-text)" },
+// icon, so the state reads at a glance without the text. The words come from
+// paymentSummary (v1.5.28), shared with the emails and the PDF.
+const STATE_LOOK: Record<PaymentState, { Icon: LucideIcon; soft: string; text: string }> = {
+  payment_detected: { Icon: Clock, soft: "bg-(--color-detected-soft)", text: "text-(--color-detected-text)" },
+  paid: { Icon: CircleCheck, soft: "bg-(--color-success-soft)", text: "text-(--color-success-text)" },
+  underpaid: { Icon: TriangleAlert, soft: "bg-(--color-warning-soft)", text: "text-(--color-warning-text)" },
+  overpaid: { Icon: CirclePlus, soft: "bg-(--color-sent-soft)", text: "text-(--color-sent-text)" },
 };
-
-function paymentState(invoice: PublicInvoice, status: PublicInvoice["status"]): PaymentState {
-  // An archived invoice reads as whatever it was before archiving.
-  const shown = status === "archived" ? (invoice.pre_archive_status ?? status) : status;
-  if (shown === "underpaid") return "underpaid";
-  if (shown === "paid" || shown === "archived") return invoice.overpaid ? "overpaid" : "paid";
-  return "payment_detected";
-}
-
-function shortTxid(txid: string): string {
-  return txid.length > 20 ? `${txid.slice(0, 8)}…${txid.slice(-8)}` : txid;
-}
 
 // The server renders in UTC; the browser then shows the payer's own time zone.
 // useSyncExternalStore keeps that switch free of hydration mismatches.
@@ -321,18 +304,6 @@ function useTimeZone(): string {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     () => "UTC",
   );
-}
-
-function fmtDateTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-    timeZone,
-  }).format(new Date(iso));
 }
 
 /**
@@ -355,13 +326,11 @@ function RateVarianceHelp() {
       </PopoverTrigger>
       <PopoverContent id="invoice-view--rate-variance-popover" side="top" className="w-72 gap-1.5 leading-[1.5]">
         <PopoverTitle className="font-semibold">Exchange Rate Variance</PopoverTitle>
-        <p className="text-(--color-text-secondary)">
-          The bitcoin amount was set by the exchange rate at the time of payment. The value shown here uses the rate
-          when the payment confirmed, a little later, so the two can differ slightly.
-        </p>
-        <p className="text-(--color-text-secondary)">
-          A small difference like this counts as paid in full, so nothing is outstanding.
-        </p>
+        {RATE_VARIANCE_EXPLAINED.map((line) => (
+          <p key={line} className="text-(--color-text-secondary)">
+            {line}
+          </p>
+        ))}
       </PopoverContent>
     </Popover>
   );
@@ -385,51 +354,9 @@ function PaymentReceived({
   txLink: string;
 }) {
   const timeZone = useTimeZone();
-  const cur = invoice.currency;
-  const state = paymentState(invoice, status);
+  const summary = paymentSummary(invoice, { audience: "client", status });
+  const { state, sums, message, time } = summary;
   const look = STATE_LOOK[state];
-  const sats = invoice.amount_received_sats;
-  const fiat = invoice.amount_received_fiat;
-  const btc = sats !== null ? `${satsToBtc(sats)} BTC` : null;
-  const sender = invoice.your_company || invoice.your_name || "the sender of this invoice";
-  // What's still owed: nothing once paid (within the 5% allowance counts as in
-  // full), the rest when underpaid, and below zero when overpaid (Jonny,
-  // 2026-10-27). Null when there's nothing to sum (detected, or marked paid by
-  // hand with no amount recorded).
-  const outstanding =
-    fiat === null || state === "payment_detected" ? null : state === "paid" ? 0 : invoice.total_fiat - fiat;
-  // A paid invoice's gap (within the allowance) shown as its own row, so the
-  // sums add up on screen (Jonny, 2026-10-27). Worked out from the rounded cents
-  // the rows show, so Requested + this row always equals Received.
-  // Only inside the allowance: a bigger gap on a paid invoice means the sender
-  // marked it paid by hand (say, an underpaid invoice settled another way), and
-  // calling that exchange rate movement would be untrue.
-  const markedPaidBySender = state === "paid" && fiat !== null && !isWithinAllowance(fiat, invoice.total_fiat);
-  const rateDifference =
-    state === "paid" && fiat !== null && !markedPaidBySender
-      ? (Math.round(fiat * 100) - Math.round(invoice.total_fiat * 100)) / 100
-      : 0;
-
-  // The box says what arrived; the text only says what to do next (Jonny,
-  // 2026-10-27). Paid needs none.
-  let message: string | null = null;
-  if (state === "underpaid") {
-    message = `To resolve full settlement of this invoice, reach out to ${sender}.`;
-  } else if (state === "overpaid") {
-    message = `To resolve overpayment of this invoice, reach out to ${sender}.`;
-  } else if (markedPaidBySender) {
-    message = `Marked as paid by ${sender}.`;
-  } else if (state === "payment_detected") {
-    message =
-      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
-  }
-
-  const confirmedAt = state === "payment_detected" ? null : invoice.payment_confirmed_at;
-  const time = confirmedAt
-    ? { label: "Paid on", iso: confirmedAt }
-    : invoice.mempool_seen_at
-      ? { label: "Seen at", iso: invoice.mempool_seen_at }
-      : null;
 
   const row = "flex items-start justify-between gap-4";
   const rowLabel = "shrink-0 text-(--color-text-secondary)";
@@ -441,41 +368,35 @@ function PaymentReceived({
           <look.Icon aria-hidden className="size-8" strokeWidth={2} />
         </div>
         <h2 id="invoice-view--payment-received-heading" className={`font-display tracking-heading text-2xl font-semibold ${look.text}`}>
-          {look.heading}
+          {summary.heading}
         </h2>
       </div>
 
-      {outstanding !== null && (
+      {sums && (
         <div id="invoice-view--payment-sums" className={`space-y-2 rounded-(--radius-md) p-4 text-[15px] ${look.soft}`}>
           <div id="invoice-view--payment-sum-requested" className="flex justify-between gap-3">
             <span className="text-(--color-ink)/70">Requested</span>
-            <span className="tabular-nums">{fmtCurrency(invoice.total_fiat, cur)}</span>
+            <span className="tabular-nums">{sums.requested}</span>
           </div>
           <div id="invoice-view--payment-sum-received" className="flex justify-between gap-3">
             <span className="text-(--color-ink)/70">Received</span>
             <span className="text-right tabular-nums">
-              {fmtCurrency(fiat!, cur)}
-              {btc && <span className="text-(--color-ink)/70 text-[13px]"> ({btc})</span>}
+              {sums.received}
+              {sums.receivedBtc && <span className="text-(--color-ink)/70 text-[13px]"> ({sums.receivedBtc})</span>}
             </span>
           </div>
-          {rateDifference !== 0 && (
+          {sums.rateVariance && (
             <div id="invoice-view--payment-sum-rate" className="flex justify-between gap-3">
               <span className="flex items-center gap-1 text-(--color-ink)/70">
                 Exchange Rate Variance
                 <RateVarianceHelp />
               </span>
-              <span className="tabular-nums">
-                {rateDifference < 0 ? "−" : "+"}
-                {fmtCurrency(Math.abs(rateDifference), cur)}
-              </span>
+              <span className="tabular-nums">{sums.rateVariance}</span>
             </div>
           )}
           <div id="invoice-view--payment-sum-outstanding" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">
             <span>Outstanding</span>
-            <span className={`tabular-nums ${look.text}`}>
-              {outstanding < 0 && "−"}
-              {fmtCurrency(Math.abs(outstanding), cur)}
-            </span>
+            <span className={`tabular-nums ${look.text}`}>{sums.outstanding}</span>
           </div>
         </div>
       )}
@@ -483,7 +404,7 @@ function PaymentReceived({
       {message && (
         <p
           id="invoice-view--payment-received-message"
-          className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${outstanding === null ? "text-center" : ""}`}
+          className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${sums ? "" : "text-center"}`}
         >
           {message}
         </p>
@@ -494,7 +415,7 @@ function PaymentReceived({
           <div className={row}>
             <span className={rowLabel}>{time.label}</span>
             <span id="invoice-view--payment-time" className="text-right font-medium">
-              {fmtDateTime(time.iso, timeZone)}
+              {formatPaymentTime(time.iso, timeZone)}
             </span>
           </div>
         )}

@@ -29,6 +29,24 @@ import {
   sendPaymentConfirmedEmail,
 } from "./send";
 
+// v1.5.28: the payment emails carry the payment block, built from this.
+const PAYMENT = {
+  status: "payment_detected" as const,
+  pre_archive_status: null,
+  overpaid: false,
+  total_fiat: 250,
+  currency: "USD",
+  amount_received_sats: null,
+  amount_received_fiat: null,
+  payment_confirmed_at: null,
+  mempool_seen_at: "2026-10-27T12:18:00Z",
+  your_company: null,
+  your_name: "Charles",
+  client_company: null,
+  client_name: "Ada",
+};
+const CONFIRMED = { ...PAYMENT, status: "paid" as const, amount_received_sats: 500_000, amount_received_fiat: 250, payment_confirmed_at: "2026-10-27T12:32:00Z" };
+
 const baseArgs = {
   to: "client@example.com",
   userId: "user-123",
@@ -179,6 +197,8 @@ describe("sendPaymentDetectedEmail", () => {
     totalFiat: 250,
     currency: "USD",
     txid: "tx-abc",
+    btcAddress: "bc1qaddr",
+    payment: PAYMENT,
   };
 
   it("sends one email to the owner and one to the payer when both addresses are set", async () => {
@@ -287,6 +307,8 @@ describe("sendPaymentConfirmedEmail", () => {
     totalFiat: 250,
     currency: "USD",
     txid: "tx-abc",
+    btcAddress: "bc1qaddr",
+    payment: PAYMENT,
   };
 
   it("sends one email to the owner and one to the payer when both addresses are set", async () => {
@@ -309,22 +331,26 @@ describe("sendPaymentConfirmedEmail", () => {
     await expect(sendPaymentConfirmedEmail(paymentArgs)).resolves.toBeUndefined();
   });
 
-  it("uses a partial-payment subject when status is underpaid", async () => {
-    await sendPaymentConfirmedEmail({
-      ...paymentArgs,
-      status: "underpaid",
-      amountReceivedFiat: 62.5,
-    });
-
+  // v1.5.28: subjects name the state; "Partial payment" became "Underpaid".
+  it.each([
+    ["paid", CONFIRMED, /INV-1 confirmed on-chain/i, /your payment for invoice INV-1 is confirmed/i],
+    ["underpaid", { ...CONFIRMED, status: "underpaid" as const, amount_received_fiat: 62.5 }, /^Underpaid payment for invoice INV-1$/, /^Underpaid payment for invoice INV-1$/],
+    ["overpaid", { ...CONFIRMED, overpaid: true, amount_received_fiat: 300 }, /^Overpayment received for invoice INV-1$/, /^Overpayment received for invoice INV-1$/],
+  ])("%s: the subject names the state", async (_label, payment, ownerSubject, payerSubject) => {
+    await sendPaymentConfirmedEmail({ ...paymentArgs, payment });
     const ownerCall = mockResendSend.mock.calls.find((call) => call[0].to === "owner@example.com");
-    expect(ownerCall![0].subject).toMatch(/partial payment/i);
+    const payerCall = mockResendSend.mock.calls.find((call) => call[0].to === "payer@example.com");
+    expect(ownerCall![0].subject).toMatch(ownerSubject);
+    expect(payerCall![0].subject).toMatch(payerSubject);
   });
 
-  it("uses the standard confirmed subject when status is paid (default)", async () => {
-    await sendPaymentConfirmedEmail(paymentArgs);
-
-    const ownerCall = mockResendSend.mock.calls.find((call) => call[0].to === "owner@example.com");
-    expect(ownerCall![0].subject).not.toMatch(/partial payment/i);
+  it("the client's email points them to the sender, the sender's to the client", async () => {
+    const { render } = await import("@react-email/render");
+    await sendPaymentConfirmedEmail({ ...paymentArgs, payment: { ...CONFIRMED, status: "underpaid", amount_received_fiat: 62.5 } });
+    const owner = mockResendSend.mock.calls.find((call) => call[0].to === "owner@example.com")![0];
+    const payer = mockResendSend.mock.calls.find((call) => call[0].to === "payer@example.com")![0];
+    expect(await render(payer.react, { plainText: true })).toContain("reach out to Charles.");
+    expect(await render(owner.react, { plainText: true })).toContain("reach out to Ada.");
   });
 });
 
@@ -340,6 +366,8 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
     totalFiat: 500,
     currency: "USD",
     txid: "tx-abc",
+    btcAddress: "bc1qaddr",
+    payment: PAYMENT,
   };
 
   it("every email carries a plain-text version alongside the HTML", async () => {
@@ -399,6 +427,8 @@ describe("logo embedded in the email (v1.5.12)", () => {
     totalFiat: 250,
     currency: "USD",
     txid: "tx-abc",
+    btcAddress: "bc1qaddr",
+    payment: PAYMENT,
   };
 
   it("attaches the logo inline and the HTML points at it, not at a web address", async () => {
@@ -408,16 +438,45 @@ describe("logo embedded in the email (v1.5.12)", () => {
 
     await sendInvoicePublishedEmail(baseArgs);
     await sendPaymentDetectedEmail(paymentArgs);
-    await sendPaymentConfirmedEmail({ ...paymentArgs, status: "paid", amountReceivedFiat: 250, overpaid: false });
+    await sendPaymentConfirmedEmail({ ...paymentArgs, payment: CONFIRMED });
 
     expect(mockResendSend.mock.calls.length).toBeGreaterThanOrEqual(5);
     for (const [payload] of mockResendSend.mock.calls) {
-      expect(payload.attachments).toEqual([
-        { filename: "satsend-logo.png", content: png, contentType: "image/png", contentId: "satsend-logo" },
-      ]);
+      expect(payload.attachments[0]).toEqual({
+        filename: "satsend-logo.png",
+        content: png,
+        contentType: "image/png",
+        contentId: "satsend-logo",
+      });
       const html = await render(payload.react);
       expect(html).toContain('src="cid:satsend-logo"');
       expect(html).not.toContain("/brand/satsend-logo-email.png");
     }
+  });
+
+  // v1.5.28: payment emails also carry their state's icon, inline like the logo.
+  it("payment emails attach their state's icon, the same picture as public/brand", async () => {
+    const { render } = await import("@react-email/render");
+    const { readFileSync } = await import("node:fs");
+    await sendPaymentDetectedEmail(paymentArgs);
+    await sendPaymentConfirmedEmail({ ...paymentArgs, payment: CONFIRMED });
+    const [detectedOwner, , confirmedOwner] = mockResendSend.mock.calls.map(([p]) => p);
+    for (const [payload, state, cid] of [
+      [detectedOwner, "payment_detected", "satsend-status-payment-detected"],
+      [confirmedOwner, "paid", "satsend-status-paid"],
+    ] as const) {
+      expect(payload.attachments[1]).toEqual({
+        filename: `${cid}.png`,
+        content: readFileSync(`public/brand/email-status-${state}.png`).toString("base64"),
+        contentType: "image/png",
+        contentId: cid,
+      });
+      expect(await render(payload.react)).toContain(`src="cid:${cid}"`);
+    }
+  });
+
+  it("the invoice email carries only the logo", async () => {
+    await sendInvoicePublishedEmail(baseArgs);
+    expect(mockResendSend.mock.calls[0][0].attachments).toHaveLength(1);
   });
 });

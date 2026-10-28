@@ -6,6 +6,7 @@ import { fetchTx, fetchTipHeight, txPaysToAddress } from "@/lib/mempool";
 import { fetchBtcPrice } from "@/lib/btc-price";
 import { hasAccess, accessCookieName } from "@/lib/access-code";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
+import { paymentAfterDecision } from "@/lib/invoices/check-invoice-payment";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 
 const STATUS_ORDER: Record<string, number> = {
@@ -42,7 +43,7 @@ export async function POST(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, btc_address, status, user_id, invoice_number, client_name, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code"
+      "id, btc_address, status, user_id, invoice_number, client_name, client_company, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code"
     )
     .eq("id", id)
     .single();
@@ -142,14 +143,11 @@ export async function POST(
         totalFiat: invoice.total_fiat,
         currency: invoice.currency,
         txid,
+        btcAddress: invoice.btc_address!,
+        payment: paymentAfterDecision(invoice, decision),
       };
       if (decision.newStatus === "paid" || decision.newStatus === "underpaid") {
-        await sendPaymentConfirmedEmail({
-          ...emailArgs,
-          status: decision.newStatus,
-          amountReceivedFiat: decision.amountReceivedFiat,
-          overpaid: decision.overpaid,
-        });
+        await sendPaymentConfirmedEmail(emailArgs);
       } else {
         await sendPaymentDetectedEmail(emailArgs);
       }
