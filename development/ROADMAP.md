@@ -666,7 +666,13 @@ gate on the status string alone.
       ("To discuss the extra $X, reach out to [Sender]"), and the date and time
       ("Paid on", from the block's time in new column `payment_confirmed_at`,
       migration 0037; else "Seen at"). Design chosen from four proposals on a
-      canvas: receipt layout, sums only when the amount was wrong.
+      canvas: receipt layout. After manual testing (Jonny, 2026-10-27): the
+      sums box on every paid state, "Outstanding" instead of "Difference"
+      ($0.00 paid, positive underpaid, negative overpaid); transaction ID in
+      full except on phones; the open page rechecks on each new block while a
+      payment is detected (it used to stay "Payment detected" until reloaded);
+      "Mark as unpaid" removed for blockchain-confirmed payments (it flipped
+      straight back and resent the email).
 
 **Done when:** a paid/detected invoice never renders a payment QR or a live BTC
 amount, however and whenever its page is loaded.

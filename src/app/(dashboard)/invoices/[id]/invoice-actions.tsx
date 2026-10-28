@@ -30,6 +30,7 @@ interface Invoice {
   sent_at?: string | null;
   send_method?: string | null;
   email_attempted_at?: string | null;
+  btc_txid?: string | null;
 }
 
 export function InvoiceActions({ invoice }: { invoice: Invoice }) {
@@ -206,6 +207,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
             onMarkPaid={(id) => run(() => markPaid(id))}
             onMarkUnpaid={(id) => run(() => markUnpaid(id))}
             onMarkOverdue={(id) => run(() => markOverdue(id))}
+            paidOnChain={!!invoice.btc_txid}
           />
         )}
 

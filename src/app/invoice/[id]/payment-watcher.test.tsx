@@ -15,7 +15,9 @@ class MockWebSocket {
   onclose: (() => void) | null = null;
   send = vi.fn();
   close = vi.fn();
+  static last: MockWebSocket | null = null;
   constructor() {
+    MockWebSocket.last = this;
     setTimeout(() => this.onopen?.(), 0);
   }
 }
@@ -428,4 +430,29 @@ describe("PaymentWatcher", () => {
   // visibility-paused / revealed-only behaviour is now provided by the active
   // poll tests above and by the v1.4.13.2 "WS close does NOT trigger any
   // polling" test for window-shoppers.
+
+  // v1.5.27: a payment is final at 2 confirmations. The block that first
+  // confirms it arrives while it is still "payment detected"; nothing used to
+  // look again, so the page sat on "Payment detected" until reloaded.
+  it("rechecks on each new block while payment is detected, so it flips to paid without a reload", async () => {
+    const onStatusChange = vi.fn();
+    render(
+      <PaymentWatcher invoiceId="inv-1" btcAddress="tb1qtarget" status="payment_detected" onStatusChange={onStatusChange} />
+    );
+    await waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1));
+
+    mockFetchAddressTxs.mockResolvedValue([confirmedTx]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "paid" }), { status: 200 }));
+    MockWebSocket.last!.onmessage?.({ data: JSON.stringify({ block: { height: 102 } }) });
+
+    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith("paid", "tx1"));
+  });
+
+  it("a new block doesn't trigger a check while nothing has been paid (no extra calls for visitors)", async () => {
+    render(<PaymentWatcher invoiceId="inv-1" btcAddress="tb1qtarget" status="pending" onStatusChange={vi.fn()} />);
+    await waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1));
+    MockWebSocket.last!.onmessage?.({ data: JSON.stringify({ block: { height: 102 } }) });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
+  });
 });

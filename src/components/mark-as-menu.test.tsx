@@ -13,7 +13,7 @@ function open() {
   fireEvent.click(screen.getByRole("button", { name: /mark as/i }));
 }
 
-function renderMenu(props: { status: InvoiceForOverdueActions["status"]; dueDate?: string | null; invoiceId?: string }) {
+function renderMenu(props: { status: InvoiceForOverdueActions["status"]; dueDate?: string | null; invoiceId?: string; paidOnChain?: boolean }) {
   render(
     <MarkAsMenu
       invoiceId={props.invoiceId ?? "inv-1"}
@@ -22,6 +22,7 @@ function renderMenu(props: { status: InvoiceForOverdueActions["status"]; dueDate
       onMarkPaid={onMarkPaid}
       onMarkUnpaid={onMarkUnpaid}
       onMarkOverdue={onMarkOverdue}
+      paidOnChain={props.paidOnChain}
     />,
   );
 }
@@ -119,5 +120,22 @@ describe("MarkAsMenu — wiring", () => {
       />,
     );
     expect(screen.getByRole("button", { name: /mark as/i })).toBeDisabled();
+  });
+});
+
+// v1.5.27: a payment confirmed on the blockchain can't be undone by marking the
+// invoice unpaid; the next check finds the bitcoin again, flips it back to paid
+// and sends the confirmation email a second time.
+describe("MarkAsMenu — payments confirmed on the blockchain (v1.5.27)", () => {
+  it("offers no Unpaid for a paid invoice with a blockchain payment", () => {
+    renderMenu({ status: "paid", paidOnChain: true });
+    open();
+    expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
+  });
+
+  it("still offers Unpaid for an invoice marked paid by hand", () => {
+    renderMenu({ status: "paid", paidOnChain: false });
+    open();
+    expect(screen.getByRole("menuitem", { name: /^unpaid$/i })).toBeInTheDocument();
   });
 });

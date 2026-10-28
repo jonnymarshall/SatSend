@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointing the client to the sender about the extra. A payment that confirms
   during the visit loads its amount without a reload. Migration 0037 adds
   `invoices.payment_confirmed_at`, filled from the block's time.
+- **v1.5.27 (follow-up) — Payment fixes found in manual testing.** An open
+  invoice page now checks again on each new block while a payment is detected,
+  so it turns to Paid without a reload (a payment needs 2 confirmations, and
+  nothing used to look after the first). A payment confirmed on the
+  blockchain can no longer be marked unpaid: the next check found the bitcoin
+  again, flipped it back and resent the confirmation email. The sums box now
+  shows on every paid invoice, with "Outstanding" ($0.00 when paid, the rest
+  when underpaid, below zero when overpaid), and the transaction ID shows in
+  full except at phone width.
 
 ### Fixed
 

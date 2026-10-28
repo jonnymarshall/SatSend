@@ -287,8 +287,8 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     const { container } = render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
     expectNothingPayable();
     expect(screen.getByRole("heading", { name: /^paid$/i })).toBeInTheDocument();
-    expect(screen.getByText("0.01 BTC · $500.00")).toBeInTheDocument();
-    expect(container.textContent).toContain("was received to the bitcoin address for this invoice.");
+    expect(document.getElementById("invoice-view--payment-sum-received")!.textContent).toContain("$500.00");
+    expect(container.textContent).toContain("This was received to the bitcoin address for this invoice.");
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });
 
@@ -362,12 +362,20 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
   const block = () => document.getElementById("invoice-view--payment-received")!;
   const sumRow = (name: string) => document.getElementById(`invoice-view--payment-sum-${name}`)?.textContent;
 
-  it("paid: green state, the amount, and when it confirmed; no sums", () => {
+  it("paid: green state, the sums with nothing outstanding, and when it confirmed", () => {
     render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
     expect(block()).toHaveAttribute("data-state", "paid");
     expect(screen.getByText("Paid on")).toBeInTheDocument();
     expect(document.getElementById("invoice-view--payment-time")!.textContent).toMatch(/Oct 27, 2026/);
-    expect(document.getElementById("invoice-view--payment-sums")).toBeNull();
+    expect(sumRow("requested")).toContain("$100.00");
+    expect(sumRow("received")).toContain("0.002 BTC");
+    expect(sumRow("outstanding")).toContain("Outstanding");
+    expect(sumRow("outstanding")).toContain("$0.00");
+  });
+
+  it("paid within the 5% allowance still shows nothing outstanding", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 98 }} btcPrice={50000} />);
+    expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
   });
 
   it("overpaid: its own state, the sums, and the approved wording", () => {
@@ -377,7 +385,7 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("requested")).toContain("$100.00");
     expect(sumRow("received")).toContain("$112.00");
     expect(sumRow("received")).toContain("0.00224 BTC");
-    expect(sumRow("difference")).toContain("+$12.00");
+    expect(sumRow("outstanding")).toMatch(/−\$12\.00$/);
     expect(container.textContent).toContain(
       "This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra $12.00, reach out to Maya Design Ltd.",
     );
@@ -389,10 +397,10 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(capturedWatcherOverpaid).toBe(true);
   });
 
-  it("underpaid: amber state with a negative difference", () => {
+  it("underpaid: amber state with the rest outstanding", () => {
     render(<InvoicePaymentView invoice={UNDERPAID} btcPrice={50000} />);
     expect(block()).toHaveAttribute("data-state", "underpaid");
-    expect(sumRow("difference")).toContain("−$38.50");
+    expect(sumRow("outstanding")).toMatch(/Outstanding\$38\.50$/);
   });
 
   it("an archived overpaid invoice still reads as overpaid", () => {
@@ -427,13 +435,15 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(screen.getByText("tb1qtarget")).toBeInTheDocument();
   });
 
-  it("a long transaction ID is shortened, with the full ID kept on the link", () => {
+  it("the transaction ID is shown in full, shortened only on a phone", () => {
     const txid = "e2e0000000000000000000000000000000000000000000000000000000000001";
     render(<InvoicePaymentView invoice={{ ...PAID, btc_txid: txid }} btcPrice={50000} />);
     const link = document.getElementById("invoice-view--btc-txid")!;
-    expect(link.textContent).toContain("e2e00000…00000001");
+    expect(document.getElementById("invoice-view--btc-txid-full")).toHaveTextContent(txid);
+    expect(document.getElementById("invoice-view--btc-txid-full")).toHaveClass("hidden", "sm:inline");
+    expect(document.getElementById("invoice-view--btc-txid-short")).toHaveTextContent("e2e00000…00000001");
+    expect(document.getElementById("invoice-view--btc-txid-short")).toHaveClass("sm:hidden");
     expect(link).toHaveAttribute("href", `https://mempool.space/tx/${txid}`);
-    expect(link).toHaveAttribute("title", txid);
   });
 
   it("a live status change to paid reloads the invoice's figures from the server", () => {

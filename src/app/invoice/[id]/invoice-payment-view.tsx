@@ -358,17 +358,21 @@ function PaymentReceived({
   const fiat = invoice.amount_received_fiat;
   const btc = sats !== null ? `${satsToBtc(sats)} BTC` : null;
   const sender = invoice.your_company || invoice.your_name || "the sender of this invoice";
-  // The sums only matter when the amount was wrong.
-  const difference = fiat !== null && (state === "underpaid" || state === "overpaid") ? fiat - invoice.total_fiat : null;
+  // What's still owed: nothing once paid (within the 5% allowance counts as in
+  // full), the rest when underpaid, and below zero when overpaid (Jonny,
+  // 2026-10-27). Null when there's nothing to sum (detected, or marked paid by
+  // hand with no amount recorded).
+  const outstanding =
+    fiat === null || state === "payment_detected" ? null : state === "paid" ? 0 : invoice.total_fiat - fiat;
 
   let message: string;
   if (state === "underpaid") {
-    message = `${difference !== null ? "This" : "Less than the amount requested"} was received to the bitcoin address for this invoice${difference !== null ? ", less than the amount requested" : ""}. To resolve full settlement of this invoice, reach out to ${sender}.`;
+    message = `${outstanding !== null ? "This" : "Less than the amount requested"} was received to the bitcoin address for this invoice${outstanding !== null ? ", less than the amount requested" : ""}. To resolve full settlement of this invoice, reach out to ${sender}.`;
   } else if (state === "overpaid") {
-    message = `This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra ${fmtCurrency(difference ?? 0, cur)}, reach out to ${sender}.`;
+    message = `This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra ${fmtCurrency(-(outstanding ?? 0), cur)}, reach out to ${sender}.`;
   } else if (state === "paid") {
-    message = btc
-      ? "was received to the bitcoin address for this invoice."
+    message = outstanding !== null
+      ? "This was received to the bitcoin address for this invoice."
       : "Payment was received to the bitcoin address for this invoice.";
   } else {
     message =
@@ -394,14 +398,9 @@ function PaymentReceived({
         <h2 id="invoice-view--payment-received-heading" className={`font-display tracking-heading text-2xl font-semibold ${look.text}`}>
           {look.heading}
         </h2>
-        {state === "paid" && btc && (
-          <p id="invoice-view--payment-amount" className="font-display text-xl font-semibold tabular-nums">
-            {btc}{fiat !== null && ` · ${fmtCurrency(fiat, cur)}`}
-          </p>
-        )}
       </div>
 
-      {difference !== null && (
+      {outstanding !== null && (
         <div id="invoice-view--payment-sums" className={`space-y-2 rounded-(--radius-md) p-4 text-[15px] ${look.soft}`}>
           <div id="invoice-view--payment-sum-requested" className="flex justify-between gap-3">
             <span className="text-(--color-ink)/70">Requested</span>
@@ -414,11 +413,11 @@ function PaymentReceived({
               {btc && <span className="text-(--color-ink)/70 text-[13px]"> ({btc})</span>}
             </span>
           </div>
-          <div id="invoice-view--payment-sum-difference" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">
-            <span>Difference</span>
+          <div id="invoice-view--payment-sum-outstanding" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">
+            <span>Outstanding</span>
             <span className={`tabular-nums ${look.text}`}>
-              {difference < 0 ? "−" : "+"}
-              {fmtCurrency(Math.abs(difference), cur)}
+              {outstanding < 0 && "−"}
+              {fmtCurrency(Math.abs(outstanding), cur)}
             </span>
           </div>
         </div>
@@ -426,7 +425,7 @@ function PaymentReceived({
 
       <p
         id="invoice-view--payment-received-message"
-        className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${difference === null ? "text-center" : ""}`}
+        className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${outstanding === null ? "text-center" : ""}`}
       >
         {message}
       </p>
@@ -454,10 +453,12 @@ function PaymentReceived({
               href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
               target="_blank"
               rel="noopener noreferrer"
-              title={btcTxid}
+              aria-label={btcTxid}
               className={`min-w-0 text-right text-[13px] ${txLink}`}
             >
-              {shortTxid(btcTxid)}
+              {/* In full where it fits; shortened only on a phone. */}
+              <span id="invoice-view--btc-txid-full" className="hidden sm:inline">{btcTxid}</span>
+              <span id="invoice-view--btc-txid-short" className="sm:hidden">{shortTxid(btcTxid)}</span>
             </a>
           </div>
         )}
