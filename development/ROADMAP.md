@@ -683,7 +683,7 @@ amount, however and whenever its page is loaded.
 
 ---
 
-### ⏳ v1.5.2.21-H — The payment block in emails and PDFs (**pre-launch**)
+### ✅ v1.5.2.21-H — The payment block in emails and PDFs (**pre-launch**)
 
 **Branch:** `v1.5.28/payment-block-emails-pdf` · package `1.5.28` · no migration
 expected.
@@ -698,24 +698,28 @@ wording rule (never imply SatSend holds funds). The PDF has a plain "Paid in
 bitcoin" panel.
 
 **Scope (decisions agreed 2026-10-27):**
-- [ ] Every payment email gets the block: coloured circle icon and state name
+- [x] Every payment email gets the block: coloured circle icon and state name
       (Payment detected violet clock, Paid green tick, Underpaid amber warning,
       Overpaid blue plus), the Requested / Received / [Exchange Rate
       Variance] / Outstanding box, the next-step sentence, "Paid on" or
       "Seen at", the full address and the full transaction ID.
-- [ ] Icons in emails are small PNGs attached inline, like the logo (email
+- [x] Icons in emails are small PNGs attached inline, like the logo (email
       apps strip SVG).
-- [ ] Client emails: "To resolve full settlement of this invoice, reach out to
+- [x] Client emails: "To resolve full settlement of this invoice, reach out to
       [Sender]." / "To resolve overpayment of this invoice, reach out to
       [Sender]." Sender's own emails name the client instead.
-- [ ] Remove every "we received" (and similar) from the payment emails.
-- [ ] Email times in UTC, named ("2:54 AM UTC"): the reader's zone is unknown.
-- [ ] Subjects: "Underpaid" replaces "Partial payment"; new Overpaid subjects
+- [x] Remove every "we received" (and similar) from the payment emails.
+- [x] Email times in UTC, named ("2:54 AM UTC"): the reader's zone is unknown.
+- [x] Subjects: "Underpaid" replaces "Partial payment"; new Overpaid subjects
       ("Overpayment received for invoice X").
-- [ ] The PDF's paid panel becomes the same block, drawn natively (react-pdf
+- [x] The PDF's paid panel becomes the same block, drawn natively (react-pdf
       `Svg` for the icons); its times use the downloader's time zone, passed
       from the browser.
-- [ ] Manual tests with real sends (Resend) of each state.
+- [x] Manual tests with real sends (Resend) of each state:
+      `manual-tests/v1.5.28-payment-block-emails-pdf.md`, and
+      `scripts/email/send-payment-samples.tsx --to <address>` (the address is
+      only ever typed on the command line; a test fails if a personal address
+      is committed).
 
 ---
 
@@ -744,6 +748,18 @@ honest clients underpaid on volatile days. Agreed plan:
       the numbers when built). Update the FAQ's "within 5%" answer.
 - [ ] Revisit the "Exchange Rate Variance" label: with quotes locked, the
       small gaps left are mostly wallet fees, not the exchange rate.
+
+---
+
+### ⏳ v1.5.2.23-H — Unknown invoice links answer 404 (**pre-launch**, small)
+
+**Context (spotted 2026-10-28, after v1.5.27 shipped).** An unknown invoice
+link (`/invoice/<made-up id>`) shows the "not found" page but answers with
+HTTP 200, so search engines could index it as a real page. The page calls
+`notFound()`; the status is probably lost to streaming.
+
+- [ ] Make an unknown invoice answer 404 (and keep the not-found page).
+- [ ] Test: a made-up id returns 404 on satsend.me after deploy.
 
 ---
 
