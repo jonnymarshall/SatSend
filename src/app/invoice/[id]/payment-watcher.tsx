@@ -45,6 +45,8 @@ interface Props {
   // Bitcoin", or the invoice is already in a paid/detected state). Gates the
   // active alongside-WS poll so window-shoppers don't burn API quota.
   paymentRevealed?: boolean;
+  // v1.5.27: a paid invoice that was overpaid shows an "Overpaid" badge.
+  overpaid?: boolean;
 }
 
 async function reportStatus(
@@ -68,6 +70,7 @@ export function PaymentWatcher({
   status,
   onStatusChange,
   paymentRevealed = false,
+  overpaid = false,
 }: Props) {
   const wsRef = useRef<WebSocket | null>(null);
   // v1.4.13.7: track the latest status in a ref so the active-poll closure
@@ -269,5 +272,5 @@ export function PaymentWatcher({
     };
   }, [invoiceId, btcAddress, onStatusChange, isPaid, paymentRevealed]);
 
-  return <InvoiceStatusBadge status={status} id="invoice-view--status" />;
+  return <InvoiceStatusBadge status={status === "paid" && overpaid ? "overpaid" : status} id="invoice-view--status" />;
 }

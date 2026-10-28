@@ -542,6 +542,7 @@ export async function markUnpaid(invoiceId: string) {
       btc_price_at_detection: null,
       amount_received_fiat: null,
       overpaid: false,
+      payment_confirmed_at: null,
     })
     .eq("id", invoiceId);
 

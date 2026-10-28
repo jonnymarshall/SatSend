@@ -126,6 +126,7 @@ export async function checkInvoicePayment(
       btc_price_at_detection: decision.btcPriceAtDetection,
       amount_received_fiat: decision.amountReceivedFiat,
       overpaid: decision.overpaid,
+      payment_confirmed_at: decision.confirmedAt,
     };
     if (decision.detectedTxid) {
       update.btc_txid = decision.detectedTxid;

@@ -659,6 +659,14 @@ gate on the status string alone.
       settlement of this invoice, reach out to [Sender]." Also fixed: a paid
       invoice viewed while the price service is down no longer says "please
       calculate the amount manually".
+- [x] Follow-up in the same release (Jonny, 2026-10-27): the block reads at a glance. An
+      icon and colour per state (detected violet clock, paid green tick,
+      underpaid amber warning, overpaid blue plus), Requested / Received /
+      Difference for under- and overpaid, "Overpaid" as its own state and badge
+      ("To discuss the extra $X, reach out to [Sender]"), and the date and time
+      ("Paid on", from the block's time in new column `payment_confirmed_at`,
+      migration 0037; else "Seen at"). Design chosen from four proposals on a
+      canvas: receipt layout, sums only when the amount was wrong.
 
 **Done when:** a paid/detected invoice never renders a payment QR or a live BTC
 amount, however and whenever its page is loaded.
@@ -933,7 +941,7 @@ payments; that is safe.
 ### ⏳ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
 
 **Branch:** `v1.5.28/short-invoice-reference` · package `1.5.28` · new migration
-(next free number, `0037` at time of writing). Renumber the package if another
+(next free number: `0038`, since v1.5.27 took `0037`). Renumber the package if another
 item ships between this plan and the branch.
 
 **Context.** Two linked requests from Jonny (2026-10-26):

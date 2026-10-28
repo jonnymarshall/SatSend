@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { CircleCheck, CirclePlus, Clock, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { PublicInvoice } from "@/lib/invoice-public";
 import { fiatToBtc, buildBip21Uri } from "@/lib/btc-qr";
 import { BtcQrCode } from "@/components/btc-qr-code";
@@ -66,6 +68,14 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   );
   usePublicInvoiceRealtime(invoice.id, handleRealtimeUpdate);
 
+  // v1.5.27: a live update carries only the status and txid, so when a payment
+  // lands or confirms during the visit, fetch the invoice again for the amount
+  // received and the times. Stops once the server's status matches.
+  const router = useRouter();
+  useEffect(() => {
+    if (status !== invoice.status && hasPayment(status, btcTxid)) router.refresh();
+  }, [status, invoice.status, btcTxid, router]);
+
   // Auto-reveal payment details for invoices that aren't awaiting payment (already
   // detected/paid), so the txid link is visible without an extra click.
   const showPaymentDetails = userRevealedPayment || !isPayableStatus(status);
@@ -111,6 +121,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                 status={status}
                 onStatusChange={handleWatcherStatusChange}
                 paymentRevealed={showPaymentDetails}
+                overpaid={invoice.overpaid}
               />
             ) : (
               <InvoiceStatusBadge status={status} id="invoice-view--status" />
@@ -258,7 +269,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
         )}
 
         {paymentMade && (
-          <PaymentReceived invoice={invoice} status={status} btcTxid={btcTxid} label={label} txLink={txLink} />
+          <PaymentReceived invoice={invoice} status={status} btcTxid={btcTxid} txLink={txLink} />
         )}
 
         {invoice.btc_address && !btcPrice && !paymentMade && (
@@ -276,78 +287,181 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   );
 }
 
+type PaymentState = "payment_detected" | "paid" | "underpaid" | "overpaid";
+
+// One look per state (v1.5.27): the same colours as the status badges, plus an
+// icon, so the state reads at a glance without the text.
+const STATE_LOOK: Record<PaymentState, { heading: string; Icon: LucideIcon; soft: string; text: string }> = {
+  payment_detected: { heading: "Payment detected", Icon: Clock, soft: "bg-(--color-detected-soft)", text: "text-(--color-detected-text)" },
+  paid: { heading: "Paid", Icon: CircleCheck, soft: "bg-(--color-success-soft)", text: "text-(--color-success-text)" },
+  underpaid: { heading: "Underpaid", Icon: TriangleAlert, soft: "bg-(--color-warning-soft)", text: "text-(--color-warning-text)" },
+  overpaid: { heading: "Overpaid", Icon: CirclePlus, soft: "bg-(--color-sent-soft)", text: "text-(--color-sent-text)" },
+};
+
+function paymentState(invoice: PublicInvoice, status: PublicInvoice["status"]): PaymentState {
+  // An archived invoice reads as whatever it was before archiving.
+  const shown = status === "archived" ? (invoice.pre_archive_status ?? status) : status;
+  if (shown === "underpaid") return "underpaid";
+  if (shown === "paid" || shown === "archived") return invoice.overpaid ? "overpaid" : "paid";
+  return "payment_detected";
+}
+
+function shortTxid(txid: string): string {
+  return txid.length > 20 ? `${txid.slice(0, 8)}…${txid.slice(-8)}` : txid;
+}
+
+// The server renders in UTC; the browser then shows the payer's own time zone.
+// useSyncExternalStore keeps that switch free of hydration mismatches.
+const subscribeNever = () => () => {};
+function useTimeZone(): string {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    () => "UTC",
+  );
+}
+
+function fmtDateTime(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+    timeZone,
+  }).format(new Date(iso));
+}
+
 /**
- * What the payer sees once a payment exists (v1.5.27): no QR, no live amount.
- * Wording says the bitcoin arrived at the invoice's address, never that SatSend
- * ("we") received it: SatSend never holds funds (Jonny, 2026-10-27).
+ * What the payer sees once a payment exists (v1.5.27): no QR,
+ * no live amount. Wording says the bitcoin arrived at the invoice's address,
+ * never that SatSend ("we") received it: SatSend never holds funds (Jonny,
+ * 2026-10-27).
  */
 function PaymentReceived({
   invoice,
   status,
   btcTxid,
-  label,
   txLink,
 }: {
   invoice: PublicInvoice;
   status: PublicInvoice["status"];
   btcTxid: string | null;
-  label: string;
   txLink: string;
 }) {
+  const timeZone = useTimeZone();
   const cur = invoice.currency;
+  const state = paymentState(invoice, status);
+  const look = STATE_LOOK[state];
   const sats = invoice.amount_received_sats;
-  const received =
-    sats !== null
-      ? `${satsToBtc(sats)} BTC${invoice.amount_received_fiat !== null ? ` (${fmtCurrency(invoice.amount_received_fiat, cur)})` : ""}`
-      : null;
+  const fiat = invoice.amount_received_fiat;
+  const btc = sats !== null ? `${satsToBtc(sats)} BTC` : null;
   const sender = invoice.your_company || invoice.your_name || "the sender of this invoice";
-  // An archived invoice reads as whatever it was before archiving.
-  const shown = status === "archived" ? (invoice.pre_archive_status ?? status) : status;
+  // The sums only matter when the amount was wrong.
+  const difference = fiat !== null && (state === "underpaid" || state === "overpaid") ? fiat - invoice.total_fiat : null;
 
-  let heading: string;
   let message: string;
-  if (shown === "underpaid") {
-    heading = "Underpaid";
-    message = received
-      ? `${received} was received to the bitcoin address for this invoice, less than the amount requested. To resolve full settlement of this invoice, reach out to ${sender}.`
-      : `Less than the amount requested was received to the bitcoin address for this invoice. To resolve full settlement of this invoice, reach out to ${sender}.`;
-  } else if (shown === "paid" || shown === "archived") {
-    heading = "Paid";
-    message = received
-      ? `${received} was received to the bitcoin address for this invoice.`
+  if (state === "underpaid") {
+    message = `${difference !== null ? "This" : "Less than the amount requested"} was received to the bitcoin address for this invoice${difference !== null ? ", less than the amount requested" : ""}. To resolve full settlement of this invoice, reach out to ${sender}.`;
+  } else if (state === "overpaid") {
+    message = `This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra ${fmtCurrency(difference ?? 0, cur)}, reach out to ${sender}.`;
+  } else if (state === "paid") {
+    message = btc
+      ? "was received to the bitcoin address for this invoice."
       : "Payment was received to the bitcoin address for this invoice.";
   } else {
-    heading = "Payment detected";
     message =
       "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
   }
 
+  const confirmedAt = state === "payment_detected" ? null : invoice.payment_confirmed_at;
+  const time = confirmedAt
+    ? { label: "Paid on", iso: confirmedAt }
+    : invoice.mempool_seen_at
+      ? { label: "Seen at", iso: invoice.mempool_seen_at }
+      : null;
+
+  const row = "flex items-start justify-between gap-4";
+  const rowLabel = "shrink-0 text-(--color-text-secondary)";
+
   return (
-    <Card id="invoice-view--payment-received" className="space-y-5">
-      <h2 id="invoice-view--payment-received-heading" className="font-display tracking-heading text-xl font-semibold">
-        {heading}
-      </h2>
-      <p id="invoice-view--payment-received-message" className="text-[15px] leading-[1.55] text-(--color-text-secondary)">
-        {message}
-      </p>
-      <div className="space-y-1">
-        <p className={label}>Address</p>
-        <p id="invoice-view--paid-address" className="min-w-0 font-mono text-sm break-all">{invoice.btc_address}</p>
+    <Card id="invoice-view--payment-received" data-state={state} className="space-y-5">
+      <div id="invoice-view--payment-summary" className="flex flex-col items-center gap-3 text-center">
+        <div id="invoice-view--payment-icon" className={`flex size-16 items-center justify-center rounded-full ${look.soft} ${look.text}`}>
+          <look.Icon aria-hidden className="size-8" strokeWidth={2} />
+        </div>
+        <h2 id="invoice-view--payment-received-heading" className={`font-display tracking-heading text-2xl font-semibold ${look.text}`}>
+          {look.heading}
+        </h2>
+        {state === "paid" && btc && (
+          <p id="invoice-view--payment-amount" className="font-display text-xl font-semibold tabular-nums">
+            {btc}{fiat !== null && ` · ${fmtCurrency(fiat, cur)}`}
+          </p>
+        )}
       </div>
-      {btcTxid && (
-        <div className="space-y-1">
-          <p className={label}>Transaction ID</p>
-          <a
-            id="invoice-view--btc-txid"
-            href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`block py-1.5 text-sm ${txLink}`}
-          >
-            {btcTxid}
-          </a>
+
+      {difference !== null && (
+        <div id="invoice-view--payment-sums" className={`space-y-2 rounded-(--radius-md) p-4 text-[15px] ${look.soft}`}>
+          <div id="invoice-view--payment-sum-requested" className="flex justify-between gap-3">
+            <span className="text-(--color-ink)/70">Requested</span>
+            <span className="tabular-nums">{fmtCurrency(invoice.total_fiat, cur)}</span>
+          </div>
+          <div id="invoice-view--payment-sum-received" className="flex justify-between gap-3">
+            <span className="text-(--color-ink)/70">Received</span>
+            <span className="text-right tabular-nums">
+              {fmtCurrency(fiat!, cur)}
+              {btc && <span className="text-(--color-ink)/70 text-[13px]"> ({btc})</span>}
+            </span>
+          </div>
+          <div id="invoice-view--payment-sum-difference" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">
+            <span>Difference</span>
+            <span className={`tabular-nums ${look.text}`}>
+              {difference < 0 ? "−" : "+"}
+              {fmtCurrency(Math.abs(difference), cur)}
+            </span>
+          </div>
         </div>
       )}
+
+      <p
+        id="invoice-view--payment-received-message"
+        className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${difference === null ? "text-center" : ""}`}
+      >
+        {message}
+      </p>
+
+      <div id="invoice-view--payment-details" className="space-y-3 border-t border-(--color-border) pt-5 text-sm">
+        {time && (
+          <div className={row}>
+            <span className={rowLabel}>{time.label}</span>
+            <span id="invoice-view--payment-time" className="text-right font-medium">
+              {fmtDateTime(time.iso, timeZone)}
+            </span>
+          </div>
+        )}
+        <div className={row}>
+          <span className={rowLabel}>Address</span>
+          <span id="invoice-view--paid-address" className="min-w-0 text-right font-mono text-[13px] break-all">
+            {invoice.btc_address}
+          </span>
+        </div>
+        {btcTxid && (
+          <div className={row}>
+            <span className={rowLabel}>Transaction</span>
+            <a
+              id="invoice-view--btc-txid"
+              href={`${getMempoolBaseUrl()}/tx/${btcTxid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={btcTxid}
+              className={`min-w-0 text-right text-[13px] ${txLink}`}
+            >
+              {shortTxid(btcTxid)}
+            </a>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

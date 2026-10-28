@@ -13,6 +13,9 @@ let capturedWatcherOnStatusChange:
   | ((s: Invoice["status"], txid?: string) => void)
   | null = null;
 let capturedWatcherPaymentRevealed: boolean | undefined = undefined;
+let capturedWatcherOverpaid: boolean | undefined = undefined;
+const mockRefresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
 let capturedRealtimeOnUpdate:
   | ((next: Partial<Invoice> & { id: string }) => void)
   | null = null;
@@ -21,9 +24,11 @@ vi.mock("./payment-watcher", () => ({
   PaymentWatcher: (props: {
     onStatusChange: (s: Invoice["status"], txid?: string) => void;
     paymentRevealed?: boolean;
+    overpaid?: boolean;
   }) => {
     capturedWatcherOnStatusChange = props.onStatusChange;
     capturedWatcherPaymentRevealed = props.paymentRevealed;
+    capturedWatcherOverpaid = props.overpaid;
     return null;
   },
 }));
@@ -41,6 +46,8 @@ vi.mock("./mark-sent-button", () => ({ MarkSentButton: () => null }));
 beforeEach(() => {
   capturedWatcherOnStatusChange = null;
   capturedWatcherPaymentRevealed = undefined;
+  capturedWatcherOverpaid = undefined;
+  mockRefresh.mockClear();
   capturedRealtimeOnUpdate = null;
 });
 
@@ -79,6 +86,7 @@ const BASE_INVOICE: Invoice = {
   next_check_at: null,
   overpaid: false,
   pre_archive_status: null,
+  payment_confirmed_at: null,
   published_at: null,
   send_method: null,
   sent_at: null,
@@ -279,11 +287,12 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     const { container } = render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
     expectNothingPayable();
     expect(screen.getByRole("heading", { name: /^paid$/i })).toBeInTheDocument();
-    expect(container.textContent).toMatch(/0\.01 BTC \(\$500\.00\) was received to the bitcoin address for this invoice/);
+    expect(screen.getByText("0.01 BTC · $500.00")).toBeInTheDocument();
+    expect(container.textContent).toContain("was received to the bitcoin address for this invoice.");
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });
 
-  it("underpaid: Jonny's wording, naming the sender", () => {
+  it("underpaid: Jonny's wording, naming the sender, under the sums (v1.5.27)", () => {
     const { container } = render(
       <InvoicePaymentView
         invoice={{
@@ -298,7 +307,7 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     );
     expectNothingPayable();
     expect(container.textContent).toContain(
-      "0.00123 BTC ($61.50) was received to the bitcoin address for this invoice, less than the amount requested. To resolve full settlement of this invoice, reach out to Maya Design Ltd.",
+      "This was received to the bitcoin address for this invoice, less than the amount requested. To resolve full settlement of this invoice, reach out to Maya Design Ltd.",
     );
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });
@@ -330,5 +339,107 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     const { rerender } = render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
     rerender(<InvoicePaymentView invoice={PAID} btcPrice={61000} />);
     expectNothingPayable();
+  });
+});
+
+// v1.5.27: the block says at a glance which state it's in (icon + colour per
+// state), shows the sums when the amount was wrong, and when it happened.
+describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
+  const PAID: Invoice = {
+    ...BASE_INVOICE,
+    btc_address: "tb1qtarget",
+    status: "paid",
+    btc_txid: "txid-1",
+    total_fiat: 100,
+    amount_received_sats: 200_000,
+    amount_received_fiat: 100,
+    mempool_seen_at: "2026-10-27T12:18:00Z",
+    payment_confirmed_at: "2026-10-27T12:32:00Z",
+    your_company: "Maya Design Ltd",
+  };
+  const OVERPAID: Invoice = { ...PAID, amount_received_sats: 224_000, amount_received_fiat: 112, overpaid: true };
+  const UNDERPAID: Invoice = { ...PAID, status: "underpaid", amount_received_sats: 123_000, amount_received_fiat: 61.5 };
+  const block = () => document.getElementById("invoice-view--payment-received")!;
+  const sumRow = (name: string) => document.getElementById(`invoice-view--payment-sum-${name}`)?.textContent;
+
+  it("paid: green state, the amount, and when it confirmed; no sums", () => {
+    render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
+    expect(block()).toHaveAttribute("data-state", "paid");
+    expect(screen.getByText("Paid on")).toBeInTheDocument();
+    expect(document.getElementById("invoice-view--payment-time")!.textContent).toMatch(/Oct 27, 2026/);
+    expect(document.getElementById("invoice-view--payment-sums")).toBeNull();
+  });
+
+  it("overpaid: its own state, the sums, and the approved wording", () => {
+    const { container } = render(<InvoicePaymentView invoice={OVERPAID} btcPrice={50000} />);
+    expect(block()).toHaveAttribute("data-state", "overpaid");
+    expect(screen.getByRole("heading", { name: /^overpaid$/i })).toBeInTheDocument();
+    expect(sumRow("requested")).toContain("$100.00");
+    expect(sumRow("received")).toContain("$112.00");
+    expect(sumRow("received")).toContain("0.00224 BTC");
+    expect(sumRow("difference")).toContain("+$12.00");
+    expect(container.textContent).toContain(
+      "This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra $12.00, reach out to Maya Design Ltd.",
+    );
+    expect(container.textContent).not.toMatch(/\bwe\b/i);
+  });
+
+  it("overpaid: the status badge says Overpaid too", () => {
+    render(<InvoicePaymentView invoice={OVERPAID} btcPrice={50000} />);
+    expect(capturedWatcherOverpaid).toBe(true);
+  });
+
+  it("underpaid: amber state with a negative difference", () => {
+    render(<InvoicePaymentView invoice={UNDERPAID} btcPrice={50000} />);
+    expect(block()).toHaveAttribute("data-state", "underpaid");
+    expect(sumRow("difference")).toContain("−$38.50");
+  });
+
+  it("an archived overpaid invoice still reads as overpaid", () => {
+    render(<InvoicePaymentView invoice={{ ...OVERPAID, status: "archived", pre_archive_status: "paid" }} btcPrice={50000} />);
+    expect(block()).toHaveAttribute("data-state", "overpaid");
+  });
+
+  it("payment detected: shows when it was seen", () => {
+    render(
+      <InvoicePaymentView
+        invoice={{ ...PAID, status: "payment_detected", amount_received_sats: null, amount_received_fiat: null, payment_confirmed_at: null }}
+        btcPrice={50000}
+      />,
+    );
+    expect(block()).toHaveAttribute("data-state", "payment_detected");
+    expect(screen.getByText("Seen at")).toBeInTheDocument();
+  });
+
+  it("a paid invoice from before confirmation times were kept falls back to when it was seen", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, payment_confirmed_at: null }} btcPrice={50000} />);
+    expect(screen.queryByText("Paid on")).toBeNull();
+    expect(screen.getByText("Seen at")).toBeInTheDocument();
+  });
+
+  it("an invoice marked paid by hand shows no time", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, mempool_seen_at: null, payment_confirmed_at: null }} btcPrice={50000} />);
+    expect(document.getElementById("invoice-view--payment-time")).toBeNull();
+  });
+
+  it("the full address stays visible, so the payer can check it", () => {
+    render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
+    expect(screen.getByText("tb1qtarget")).toBeInTheDocument();
+  });
+
+  it("a long transaction ID is shortened, with the full ID kept on the link", () => {
+    const txid = "e2e0000000000000000000000000000000000000000000000000000000000001";
+    render(<InvoicePaymentView invoice={{ ...PAID, btc_txid: txid }} btcPrice={50000} />);
+    const link = document.getElementById("invoice-view--btc-txid")!;
+    expect(link.textContent).toContain("e2e00000…00000001");
+    expect(link).toHaveAttribute("href", `https://mempool.space/tx/${txid}`);
+    expect(link).toHaveAttribute("title", txid);
+  });
+
+  it("a live status change to paid reloads the invoice's figures from the server", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, status: "payment_detected" }} btcPrice={50000} />);
+    expect(mockRefresh).not.toHaveBeenCalled();
+    act(() => capturedRealtimeOnUpdate?.({ id: "inv-1", status: "paid", btc_txid: "txid-1" }));
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });

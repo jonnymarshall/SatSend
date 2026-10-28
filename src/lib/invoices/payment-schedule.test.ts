@@ -31,6 +31,7 @@ const NO_VERDICT = {
   amountReceivedFiat: null,
   overpaid: false,
   revertToPending: false,
+  confirmedAt: null,
 };
 
 // Time-based scheduling (v1.4.28-H / S3): the next check is the first cumulative
@@ -579,5 +580,45 @@ describe("decidePaymentSchedule — vanished payment revert (M-MONEY-4)", () => 
     expect(decision.newStatus).toBe("payment_detected");
     expect(decision.revertToPending).toBe(false);
     expect(decision.newNextCheckAt).not.toBeNull();
+  });
+});
+
+// v1.5.27: the payer's page shows when the payment confirmed, taken from the
+// blockchain's own record of the block, not from when SatSend happened to look.
+describe("decidePaymentSchedule — confirmation time (v1.5.27)", () => {
+  const INPUT = {
+    status: "pending" as const,
+    btc_address: "bc1qaddr",
+    mempool_seen_at: null,
+    published_at: NOW.toISOString(),
+    stage_attempt: 2,
+    total_fiat: TOTAL_FIAT,
+  };
+
+  it("a finalized payment records its block's time", () => {
+    const tx = confirmedTx("tx-paid", "bc1qaddr");
+    tx.status.block_time = 1_793_100_000;
+    const decision = decidePaymentSchedule(INPUT, [tx], NOW, PRICE_FINALIZED);
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.confirmedAt).toBe(new Date(1_793_100_000 * 1000).toISOString());
+  });
+
+  it("falls back to now when the block time is missing", () => {
+    const decision = decidePaymentSchedule(INPUT, [confirmedTx("tx-paid", "bc1qaddr")], NOW, PRICE_FINALIZED);
+    expect(decision.confirmedAt).toBe(NOW.toISOString());
+  });
+
+  it("an underpaid verdict records it too", () => {
+    const tx = confirmedTx("tx-under", "bc1qaddr", 900_000, 40_000);
+    tx.status.block_time = 1_793_100_000;
+    const decision = decidePaymentSchedule(INPUT, [tx], NOW, PRICE_FINALIZED);
+    expect(decision.newStatus).toBe("underpaid");
+    expect(decision.confirmedAt).not.toBeNull();
+  });
+
+  it("nothing is recorded before the payment is final", () => {
+    const decision = decidePaymentSchedule(INPUT, [unconfirmedTx("tx-u", "bc1qaddr")], NOW, PRICE_FINALIZED);
+    expect(decision.newStatus).toBe("payment_detected");
+    expect(decision.confirmedAt).toBeNull();
   });
 });

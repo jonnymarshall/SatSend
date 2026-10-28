@@ -16,6 +16,7 @@ export type InvoiceStatus =
   | "payment_detected"
   | "paid"
   | "underpaid"
+  | "overpaid"
   | "overdue"
   | "archived";
 
@@ -51,6 +52,14 @@ export const STATUS_TONES: Record<InvoiceStatus, Tone> = {
     bg: "bg-(--color-warning-soft)",
     dot: "bg-(--color-warning)",
     text: "text-(--color-warning-text)",
+  },
+  // v1.5.27: display-only. An overpaid invoice is stored as `paid` with the
+  // `overpaid` flag; the payer's page shows it under its own name.
+  overpaid: {
+    label: "Overpaid",
+    bg: "bg-(--color-sent-soft)",
+    dot: "bg-(--color-sent)",
+    text: "text-(--color-sent-text)",
   },
   overdue: {
     label: "Overdue",

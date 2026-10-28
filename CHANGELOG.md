@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.27 (follow-up) — Clearer payment block on the public invoice.** Each state has its
+  own icon and colour (Payment detected: violet clock; Paid: green tick;
+  Underpaid: amber warning; Overpaid: blue plus). Underpaid and Overpaid show
+  Requested / Received / Difference. The block shows when the payment confirmed
+  ("Paid on", in the payer's time zone) or, before that, when it was seen.
+  Overpaid invoices now say "Overpaid" on the page and its badge, with wording
+  pointing the client to the sender about the extra. A payment that confirms
+  during the visit loads its amount without a reload. Migration 0037 adds
+  `invoices.payment_confirmed_at`, filled from the block's time.
+
 ### Fixed
 
 - **v1.5.27 — No payable QR once an invoice is paid (roadmap v1.5.2.13-H).** Once

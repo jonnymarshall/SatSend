@@ -90,6 +90,9 @@ export interface ScheduleDecision {
   // put back to a clean `pending` (caller clears btc_txid and re-anchors the
   // schedule). (v1.4.22-H / M-MONEY-4)
   revertToPending: boolean;
+  // When a paid/underpaid verdict's tx confirmed: the block's own time, else
+  // now. Null for every other decision. Shown to the payer (v1.5.27).
+  confirmedAt: string | null;
 }
 
 const NO_VERDICT = {
@@ -98,6 +101,7 @@ const NO_VERDICT = {
   amountReceivedFiat: null,
   overpaid: false,
   revertToPending: false,
+  confirmedAt: null,
 } as const;
 
 function sumVouts(tx: MempoolTx, address: string): number {
@@ -200,6 +204,9 @@ export function decidePaymentSchedule(
         amountReceivedFiat: receivedFiat,
         overpaid: coverage > OVERPAID_COVERAGE,
         revertToPending: false,
+        confirmedAt: paying.status.block_time
+          ? new Date(paying.status.block_time * 1000).toISOString()
+          : now.toISOString(),
       };
     }
 
@@ -285,6 +292,7 @@ export function decidePaymentSchedule(
       amountReceivedFiat: null,
       overpaid: false,
       revertToPending: true,
+      confirmedAt: null,
     };
   }
 
