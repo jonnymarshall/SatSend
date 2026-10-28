@@ -29,6 +29,7 @@ const detected: CheckableInvoice = {
   stage_attempt: 1,
   invoice_number: "INV-1",
   client_name: "Ada",
+  client_company: "Ada Labs",
   client_email: "payer@example.com",
   total_fiat: 250,
   currency: "USD",
@@ -113,6 +114,33 @@ describe("checkInvoicePayment", () => {
       status: "paid",
       payment_confirmed_at: new Date(1_793_100_000 * 1000).toISOString(),
     });
+  });
+
+  it("the confirmation email gets the invoice as it now stands, for the payment block (v1.5.28)", async () => {
+    mockFetchAddressTxs.mockResolvedValue([{ ...confirmedTx, status: { ...confirmedTx.status, block_time: 1_793_100_000 } }]);
+    const db = fakeDb("payment_detected");
+    await checkInvoicePayment(db.client, detected, 900_002, NOW);
+    expect(mockSendConfirmed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        btcAddress: ADDR,
+        txid: "tx-1",
+        payment: {
+          status: "paid",
+          pre_archive_status: null,
+          overpaid: false,
+          total_fiat: 250,
+          currency: "USD",
+          amount_received_sats: 500_000,
+          amount_received_fiat: 250,
+          payment_confirmed_at: new Date(1_793_100_000 * 1000).toISOString(),
+          mempool_seen_at: detected.mempool_seen_at,
+          your_company: null,
+          your_name: "Charles",
+          client_company: "Ada Labs",
+          client_name: "Ada",
+        },
+      }),
+    );
   });
 
   it("defers without writing when mempool.space is unreachable", async () => {

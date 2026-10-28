@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
 import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -35,6 +36,7 @@ interface Invoice {
 
 export function InvoiceActions({ invoice }: { invoice: Invoice }) {
   const router = useRouter();
+  const timeZone = useTimeZone();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -133,7 +135,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {!isDraft && (
           <a
             id="invoice-actions--download-pdf-button"
-            href={`/api/invoices/${invoice.id}/pdf`}
+            href={pdfHref(`/api/invoices/${invoice.id}/pdf`, timeZone)}
             download
             className={buttonVariants({ variant: "secondary" })}
           >

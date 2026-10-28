@@ -35,6 +35,8 @@ export const statusColors = {
   payment_detected: { label: "Payment detected", fill: "#F3EFFE", dot: "#8B5CF6", text: "#7B53DB" },
   paid: { label: "Paid", fill: "#E7F6F0", dot: "#2F9A74", text: "#297C63" },
   underpaid: { label: "Underpaid", fill: "#FFF2DD", dot: "#F0A43B", text: "#906835" },
+  // v1.5.28: display-only, like the badge (an overpaid invoice is stored as paid).
+  overpaid: { label: "Overpaid", fill: "#EAF0FF", dot: "#4776E6", text: "#3F68C9" },
   overdue: { label: "Overdue", fill: "#FCE8E8", dot: "#D95F5F", text: "#AA4F53" },
   archived: { label: "Archived", fill: "#FFFFFF", dot: "#7A8190", text: "#676E7D" },
 } as const;

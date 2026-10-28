@@ -1,11 +1,10 @@
 import { getResend, getFromAddress, getAppUrl } from "./client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { InvoicePublishedEmail } from "./templates/invoice-published";
-import { PaymentDetectedOwnerEmail } from "./templates/payment-detected-owner";
-import { PaymentDetectedPayerEmail } from "./templates/payment-detected-payer";
-import { PaymentConfirmedOwnerEmail } from "./templates/payment-confirmed-owner";
-import { PaymentConfirmedPayerEmail } from "./templates/payment-confirmed-payer";
+import { PaymentStatusEmail } from "./templates/payment-status-email";
 import { LOGO_ATTACHMENT } from "./logo-inline";
+import { statusIconAttachment } from "./status-icons-inline";
+import { paymentState, type PaymentAudience, type PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
@@ -156,6 +155,7 @@ async function message(m: {
   subject: string;
   react: ReactElement;
   replyTo?: string | null;
+  attachments?: { filename: string; content: string; contentType: string; contentId: string }[];
 }) {
   return {
     from: getFromAddress(),
@@ -164,7 +164,7 @@ async function message(m: {
     react: m.react,
     text: await render(m.react, { plainText: true }),
     // EmailLayout's logo is src="cid:satsend-logo" (v1.5.12).
-    attachments: [LOGO_ATTACHMENT],
+    attachments: [LOGO_ATTACHMENT, ...(m.attachments ?? [])],
     ...(m.replyTo ? { replyTo: m.replyTo } : {}),
   };
 }
@@ -225,150 +225,72 @@ export interface SendPaymentStatusArgs {
   totalFiat: number;
   currency: string;
   txid: string;
-  // Confirmed-payment amount verification (v1.4.19-H). Optional so existing
-  // callers/tests that predate amount verification keep behaving as "paid".
-  status?: "paid" | "underpaid";
-  amountReceivedFiat?: number | null;
-  overpaid?: boolean;
+  btcAddress: string;
+  // The invoice as it stands after this check (v1.5.28): the emails show the
+  // same payment block as the client's invoice page, from paymentSummary.
+  payment: PaymentSummaryInvoice;
 }
 
-const InvoiceLabel = (n: string | null) => (n ? `Invoice ${n}` : "Your invoice");
+/** One payment email to one reader: the shared block, its state's icon inline. */
+function paymentMessage(args: SendPaymentStatusArgs, audience: PaymentAudience, to: string, subject: string) {
+  const state = paymentState(args.payment);
+  return message({
+    to,
+    subject,
+    ...(audience === "client" ? { replyTo: args.ownerEmail } : {}),
+    attachments: [statusIconAttachment(state)],
+    react: PaymentStatusEmail({
+      audience,
+      payment: args.payment,
+      invoiceNumber: args.invoiceNumber,
+      btcAddress: args.btcAddress,
+      txid: args.txid,
+      mempoolUrl: mempoolTxUrl(args.txid),
+      actionUrl:
+        audience === "client" ? `${getAppUrl()}/invoice/${args.invoiceId}` : `${getAppUrl()}/invoices/${args.invoiceId}`,
+    }),
+  });
+}
 
-export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Promise<void> {
-  const totalDisplay = fmtCurrency(args.totalFiat, args.currency);
-  const mempoolUrl = mempoolTxUrl(args.txid);
-
+async function sendBoth(
+  args: SendPaymentStatusArgs,
+  type: "payment_detected" | "payment_confirmed",
+  subjects: { owner: string; payer: string },
+): Promise<void> {
   await safeSend(
-    {
-      invoiceId: args.invoiceId,
-      userId: args.userId,
-      type: "payment_detected",
-      recipient: args.ownerEmail,
-    },
-    async () => {
-      const resend = getResend()!;
-      return await resend.emails.send(await message({
-        to: args.ownerEmail,
-        subject: args.invoiceNumber
-          ? `Your client paid invoice ${args.invoiceNumber}`
-          : "Your client paid an invoice",
-        react: PaymentDetectedOwnerEmail({
-          invoiceNumber: args.invoiceNumber,
-          clientName: args.clientName,
-          totalDisplay,
-          txid: args.txid,
-          mempoolUrl,
-          dashboardUrl: `${getAppUrl()}/invoices/${args.invoiceId}`,
-        }),
-      }));
-    },
+    { invoiceId: args.invoiceId, userId: args.userId, type, recipient: args.ownerEmail },
+    async () => getResend()!.emails.send(await paymentMessage(args, "sender", args.ownerEmail, subjects.owner)),
   );
 
   if (!args.payerEmail) return;
 
   await safeSend(
-    {
-      invoiceId: args.invoiceId,
-      userId: args.userId,
-      type: "payment_detected",
-      recipient: args.payerEmail,
-    },
-    async () => {
-      const resend = getResend()!;
-      return await resend.emails.send(await message({
-        to: args.payerEmail!,
-        replyTo: args.ownerEmail,
-        subject: args.invoiceNumber
-          ? `Your payment for invoice ${args.invoiceNumber} has been detected`
-          : "Your payment has been detected",
-        react: PaymentDetectedPayerEmail({
-          invoiceNumber: args.invoiceNumber,
-          senderName: args.senderName,
-          totalDisplay,
-          txid: args.txid,
-          mempoolUrl,
-          invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
-        }),
-      }));
-    },
+    { invoiceId: args.invoiceId, userId: args.userId, type, recipient: args.payerEmail },
+    async () => getResend()!.emails.send(await paymentMessage(args, "client", args.payerEmail!, subjects.payer)),
   );
+}
+
+export async function sendPaymentDetectedEmail(args: SendPaymentStatusArgs): Promise<void> {
+  const n = args.invoiceNumber;
+  await sendBoth(args, "payment_detected", {
+    owner: n ? `Your client paid invoice ${n}` : "Your client paid an invoice",
+    payer: n ? `Your payment for invoice ${n} has been detected` : "Your payment has been detected",
+  });
 }
 
 export async function sendPaymentConfirmedEmail(args: SendPaymentStatusArgs): Promise<void> {
-  const totalDisplay = fmtCurrency(args.totalFiat, args.currency);
-  const mempoolUrl = mempoolTxUrl(args.txid);
-  const underpaid = args.status === "underpaid";
-  const overpaid = !!args.overpaid;
-  const amountReceivedDisplay =
-    args.amountReceivedFiat != null ? fmtCurrency(args.amountReceivedFiat, args.currency) : null;
-
-  await safeSend(
-    {
-      invoiceId: args.invoiceId,
-      userId: args.userId,
-      type: "payment_confirmed",
-      recipient: args.ownerEmail,
-    },
-    async () => {
-      const resend = getResend()!;
-      return await resend.emails.send(await message({
-        to: args.ownerEmail,
-        subject: underpaid
-          ? args.invoiceNumber
-            ? `Partial payment received for invoice ${args.invoiceNumber}`
-            : "Partial payment received"
-          : args.invoiceNumber
-            ? `${InvoiceLabel(args.invoiceNumber)} confirmed on-chain`
-            : "Your invoice payment is confirmed",
-        react: PaymentConfirmedOwnerEmail({
-          invoiceNumber: args.invoiceNumber,
-          clientName: args.clientName,
-          totalDisplay,
-          txid: args.txid,
-          mempoolUrl,
-          dashboardUrl: `${getAppUrl()}/invoices/${args.invoiceId}`,
-          underpaid,
-          overpaid,
-          amountReceivedDisplay,
-        }),
-      }));
-    },
-  );
-
-  if (!args.payerEmail) return;
-
-  await safeSend(
-    {
-      invoiceId: args.invoiceId,
-      userId: args.userId,
-      type: "payment_confirmed",
-      recipient: args.payerEmail,
-    },
-    async () => {
-      const resend = getResend()!;
-      return await resend.emails.send(await message({
-        to: args.payerEmail!,
-        replyTo: args.ownerEmail,
-        subject: underpaid
-          ? args.invoiceNumber
-            ? `Your partial payment for invoice ${args.invoiceNumber} was received`
-            : "Your partial payment was received"
-          : args.invoiceNumber
-            ? `Your payment for invoice ${args.invoiceNumber} is confirmed`
-            : "Your payment is confirmed",
-        react: PaymentConfirmedPayerEmail({
-          invoiceNumber: args.invoiceNumber,
-          senderName: args.senderName,
-          totalDisplay,
-          txid: args.txid,
-          mempoolUrl,
-          invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
-          underpaid,
-          overpaid,
-          amountReceivedDisplay,
-        }),
-      }));
-    },
-  );
+  const n = args.invoiceNumber;
+  const state = paymentState(args.payment);
+  const forInvoice = n ? `for invoice ${n}` : "for your invoice";
+  // v1.5.28: "Underpaid" replaces "Partial payment"; Overpaid gets its own.
+  const subjects =
+    state === "underpaid"
+      ? { owner: `Underpaid payment ${forInvoice}`, payer: `Underpaid payment ${forInvoice}` }
+      : state === "overpaid"
+        ? { owner: `Overpayment received ${forInvoice}`, payer: `Overpayment received ${forInvoice}` }
+        : {
+            owner: n ? `Invoice ${n} confirmed on-chain` : "Your invoice payment is confirmed",
+            payer: n ? `Your payment for invoice ${n} is confirmed` : "Your payment is confirmed",
+          };
+  await sendBoth(args, "payment_confirmed", subjects);
 }
-

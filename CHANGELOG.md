@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.28 — The payment block in emails and PDFs (roadmap v1.5.2.21-H).**
+  The four payment emails (detected and confirmed, to the client and to the
+  sender) and the PDF's payment panel now match the client's invoice page: the
+  state icon and colour (Payment detected, Paid, Underpaid, Overpaid),
+  Requested / Received / Exchange Rate Variance / Outstanding, the next step
+  (the client is pointed to the sender, the sender to the client), "Paid on" or
+  "Seen at", the full address and transaction. Emails show times in UTC; the
+  PDF uses the downloader's time zone. "We received" is gone from the emails.
+  Subjects: "Underpaid payment for invoice X" (was "Partial payment") and
+  "Overpayment received for invoice X". One shared module
+  (`payment-summary.ts`) works the block out for the page, emails and PDF.
+  `scripts/email/send-payment-samples.tsx` sends every state to an address
+  given on the command line; a test stops personal email addresses from ever
+  being committed.
+
+### Changed
+
 - **v1.5.27 (follow-up) — Clearer payment block on the public invoice.** Each state has its
   own icon and colour (Payment detected: violet clock; Paid: green tick;
   Underpaid: amber warning; Overpaid: blue plus). Underpaid and Overpaid show

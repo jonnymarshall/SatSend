@@ -44,6 +44,7 @@ describe("status colours (emails + PDF) stay in lockstep with signal-amber.css (
     payment_detected: "detected",
     paid: "success",
     underpaid: "warning",
+    overpaid: "sent",
     overdue: "danger",
     archived: "neutral",
   };
