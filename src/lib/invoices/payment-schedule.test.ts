@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { MempoolTx } from "@/lib/mempool";
-import { decidePaymentSchedule, isWithinAllowance, CONFIRMATION_DEPTH_REQUIRED, type PriceContext } from "./payment-schedule";
+import {
+  decidePaymentSchedule,
+  isWithinSlippageTolerance,
+  slippageToleranceFiat,
+  CONFIRMATION_DEPTH_REQUIRED,
+  type PriceContext,
+} from "./payment-schedule";
+import type { PaymentQuote } from "./quotes";
 
 const NOW = new Date("2026-04-23T12:00:00.000Z");
 
@@ -32,6 +39,9 @@ const NO_VERDICT = {
   overpaid: false,
   revertToPending: false,
   confirmedAt: null,
+  btcPriceAtSeen: null,
+  paymentQuoteId: null,
+  slippageToleranceFiat: null,
 };
 
 // Time-based scheduling (v1.4.28-H / S3): the next check is the first cumulative
@@ -191,6 +201,7 @@ describe("decidePaymentSchedule — pre-mempool (status=pending, mempool_seen_at
       newNextCheckAt: new Date(NOW.getTime() + 10 * 60_000).toISOString(),
       detectedTxid: "tx-seen",
       ...NO_VERDICT,
+      btcPriceAtSeen: 50_000,
     });
   });
 
@@ -390,27 +401,30 @@ describe("decidePaymentSchedule — post-mempool (status=payment_detected)", () 
 describe("decidePaymentSchedule — amount verification", () => {
   const SEEN = new Date("2026-04-23T10:00:00.000Z").toISOString();
 
-  it("90% coverage lands on underpaid", () => {
-    // 45,000 sats @ $50,000/BTC = $22.50, against a $25 total = 90% coverage.
+  // v1.5.29: the Slippage Tolerance is 1% of the total, capped at $25. On a $25
+  // invoice that is $0.25, which is 500 sats at $50,000/BTC.
+  it("98% coverage lands on underpaid", () => {
+    // 49,000 sats @ $50,000/BTC = $24.50, $0.50 short of $25.
     const decision = decidePaymentSchedule(
       { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
-      [confirmedTx("tx-under", "bc1qaddr", 900_000, 45_000)],
+      [confirmedTx("tx-under", "bc1qaddr", 900_000, 49_000)],
       NOW,
       PRICE_FINALIZED
     );
 
     expect(decision.newStatus).toBe("underpaid");
-    expect(decision.amountReceivedSats).toBe(45_000);
-    expect(decision.amountReceivedFiat).toBe(22.5);
+    expect(decision.amountReceivedSats).toBe(49_000);
+    expect(decision.amountReceivedFiat).toBe(24.5);
     expect(decision.overpaid).toBe(false);
     expect(decision.newNextCheckAt).toBeNull();
+    expect(decision.slippageToleranceFiat).toBe(0.25);
   });
 
-  it("95% coverage (lower tolerance boundary) lands on paid, not underpaid", () => {
-    // 47,500 sats @ $50,000/BTC = $23.75 = 95% of $25.
+  it("99% coverage (lower Slippage Tolerance boundary) lands on paid, not underpaid", () => {
+    // 49,500 sats @ $50,000/BTC = $24.75 = 99% of $25.
     const decision = decidePaymentSchedule(
       { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
-      [confirmedTx("tx-lowbound", "bc1qaddr", 900_000, 47_500)],
+      [confirmedTx("tx-lowbound", "bc1qaddr", 900_000, 49_500)],
       NOW,
       PRICE_FINALIZED
     );
@@ -419,11 +433,11 @@ describe("decidePaymentSchedule — amount verification", () => {
     expect(decision.overpaid).toBe(false);
   });
 
-  it("105% coverage (upper tolerance boundary) lands on paid, not overpaid", () => {
-    // 52,500 sats @ $50,000/BTC = $26.25 = 105% of $25.
+  it("101% coverage (upper Slippage Tolerance boundary) lands on paid, not overpaid", () => {
+    // 50,500 sats @ $50,000/BTC = $25.25 = 101% of $25.
     const decision = decidePaymentSchedule(
       { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
-      [confirmedTx("tx-highbound", "bc1qaddr", 900_000, 52_500)],
+      [confirmedTx("tx-highbound", "bc1qaddr", 900_000, 50_500)],
       NOW,
       PRICE_FINALIZED
     );
@@ -432,18 +446,29 @@ describe("decidePaymentSchedule — amount verification", () => {
     expect(decision.overpaid).toBe(false);
   });
 
-  it("110% coverage lands on paid + overpaid", () => {
-    // 55,000 sats @ $50,000/BTC = $27.50 = 110% of $25.
+  it("102% coverage lands on paid + overpaid", () => {
+    // 51,000 sats @ $50,000/BTC = $25.50 = 102% of $25.
     const decision = decidePaymentSchedule(
       { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
-      [confirmedTx("tx-over", "bc1qaddr", 900_000, 55_000)],
+      [confirmedTx("tx-over", "bc1qaddr", 900_000, 51_000)],
       NOW,
       PRICE_FINALIZED
     );
 
     expect(decision.newStatus).toBe("paid");
     expect(decision.overpaid).toBe(true);
-    expect(decision.amountReceivedFiat).toBe(27.5);
+    expect(decision.amountReceivedFiat).toBe(25.5);
+  });
+
+  it("the $25 cap applies to large invoices: $25 short is paid, $25.50 short is underpaid", () => {
+    const input = { status: "payment_detected" as const, btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: 8_000 };
+    // $7,975 @ $50,000/BTC = 15,950,000 sats.
+    const paid = decidePaymentSchedule(input, [confirmedTx("tx-a", "bc1qaddr", 900_000, 15_950_000)], NOW, PRICE_FINALIZED);
+    expect(paid.newStatus).toBe("paid");
+    expect(paid.slippageToleranceFiat).toBe(25);
+    // $7,974.50 = 15,949,000 sats.
+    const under = decidePaymentSchedule(input, [confirmedTx("tx-b", "bc1qaddr", 900_000, 15_949_000)], NOW, PRICE_FINALIZED);
+    expect(under.newStatus).toBe("underpaid");
   });
 
   it("defers (no status flip) when the BTC price oracle is unavailable, even at sufficient confirmation depth", () => {
@@ -623,11 +648,216 @@ describe("decidePaymentSchedule — confirmation time (v1.5.27)", () => {
   });
 });
 
-describe("isWithinAllowance", () => {
-  it("is true from 95% to 105% of the total, inclusive", () => {
-    expect(isWithinAllowance(95, 100)).toBe(true);
-    expect(isWithinAllowance(105, 100)).toBe(true);
-    expect(isWithinAllowance(94.99, 100)).toBe(false);
-    expect(isWithinAllowance(105.01, 100)).toBe(false);
+describe("Slippage Tolerance (v1.5.29)", () => {
+  it("is 1% of the total, capped at $25", () => {
+    expect(slippageToleranceFiat(100)).toBe(1);
+    expect(slippageToleranceFiat(10)).toBe(0.1);
+    expect(slippageToleranceFiat(2_500)).toBe(25);
+    expect(slippageToleranceFiat(8_000)).toBe(25);
+  });
+
+  it("a payment within it either way counts as paid in full", () => {
+    expect(isWithinSlippageTolerance(99, 100)).toBe(true);
+    expect(isWithinSlippageTolerance(101, 100)).toBe(true);
+    expect(isWithinSlippageTolerance(98.99, 100)).toBe(false);
+    expect(isWithinSlippageTolerance(101.01, 100)).toBe(false);
+  });
+
+  it("takes the tolerance an invoice was judged with (5% before v1.5.29)", () => {
+    expect(isWithinSlippageTolerance(96, 100, 5)).toBe(true);
+    expect(isWithinSlippageTolerance(94.99, 100, 5)).toBe(false);
+  });
+});
+
+// v1.5.29 (roadmap v1.5.2.22-H): a payment that matches a quote is judged in
+// bitcoin against it and valued at its price, so price movement drops out.
+describe("decidePaymentSchedule — locked quotes (v1.5.29)", () => {
+  const SEEN = new Date("2026-04-23T11:50:00.000Z");
+  const minutes = (n: number) => n * 60_000;
+  // The price fell 20% since the quote: without the quote this would be underpaid.
+  const PRICE_MOVED: PriceContext = { btcPrice: 40_000, tipHeight: 900_001 };
+
+  function quote(over: Partial<PaymentQuote> = {}): PaymentQuote {
+    return {
+      id: "q1",
+      amount_sats: 50_000, // $25 at $50,000/BTC
+      btc_price: 50_000,
+      created_at: new Date(SEEN.getTime() - minutes(5)).toISOString(),
+      expires_at: new Date(SEEN.getTime() + minutes(25)).toISOString(),
+      ...over,
+    };
+  }
+
+  function judge(sats: number, quotes: PaymentQuote[], extra: { btc_price_at_seen?: number | null; seen?: Date } = {}) {
+    return decidePaymentSchedule(
+      {
+        status: "payment_detected",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: (extra.seen ?? SEEN).toISOString(),
+        published_at: SEEN.toISOString(),
+        stage_attempt: 3,
+        total_fiat: TOTAL_FIAT,
+        btc_price_at_seen: extra.btc_price_at_seen ?? null,
+        quotes,
+      },
+      [confirmedTx("tx", "bc1qaddr", 900_000, sats)],
+      NOW,
+      PRICE_MOVED
+    );
+  }
+
+  it("the exact quoted amount is paid, valued at the quoted price: Received equals Requested", () => {
+    const decision = judge(50_000, [quote()]);
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.overpaid).toBe(false);
+    expect(decision.amountReceivedFiat).toBe(25);
+    expect(decision.btcPriceAtDetection).toBe(50_000);
+    expect(decision.paymentQuoteId).toBe("q1");
+    expect(decision.slippageToleranceFiat).toBe(0.25);
+  });
+
+  it("is judged in bitcoin against the quote: inside the Slippage Tolerance is paid", () => {
+    // 400 sats short = $0.20 at the quoted price, inside $0.25.
+    expect(judge(49_600, [quote()]).newStatus).toBe("paid");
+  });
+
+  it("short of the quote by more than the Slippage Tolerance is underpaid", () => {
+    // 1,000 sats short = $0.50.
+    const decision = judge(49_000, [quote()]);
+    expect(decision.newStatus).toBe("underpaid");
+    expect(decision.amountReceivedFiat).toBe(24.5);
+  });
+
+  it("over the quote by more than the Slippage Tolerance is overpaid", () => {
+    const decision = judge(51_000, [quote()]);
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.overpaid).toBe(true);
+  });
+
+  it("with several valid quotes, the one closest to the amount paid is used", () => {
+    const decision = judge(62_500, [quote(), quote({ id: "q2", amount_sats: 62_500, btc_price: 40_000 })]);
+    expect(decision.paymentQuoteId).toBe("q2");
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.amountReceivedFiat).toBe(25);
+  });
+
+  it("a payment seen shortly after the quote expired still matches (the background check can lag)", () => {
+    const decision = judge(50_000, [quote()], { seen: new Date(SEEN.getTime() + minutes(45)) });
+    expect(decision.paymentQuoteId).toBe("q1");
+  });
+
+  it("a payment seen long after the quote expired doesn't match it", () => {
+    const decision = judge(50_000, [quote()], { seen: new Date(SEEN.getTime() + minutes(60)) });
+    expect(decision.paymentQuoteId).toBeNull();
+  });
+
+  it("a quote made after the payment was seen doesn't match it", () => {
+    const later = quote({ created_at: new Date(SEEN.getTime() + minutes(1)).toISOString() });
+    expect(judge(50_000, [later]).paymentQuoteId).toBeNull();
+  });
+
+  it("the block time counts when it's earlier than the sighting", () => {
+    // Seen an hour after the quote expired, but mined while it was valid.
+    const tx = confirmedTx("tx", "bc1qaddr", 900_000, 50_000);
+    tx.status.block_time = (SEEN.getTime() + minutes(10)) / 1000;
+    const decision = decidePaymentSchedule(
+      {
+        status: "payment_detected",
+        btc_address: "bc1qaddr",
+        mempool_seen_at: new Date(SEEN.getTime() + minutes(90)).toISOString(),
+        published_at: SEEN.toISOString(),
+        stage_attempt: 3,
+        total_fiat: TOTAL_FIAT,
+        quotes: [quote()],
+      },
+      [tx],
+      NOW,
+      PRICE_MOVED
+    );
+    expect(decision.paymentQuoteId).toBe("q1");
+  });
+
+  it("a quote needs no live price: it finalizes while the price service is down", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN.toISOString(), published_at: SEEN.toISOString(), stage_attempt: 3, total_fiat: TOTAL_FIAT, quotes: [quote()] },
+      [confirmedTx("tx", "bc1qaddr", 900_000, 50_000)],
+      NOW,
+      { btcPrice: null, tipHeight: 900_001 }
+    );
+    expect(decision.newStatus).toBe("paid");
+  });
+});
+
+// With no matching quote (paid late, or from the PDF), the payment is valued at
+// the price when it was first seen, not when it confirmed.
+describe("decidePaymentSchedule — price when first seen (v1.5.29)", () => {
+  const SEEN = new Date("2026-04-23T11:40:00.000Z").toISOString();
+  const PRICE_MOVED: PriceContext = { btcPrice: 40_000, tipHeight: 900_001 };
+
+  it("the first sighting records the price", () => {
+    const decision = decidePaymentSchedule(
+      { status: "pending", btc_address: "bc1qaddr", mempool_seen_at: null, published_at: SEEN, stage_attempt: 1, total_fiat: TOTAL_FIAT },
+      [unconfirmedTx("tx", "bc1qaddr")],
+      NOW,
+      PRICE_FINALIZED
+    );
+    expect(decision.newStatus).toBe("payment_detected");
+    expect(decision.btcPriceAtSeen).toBe(50_000);
+  });
+
+  it("later checks keep it", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 1, total_fiat: TOTAL_FIAT, btc_price_at_seen: 50_000 },
+      [unconfirmedTx("tx", "bc1qaddr")],
+      NOW,
+      PRICE_MOVED
+    );
+    expect(decision.btcPriceAtSeen).toBe(50_000);
+  });
+
+  it("the verdict values the payment at it, not at the confirmation price", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT, btc_price_at_seen: 50_000 },
+      [confirmedTx("tx", "bc1qaddr", 900_000, 50_000)],
+      NOW,
+      PRICE_MOVED
+    );
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.amountReceivedFiat).toBe(25);
+    expect(decision.btcPriceAtDetection).toBe(50_000);
+    expect(decision.paymentQuoteId).toBeNull();
+  });
+
+  it("it finalizes while the price service is down", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT, btc_price_at_seen: 50_000 },
+      [confirmedTx("tx", "bc1qaddr", 900_000, 50_000)],
+      NOW,
+      { btcPrice: null, tipHeight: 900_001 }
+    );
+    expect(decision.newStatus).toBe("paid");
+  });
+
+  it("a payment first seen already confirmed is valued at the price now, and records it", () => {
+    const decision = decidePaymentSchedule(
+      { status: "pending", btc_address: "bc1qaddr", mempool_seen_at: null, published_at: SEEN, stage_attempt: 1, total_fiat: TOTAL_FIAT },
+      [confirmedTx("tx", "bc1qaddr", 900_000, 62_500)],
+      NOW,
+      PRICE_MOVED
+    );
+    expect(decision.newStatus).toBe("paid");
+    expect(decision.btcPriceAtSeen).toBe(40_000);
+    expect(decision.amountReceivedFiat).toBe(25);
+  });
+
+  it("a vanished payment clears it", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: new Date(NOW.getTime() - 2 * 60 * 60_000).toISOString(), published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT, btc_price_at_seen: 50_000 },
+      [],
+      NOW,
+      PRICE_FINALIZED
+    );
+    expect(decision.revertToPending).toBe(true);
+    expect(decision.btcPriceAtSeen).toBeNull();
   });
 });
