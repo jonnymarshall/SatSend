@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { CircleCheck, CirclePlus, Clock, TriangleAlert, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleHelp, CirclePlus, Clock, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import type { PublicInvoice } from "@/lib/invoice-public";
 import { fiatToBtc, buildBip21Uri } from "@/lib/btc-qr";
 import { BtcQrCode } from "@/components/btc-qr-code";
@@ -334,6 +335,37 @@ function fmtDateTime(iso: string, timeZone: string): string {
 }
 
 /**
+ * Explains the Exchange Rate Variance row (Jonny, 2026-10-27). A button, so it
+ * works by tap, click and keyboard as well as hover (hover alone fails on
+ * phones). 24px target, the WCAG 2.2 minimum.
+ */
+function RateVarianceHelp() {
+  return (
+    <Popover>
+      <PopoverTrigger
+        id="invoice-view--rate-variance-help"
+        openOnHover
+        delay={150}
+        aria-label="What is Exchange Rate Variance?"
+        className="-my-1 inline-flex size-6 cursor-help items-center justify-center rounded-full text-(--color-ink)/50 transition-colors hover:text-(--color-ink) focus-visible:text-(--color-ink) focus-visible:outline-2 focus-visible:outline-(--color-brand)"
+      >
+        <CircleHelp aria-hidden className="size-4" />
+      </PopoverTrigger>
+      <PopoverContent id="invoice-view--rate-variance-popover" side="top" className="w-72 gap-1.5 leading-[1.5]">
+        <PopoverTitle className="font-semibold">Exchange Rate Variance</PopoverTitle>
+        <p className="text-(--color-text-secondary)">
+          The bitcoin amount was set by the exchange rate at the time of payment. The value shown here uses the rate
+          when the payment confirmed, a little later, so the two can differ slightly.
+        </p>
+        <p className="text-(--color-text-secondary)">
+          A small difference like this counts as paid in full, so nothing is outstanding.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
  * What the payer sees once a payment exists (v1.5.27): no QR,
  * no live amount. Wording says the bitcoin arrived at the invoice's address,
  * never that SatSend ("we") received it: SatSend never holds funds (Jonny,
@@ -379,7 +411,7 @@ function PaymentReceived({
     message = `To resolve overpayment of this invoice, reach out to ${sender}.`;
   } else if (state === "payment_detected") {
     message =
-      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
+      "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually around 10 minutes.";
   }
 
   const confirmedAt = state === "payment_detected" ? null : invoice.payment_confirmed_at;
@@ -418,7 +450,10 @@ function PaymentReceived({
           </div>
           {rateDifference !== 0 && (
             <div id="invoice-view--payment-sum-rate" className="flex justify-between gap-3">
-              <span className="text-(--color-ink)/70">Exchange rate difference</span>
+              <span className="flex items-center gap-1 text-(--color-ink)/70">
+                Exchange Rate Variance
+                <RateVarianceHelp />
+              </span>
               <span className="tabular-nums">
                 {rateDifference < 0 ? "−" : "+"}
                 {fmtCurrency(Math.abs(rateDifference), cur)}

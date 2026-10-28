@@ -33,9 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v1.5.27 — The PDF no longer prints a payable QR once paid.** Underpaid
   invoices, archived paid ones, and any invoice with a transaction now get the
   paid panel instead of "Pay with Bitcoin" and its QR code.
-- **v1.5.27 — "Exchange rate difference" row.** A paid invoice whose amount
+- **v1.5.27 — "Exchange Rate Variance" row.** A paid invoice whose amount
   differs slightly (within the allowance) shows the gap as its own row above
-  "Outstanding $0.00", so the sums add up.
+  "Outstanding $0.00", so the sums add up. A **?** button beside it (hover,
+  tap or keyboard) explains what it means. "Payment detected" now says
+  confirmation usually takes around 10 minutes.
 
 ### Fixed
 

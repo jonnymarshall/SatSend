@@ -383,8 +383,16 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
   // maths mistake, so a paid-within-the-allowance gap gets its own row.
   it("paid a little over: an exchange rate difference row explains the gap", () => {
     render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 100.125 }} btcPrice={50000} />);
-    expect(sumRow("rate")).toMatch(/^Exchange rate difference\+\$0\.13$/);
+    expect(sumRow("rate")).toMatch(/^Exchange Rate Variance\+\$0\.13$/);
     expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
+  });
+
+  it("the variance has a help button explaining it, for clients who wonder (Jonny, 2026-10-27)", async () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 100.75 }} btcPrice={50000} />);
+    const help = screen.getByRole("button", { name: /what is exchange rate variance/i });
+    fireEvent.click(help);
+    expect(await screen.findByText(/counts as paid in full/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\bwe\b/i);
   });
 
   it("paid a little under: the difference shows as negative", () => {
@@ -444,6 +452,7 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     );
     expect(block()).toHaveAttribute("data-state", "payment_detected");
     expect(screen.getByText("Seen at")).toBeInTheDocument();
+    expect(screen.getByText(/usually around 10 minutes\.$/)).toBeInTheDocument();
   });
 
   it("a paid invoice from before confirmation times were kept falls back to when it was seen", () => {

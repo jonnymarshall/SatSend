@@ -674,7 +674,7 @@ gate on the status string alone.
       "Mark as unpaid" removed for blockchain-confirmed payments (it flipped
       straight back and resent the email).
 - [x] A paid invoice whose amount differs within the allowance shows an
-      "Exchange rate difference" row (+ over, − under) between Received and
+      "Exchange Rate Variance" row (+ over, − under) between Received and
       Outstanding, so the sums add up on screen (Jonny, 2026-10-27). The PDF no
       longer prints a payable QR for underpaid, archived-paid or txid invoices.
 
@@ -700,8 +700,8 @@ bitcoin" panel.
 **Scope (decisions agreed 2026-10-27):**
 - [ ] Every payment email gets the block: coloured circle icon and state name
       (Payment detected violet clock, Paid green tick, Underpaid amber warning,
-      Overpaid blue plus), the Requested / Received / [Exchange rate
-      difference] / Outstanding box, the next-step sentence, "Paid on" or
+      Overpaid blue plus), the Requested / Received / [Exchange Rate
+      Variance] / Outstanding box, the next-step sentence, "Paid on" or
       "Seen at", the full address and the full transaction ID.
 - [ ] Icons in emails are small PNGs attached inline, like the logo (email
       apps strip SVG).
@@ -736,13 +736,13 @@ honest clients underpaid on volatile days. Agreed plan:
 - [ ] **Judge in bitcoin.** A payment that matches a valid quote is compared in
       bitcoin against that quote, so price movement drops out. Value it at the
       quoted price, so an exact payment shows Received equal to Requested and
-      no "Exchange rate difference" row.
+      no "Exchange Rate Variance" row.
 - [ ] **Fallback.** With no valid quote (paid late, or from the PDF, whose QR
       has no amount), value at the price when the payment was **first seen**,
       not when it confirmed.
 - [ ] **Tighten the allowance**, for example 1% capped at $25 to $50 (decide
       the numbers when built). Update the FAQ's "within 5%" answer.
-- [ ] Revisit the "Exchange rate difference" label: with quotes locked, the
+- [ ] Revisit the "Exchange Rate Variance" label: with quotes locked, the
       small gaps left are mostly wallet fees, not the exchange rate.
 
 ---
