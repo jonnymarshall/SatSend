@@ -17,6 +17,7 @@ import { LogoHomeLink } from "@/components/brand/logo-home-link";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
+import { isWithinAllowance } from "@/lib/invoices/payment-schedule";
 
 function isPayableStatus(s: PublicInvoice["status"]): boolean {
   return s === "pending" || s === "overdue";
@@ -399,8 +400,14 @@ function PaymentReceived({
   // A paid invoice's gap (within the allowance) shown as its own row, so the
   // sums add up on screen (Jonny, 2026-10-27). Worked out from the rounded cents
   // the rows show, so Requested + this row always equals Received.
+  // Only inside the allowance: a bigger gap on a paid invoice means the sender
+  // marked it paid by hand (say, an underpaid invoice settled another way), and
+  // calling that exchange rate movement would be untrue.
+  const markedPaidBySender = state === "paid" && fiat !== null && !isWithinAllowance(fiat, invoice.total_fiat);
   const rateDifference =
-    state === "paid" && fiat !== null ? (Math.round(fiat * 100) - Math.round(invoice.total_fiat * 100)) / 100 : 0;
+    state === "paid" && fiat !== null && !markedPaidBySender
+      ? (Math.round(fiat * 100) - Math.round(invoice.total_fiat * 100)) / 100
+      : 0;
 
   // The box says what arrived; the text only says what to do next (Jonny,
   // 2026-10-27). Paid needs none.
@@ -409,6 +416,8 @@ function PaymentReceived({
     message = `To resolve full settlement of this invoice, reach out to ${sender}.`;
   } else if (state === "overpaid") {
     message = `To resolve overpayment of this invoice, reach out to ${sender}.`;
+  } else if (markedPaidBySender) {
+    message = `Marked as paid by ${sender}.`;
   } else if (state === "payment_detected") {
     message =
       "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";

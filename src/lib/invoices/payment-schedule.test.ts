@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { MempoolTx } from "@/lib/mempool";
-import { decidePaymentSchedule, CONFIRMATION_DEPTH_REQUIRED, type PriceContext } from "./payment-schedule";
+import { decidePaymentSchedule, isWithinAllowance, CONFIRMATION_DEPTH_REQUIRED, type PriceContext } from "./payment-schedule";
 
 const NOW = new Date("2026-04-23T12:00:00.000Z");
 
@@ -620,5 +620,14 @@ describe("decidePaymentSchedule — confirmation time (v1.5.27)", () => {
     const decision = decidePaymentSchedule(INPUT, [unconfirmedTx("tx-u", "bc1qaddr")], NOW, PRICE_FINALIZED);
     expect(decision.newStatus).toBe("payment_detected");
     expect(decision.confirmedAt).toBeNull();
+  });
+});
+
+describe("isWithinAllowance", () => {
+  it("is true from 95% to 105% of the total, inclusive", () => {
+    expect(isWithinAllowance(95, 100)).toBe(true);
+    expect(isWithinAllowance(105, 100)).toBe(true);
+    expect(isWithinAllowance(94.99, 100)).toBe(false);
+    expect(isWithinAllowance(105.01, 100)).toBe(false);
   });
 });

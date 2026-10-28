@@ -400,6 +400,24 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("rate")).toMatch(/−\$2\.00$/);
   });
 
+  // A gap beyond the allowance on a paid invoice isn't exchange rate movement:
+  // the sender marked it paid by hand (e.g. an underpaid invoice settled some
+  // other way). Calling it a variance would be untrue.
+  it("a paid invoice with a gap beyond the allowance shows no variance row and says the sender marked it paid", () => {
+    const { container } = render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 61.5 }} btcPrice={50000} />);
+    expect(sumRow("rate")).toBeUndefined();
+    expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
+    expect(container.textContent).toContain("Marked as paid by Maya Design Ltd.");
+  });
+
+  it("the variance row stops exactly at the allowance edge", () => {
+    const { unmount } = render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 105 }} btcPrice={50000} />);
+    expect(sumRow("rate")).toMatch(/\+\$5\.00$/);
+    unmount();
+    render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 105.01 }} btcPrice={50000} />);
+    expect(sumRow("rate")).toBeUndefined();
+  });
+
   it("an exact payment has no exchange rate row", () => {
     render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
     expect(sumRow("rate")).toBeUndefined();

@@ -50,6 +50,12 @@ export const REVERT_TO_PENDING_AFTER_MS = 60 * 60_000;
 const UNDERPAID_COVERAGE = 0.95;
 const OVERPAID_COVERAGE = 1.05;
 
+/** True when a payment counts as paid in full: 95% to 105% of the total. */
+export function isWithinAllowance(receivedFiat: number, totalFiat: number): boolean {
+  const coverage = receivedFiat / totalFiat;
+  return coverage >= UNDERPAID_COVERAGE && coverage <= OVERPAID_COVERAGE;
+}
+
 // mempool.space (and esplora-style APIs generally) only report whether a tx
 // is confirmed and which block it landed in — not a live confirmation count,
 // since that's relative to the ever-advancing tip. We require the tip to be

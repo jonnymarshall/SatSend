@@ -36,7 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v1.5.27 — "Exchange Rate Variance" row.** A paid invoice whose amount
   differs slightly (within the allowance) shows the gap as its own row above
   "Outstanding $0.00", so the sums add up. A **?** button beside it (hover,
-  tap or keyboard) explains what it means.
+  tap or keyboard) explains what it means. The row only appears inside the
+  allowance (95% to 105%); a bigger gap on a paid invoice means the sender
+  marked it paid by hand, and the page says "Marked as paid by [Sender]."
 
 ### Fixed
 
