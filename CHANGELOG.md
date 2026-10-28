@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so it turns to Paid without a reload (a payment needs 2 confirmations, and
   nothing used to look after the first). A payment confirmed on the
   blockchain can no longer be marked unpaid: the next check found the bitcoin
-  again, flipped it back and resent the confirmation email. The sums box now
+  again, flipped it back and resent the confirmation email. With nothing
+  left to mark, the "Mark as" button is hidden rather than opening empty. The sums box now
   shows on every paid invoice, with "Outstanding" ($0.00 when paid, the rest
   when underpaid, below zero when overpaid), and the transaction ID shows in
   full except at phone width. The text under the box only says what to do

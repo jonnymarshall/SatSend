@@ -129,8 +129,12 @@ describe("MarkAsMenu — wiring", () => {
 describe("MarkAsMenu — payments confirmed on the blockchain (v1.5.27)", () => {
   it("offers no Unpaid for a paid invoice with a blockchain payment", () => {
     renderMenu({ status: "paid", paidOnChain: true });
-    open();
     expect(screen.queryByRole("menuitem", { name: /^unpaid$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows no Mark as button at all when it would have nothing in it", () => {
+    renderMenu({ status: "paid", paidOnChain: true });
+    expect(screen.queryByRole("button", { name: /mark as/i })).not.toBeInTheDocument();
   });
 
   it("still offers Unpaid for an invoice marked paid by hand", () => {

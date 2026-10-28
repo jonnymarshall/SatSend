@@ -43,6 +43,9 @@ export function MarkAsMenu({
   const showPending = (isPaid && !paidOnChain) || canMarkAsPending({ status, due_date: dueDate });
   // Suppress the duplicate when the row is already in an unpaid state.
   const showPendingItem = showPending && !isUnpaid;
+  // v1.5.27: a blockchain-paid invoice has nothing to mark (not Paid again, not
+  // Unpaid, not Overdue), and an empty menu looks broken. Show no button.
+  if (isPaid && !showPendingItem && !showOverdue) return null;
 
   return (
     <DropdownMenu>
