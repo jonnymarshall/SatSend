@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { pdfHref } from "@/lib/use-time-zone";
 import { ArrowUpDown, MoreHorizontal, Mail, Send, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -255,7 +256,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                   <DropdownMenuItem onClick={() => actions.onCopyPublicLink(invoice.id)}>
                     Copy public link
                   </DropdownMenuItem>
-                  <DropdownMenuItem render={<a href={`/api/invoices/${invoice.id}/pdf`} download>Download PDF</a>} />
+                  <DropdownMenuItem render={<a href={pdfHref(`/api/invoices/${invoice.id}/pdf`, Intl.DateTimeFormat().resolvedOptions().timeZone)} download>Download PDF</a>} />
                 </>
               )}
               {showSendOptions && (

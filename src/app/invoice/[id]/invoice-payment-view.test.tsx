@@ -98,7 +98,9 @@ describe("InvoicePaymentView — download PDF", () => {
     render(<InvoicePaymentView invoice={BASE_INVOICE} btcPrice={null} />);
     const link = screen.getByRole("link", { name: /download pdf/i }) as HTMLAnchorElement;
     expect(link).toBeInTheDocument();
-    expect(link.getAttribute("href")).toBe("/api/invoice/inv-1/pdf");
+    // v1.5.28: with the viewer's time zone, for the payment times.
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(link.getAttribute("href")).toBe(`/api/invoice/inv-1/pdf?tz=${encodeURIComponent(tz)}`);
     expect(link.hasAttribute("download")).toBe(true);
   });
 });

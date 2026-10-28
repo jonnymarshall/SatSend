@@ -48,8 +48,8 @@ const baseInvoice: Invoice = {
   stage_attempt: 0,
 };
 
-async function textFromPdf(invoice: Invoice, appUrl = "https://satsend.test"): Promise<string> {
-  const buf = await renderInvoicePdf(invoice, { appUrl });
+async function textFromPdf(invoice: Invoice, appUrl = "https://satsend.test", timeZone?: string): Promise<string> {
+  const buf = await renderInvoicePdf(invoice, { appUrl, timeZone });
   const parser = new PDFParse({ data: new Uint8Array(buf) });
   const result = await parser.getText();
   await parser.destroy();
@@ -143,20 +143,9 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     expect(text).not.toContain("Amount due");
   });
 
-  it("a paid invoice shows the transaction and drops the payment instructions", async () => {
+  it("a paid invoice shows the payment block and drops the payment instructions", async () => {
     const text = await textFromPdf({ ...baseInvoice, status: "paid", btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" });
-    expect(text).toContain("Paid in bitcoin");
-    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
-    expect(text).not.toContain("does not encode the amount");
-  });
-
-  it("a payment-detected invoice shows the paid panel marked unconfirmed, with the transaction", async () => {
-    const text = await textFromPdf({
-      ...baseInvoice,
-      status: "payment_detected",
-      btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6",
-    });
-    expect(text).toContain("Paid in bitcoin (unconfirmed)");
+    expect(text).toMatch(/\bPaid\b/);
     expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
     expect(text).not.toContain("does not encode the amount");
   });
@@ -166,9 +155,9 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     ["underpaid", { status: "underpaid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
     ["archived after paying", { status: "archived" as const, pre_archive_status: "paid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
     ["pending with a transaction", { status: "pending" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
-  ])("an invoice %s shows the paid panel, never the payment instructions", async (_label, patch) => {
+  ])("an invoice %s shows the payment block, never the payment instructions", async (_label, patch) => {
     const text = await textFromPdf({ ...baseInvoice, ...patch });
-    expect(text).toContain("Paid in bitcoin");
+    expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
     expect(text).not.toContain("Pay with Bitcoin");
     expect(text).not.toContain("does not encode the amount");
   });
@@ -183,5 +172,69 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
   it("keeps the payment link on invoices without a bitcoin address", async () => {
     const text = await textFromPdf({ ...baseInvoice, btc_address: null }, "https://satsend.app");
     expect(text).toContain("https://satsend.app/invoice/inv-id-1");
+  });
+});
+
+// v1.5.28: the PDF's payment panel is the invoice page's payment block.
+describe("renderInvoicePdf — the payment block (v1.5.28)", () => {
+  const TXID = "f4184fc596403b9d638783cf57adfe4c75c605f6";
+  const PAID: Invoice = {
+    ...baseInvoice,
+    status: "paid",
+    btc_txid: TXID,
+    total_fiat: 7200,
+    amount_received_sats: 7_200_000,
+    amount_received_fiat: 7200,
+    mempool_seen_at: "2026-10-27T12:18:00Z",
+    payment_confirmed_at: "2026-10-27T12:32:00Z",
+  };
+  const flat = (t: string) => t.replace(/\s+/g, " ");
+
+  it("paid: the sums with nothing outstanding, and when it was paid", async () => {
+    const text = flat(await textFromPdf(PAID));
+    expect(text).toContain("Paid");
+    expect(text).toMatch(/Requested \$7,200\.00/);
+    expect(text).toMatch(/Received \$7,200\.00 \(0\.072 BTC\)/);
+    expect(text).toMatch(/Outstanding \$0\.00/);
+    expect(text).toMatch(/Paid on Oct 27, 2026, 12:32 PM UTC/);
+    expect(text).toContain(baseInvoice.btc_address!);
+  });
+
+  it("uses the time zone it's given", async () => {
+    expect(flat(await textFromPdf(PAID, undefined, "America/New_York"))).toMatch(/Paid on Oct 27, 2026, 8:32 AM EDT/);
+  });
+
+  it("a variance comes with its explanation", async () => {
+    const text = flat(await textFromPdf({ ...PAID, amount_received_fiat: 7210 }));
+    expect(text).toMatch(/Exchange Rate Variance \+\$10\.00/);
+    expect(text).toContain("counts as paid in full");
+  });
+
+  it("underpaid: the rest outstanding, the client pointed to the sender", async () => {
+    const text = flat(await textFromPdf({ ...PAID, status: "underpaid", amount_received_fiat: 5000 }));
+    expect(text).toContain("Underpaid");
+    expect(text).toMatch(/Outstanding \$2,200\.00/);
+    expect(text).toContain("To resolve full settlement of this invoice, reach out to Analytical Ltd.");
+  });
+
+  it("overpaid: a negative outstanding and its sentence", async () => {
+    const text = flat(await textFromPdf({ ...PAID, overpaid: true, amount_received_fiat: 8000 }));
+    expect(text).toContain("Overpaid");
+    expect(text).toMatch(/Outstanding −\$800\.00/);
+    expect(text).toContain("To resolve overpayment of this invoice, reach out to Analytical Ltd.");
+  });
+
+  it("payment detected: no sums, the waiting sentence, when it was seen", async () => {
+    const text = flat(await textFromPdf({ ...PAID, status: "payment_detected", amount_received_fiat: null, amount_received_sats: null, payment_confirmed_at: null }));
+    expect(text).toContain("Payment detected");
+    expect(text).not.toContain("Outstanding");
+    expect(text).toContain("usually within about 20 minutes.");
+    expect(text).toMatch(/Seen at Oct 27, 2026, 12:18 PM UTC/);
+  });
+
+  it("never says SatSend received anything", async () => {
+    for (const inv of [PAID, { ...PAID, status: "underpaid" as const, amount_received_fiat: 5000 }, { ...PAID, overpaid: true, amount_received_fiat: 8000 }]) {
+      expect(await textFromPdf(inv)).not.toMatch(/\bwe\b/i);
+    }
   });
 });

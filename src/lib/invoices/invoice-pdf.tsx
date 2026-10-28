@@ -1,5 +1,6 @@
 import path from "node:path";
 import {
+  Circle,
   Document,
   Font,
   Image,
@@ -15,7 +16,15 @@ import {
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import type { Invoice } from "@/lib/invoice-public";
-import { brandColors } from "@/lib/brand-colors";
+import { brandColors, statusColors } from "@/lib/brand-colors";
+import { PAYMENT_ICON_NODES } from "./payment-icons";
+import {
+  RATE_VARIANCE_EXPLAINED,
+  formatPaymentTime,
+  hasPayment,
+  paymentSummary,
+  type PaymentState,
+} from "./payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
 import { WORDMARK_DOMAIN_PATH, WORDMARK_NAME_PATH, WORDMARK_VIEWBOX } from "@/lib/brand/wordmark-paths";
 
@@ -160,6 +169,27 @@ const styles = StyleSheet.create({
   link: { color: C.ink, textDecoration: "none" },
   note: { fontSize: 8.5, color: C.textSecondary, marginTop: 8, lineHeight: 1.45 },
 
+  // v1.5.28: the payment block, as on the invoice page.
+  payHead: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  payIcon: { width: 30, height: 30, marginRight: 10 },
+  payHeading: { fontFamily: "Onest", fontWeight: 700, fontSize: 15 },
+  sums: { borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 10 },
+  sumRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
+  sumLabel: { color: "#4A4F5E" },
+  sumTotal: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    // react-pdf can't draw rgba borders (they come out red): a solid ink tint.
+    borderColor: "#D3D6DC",
+  },
+  payMessage: { color: C.textSecondary, marginBottom: 10 },
+  detailRow: { flexDirection: "row", paddingVertical: 3 },
+  detailLabel: { width: 90, color: C.textSecondary },
+  detailValue: { flex: 1 },
+
   footer: {
     position: "absolute",
     left: 48,
@@ -183,23 +213,114 @@ function Wordmark() {
   );
 }
 
+/** The state's icon in its soft circle, drawn from the page's Lucide shapes. */
+function PaymentIcon({ state }: { state: PaymentState }) {
+  const c = statusColors[state];
+  return (
+    <Svg viewBox="0 0 64 64" style={styles.payIcon}>
+      <Circle cx="32" cy="32" r="32" fill={c.fill} />
+      {/* The 24-unit icon drawn at 32 units, centred: offset 16, scale 4/3. */}
+      {PAYMENT_ICON_NODES[state].map(([tag, attrs], i) => {
+        const shape = { stroke: c.text, strokeWidth: 2, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" } as const;
+        return tag === "circle" ? (
+          <Circle key={i} cx={16 + Number(attrs.cx) * (4 / 3)} cy={16 + Number(attrs.cy) * (4 / 3)} r={Number(attrs.r) * (4 / 3)} {...shape} strokeWidth={2 * (4 / 3)} />
+        ) : (
+          <Path key={i} d={attrs.d} {...shape} transform="translate(16 16) scale(1.3333)" />
+        );
+      })}
+    </Svg>
+  );
+}
+
+function PaymentBlock({ invoice, timeZone }: { invoice: Invoice; timeZone: string }) {
+  const { state, heading, sums, message, time } = paymentSummary(invoice, { audience: "client" });
+  const c = statusColors[state];
+  return (
+    <View style={styles.btc} wrap={false}>
+      <View style={styles.btcInfo}>
+        <View style={styles.payHead}>
+          <PaymentIcon state={state} />
+          <Text style={[styles.payHeading, { color: c.text }]}>{heading}</Text>
+        </View>
+
+        {sums ? (
+          <View style={[styles.sums, { backgroundColor: c.fill }]}>
+            <View style={styles.sumRow}>
+              <Text style={styles.sumLabel}>Requested</Text>
+              <Text>{sums.requested}</Text>
+            </View>
+            <View style={styles.sumRow}>
+              <Text style={styles.sumLabel}>Received</Text>
+              <Text>
+                {sums.received}
+                {sums.receivedBtc ? <Text style={{ color: "#4A4F5E", fontSize: 9 }}> ({sums.receivedBtc})</Text> : null}
+              </Text>
+            </View>
+            {sums.rateVariance ? (
+              <View style={styles.sumRow}>
+                <Text style={styles.sumLabel}>Exchange Rate Variance</Text>
+                <Text>{sums.rateVariance}</Text>
+              </View>
+            ) : null}
+            <View style={styles.sumTotal}>
+              <Text style={{ fontWeight: 600 }}>Outstanding</Text>
+              <Text style={{ fontWeight: 600, color: c.text }}>{sums.outstanding}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {sums?.rateVariance ? (
+          <Text style={[styles.note, { marginTop: 0, marginBottom: 10 }]}>
+            <Text style={{ fontWeight: 600, color: C.ink }}>Exchange Rate Variance: </Text>
+            {RATE_VARIANCE_EXPLAINED.join(" ")}
+          </Text>
+        ) : null}
+
+        {message ? <Text style={styles.payMessage}>{message}</Text> : null}
+
+        {time ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>{time.label}</Text>
+            <Text style={[styles.detailValue, { fontWeight: 500 }]}>{formatPaymentTime(time.iso, timeZone)}</Text>
+          </View>
+        ) : null}
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Bitcoin address</Text>
+          <Text style={[styles.detailValue, styles.mono, { marginTop: 0, marginBottom: 0 }]}>{invoice.btc_address}</Text>
+        </View>
+        {invoice.btc_txid ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Transaction</Text>
+            <View style={styles.detailValue}>
+              <View style={styles.linkWrap}>
+                <Link src={mempoolTxUrl(invoice.btc_txid)} style={[styles.link, styles.mono, { marginTop: 0, marginBottom: 0 }]}>
+                  {invoice.btc_txid}
+                </Link>
+              </View>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 interface RenderProps {
   invoice: Invoice;
   publicUrl: string;
   qrDataUrl: string | null;
+  timeZone: string;
 }
 
-function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
+function InvoiceDocument({ invoice, publicUrl, qrDataUrl, timeZone }: RenderProps) {
   const cur = invoice.currency;
   const lineTotal = (li: Invoice["line_items"][number]) => li.quantity * li.unit_price;
   const title = invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice";
-  // A detected (still unconfirmed) payment already has its transaction, so it
-  // gets the paid panel, marked "(unconfirmed)".
   // v1.5.27: any sign of a payment (a txid, or a paid status, archived ones
   // read as what they were) means no payable QR, as on the invoice page.
+  // v1.5.28: and the panel is the page's payment block.
   const shown = invoice.status === "archived" ? (invoice.pre_archive_status ?? invoice.status) : invoice.status;
-  const isDetected = shown === "payment_detected";
-  const isPaid = !!invoice.btc_txid || isDetected || shown === "paid" || shown === "underpaid";
+  const isPaid = hasPayment(shown, invoice.btc_txid);
 
   return (
     <Document title={title} author={invoice.your_name ?? undefined} creator="SatSend" producer="SatSend">
@@ -284,23 +405,7 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
         </View>
 
         {isPaid && invoice.btc_address ? (
-          <View style={styles.btc} wrap={false}>
-            <View style={styles.btcInfo}>
-              <Text style={styles.btcTitle}>{isDetected ? "Paid in bitcoin (unconfirmed)" : shown === "underpaid" ? "Paid in bitcoin (underpaid)" : "Paid in bitcoin"}</Text>
-              <Text style={styles.label}>Bitcoin address</Text>
-              <Text style={styles.mono}>{invoice.btc_address}</Text>
-              {invoice.btc_txid ? (
-                <>
-                  <Text style={styles.label}>Transaction</Text>
-                  <View style={[styles.linkWrap, { marginTop: 3 }]}>
-                    <Link src={mempoolTxUrl(invoice.btc_txid)} style={[styles.link, styles.mono, { marginTop: 0, marginBottom: 0 }]}>
-                      {invoice.btc_txid}
-                    </Link>
-                  </View>
-                </>
-              ) : null}
-            </View>
-          </View>
+          <PaymentBlock invoice={invoice} timeZone={timeZone} />
         ) : invoice.btc_address ? (
           <View style={styles.btc} wrap={false}>
             {qrDataUrl ? (
@@ -347,6 +452,8 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl }: RenderProps) {
 
 export interface RenderInvoicePdfOptions {
   appUrl: string;
+  /** The downloader's time zone for payment times (v1.5.28); UTC if unknown. */
+  timeZone?: string;
 }
 
 export async function renderInvoicePdf(invoice: Invoice, opts: RenderInvoicePdfOptions): Promise<Buffer> {
@@ -359,5 +466,7 @@ export async function renderInvoicePdf(invoice: Invoice, opts: RenderInvoicePdfO
       })
     : null;
 
-  return renderToBuffer(<InvoiceDocument invoice={invoice} publicUrl={publicUrl} qrDataUrl={qrDataUrl} />);
+  return renderToBuffer(
+    <InvoiceDocument invoice={invoice} publicUrl={publicUrl} qrDataUrl={qrDataUrl} timeZone={opts.timeZone ?? "UTC"} />,
+  );
 }

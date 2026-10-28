@@ -5,6 +5,7 @@ import { renderInvoicePdf } from "@/lib/invoices/invoice-pdf";
 import { buildPdfFilename } from "@/lib/invoices/pdf-filename";
 import { getAppUrl } from "@/lib/app-url";
 import { hasAccess, accessCookieName } from "@/lib/access-code";
+import { safeTimeZone } from "@/lib/invoices/payment-summary";
 
 export async function GET(
   request: NextRequest,
@@ -30,13 +31,16 @@ export async function GET(
   // every write (including the sweep), so a changed invoice always gets a fresh
   // tag. "private" because the PDF can be access-protected, and no-cache means
   // the browser revalidates (cheap 304) rather than re-rendering every time.
-  const etag = `"${invoice.id}-${new Date(invoice.updated_at).getTime()}"`;
+  // v1.5.28: payment times print in the downloader's time zone, so it's part
+  // of the version too.
+  const timeZone = safeTimeZone(request.nextUrl.searchParams.get("tz"));
+  const etag = `"${invoice.id}-${new Date(invoice.updated_at).getTime()}-${timeZone}"`;
   const cacheHeaders = { etag, "cache-control": "private, no-cache" };
   if (request.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: cacheHeaders });
   }
 
-  const pdf = await renderInvoicePdf(invoice, { appUrl: getAppUrl() });
+  const pdf = await renderInvoicePdf(invoice, { appUrl: getAppUrl(), timeZone });
   const filename = buildPdfFilename(invoice);
   const asciiFilename = filename.replace(/[^\x20-\x7E]/g, "_");
   const encodedFilename = encodeURIComponent(filename);

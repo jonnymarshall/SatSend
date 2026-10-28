@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleCheck, CircleHelp, CirclePlus, Clock, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +17,7 @@ import { LogoHomeLink } from "@/components/brand/logo-home-link";
 import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
+import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
 import {
   RATE_VARIANCE_EXPLAINED,
   formatPaymentTime,
@@ -69,6 +70,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   // v1.5.27: a live update carries only the status and txid, so when a payment
   // lands or confirms during the visit, fetch the invoice again for the amount
   // received and the times. Stops once the server's status matches.
+  const timeZone = useTimeZone();
   const router = useRouter();
   useEffect(() => {
     if (status !== invoice.status && hasPayment(status, btcTxid)) router.refresh();
@@ -126,7 +128,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
             )}
             <a
               id="invoice-view--download-pdf"
-              href={`/api/invoice/${invoice.id}/pdf`}
+              href={pdfHref(`/api/invoice/${invoice.id}/pdf`, timeZone)}
               download
               className={buttonVariants({ variant: "secondary", size: "sm", className: "h-11 sm:h-9" })}
             >
@@ -294,17 +296,6 @@ const STATE_LOOK: Record<PaymentState, { Icon: LucideIcon; soft: string; text: s
   underpaid: { Icon: TriangleAlert, soft: "bg-(--color-warning-soft)", text: "text-(--color-warning-text)" },
   overpaid: { Icon: CirclePlus, soft: "bg-(--color-sent-soft)", text: "text-(--color-sent-text)" },
 };
-
-// The server renders in UTC; the browser then shows the payer's own time zone.
-// useSyncExternalStore keeps that switch free of hydration mismatches.
-const subscribeNever = () => () => {};
-function useTimeZone(): string {
-  return useSyncExternalStore(
-    subscribeNever,
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-    () => "UTC",
-  );
-}
 
 /**
  * Explains the Exchange Rate Variance row (Jonny, 2026-10-27). A button, so it

@@ -415,7 +415,9 @@ describe("InvoiceDataTable — per-row actions", () => {
     expect(item).toBeInTheDocument();
     const link = item.closest("a") ?? item.querySelector("a");
     expect(link).not.toBeNull();
-    expect(link!.getAttribute("href")).toBe("/api/invoices/inv-2/pdf");
+    // v1.5.28: with the viewer's time zone, for the payment times.
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(link!.getAttribute("href")).toBe(`/api/invoices/inv-2/pdf?tz=${encodeURIComponent(tz)}`);
     expect(link!.hasAttribute("download")).toBe(true);
   });
 

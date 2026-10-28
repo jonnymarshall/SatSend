@@ -106,6 +106,17 @@ export function formatPaymentTime(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
+/** A time zone the runtime recognises, else UTC (it arrives in a URL). */
+export function safeTimeZone(tz: string | null | undefined): string {
+  if (!tz) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return "UTC";
+  }
+}
+
 export function paymentState(invoice: PaymentSummaryInvoice, status: Invoice["status"] = invoice.status): PaymentState {
   // An archived invoice reads as whatever it was before archiving.
   const shown = status === "archived" ? (invoice.pre_archive_status ?? status) : status;
