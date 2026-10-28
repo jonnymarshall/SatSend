@@ -364,6 +364,11 @@ function PaymentReceived({
   // hand with no amount recorded).
   const outstanding =
     fiat === null || state === "payment_detected" ? null : state === "paid" ? 0 : invoice.total_fiat - fiat;
+  // A paid invoice's gap (within the allowance) shown as its own row, so the
+  // sums add up on screen (Jonny, 2026-10-27). Worked out from the rounded cents
+  // the rows show, so Requested + this row always equals Received.
+  const rateDifference =
+    state === "paid" && fiat !== null ? (Math.round(fiat * 100) - Math.round(invoice.total_fiat * 100)) / 100 : 0;
 
   // The box says what arrived; the text only says what to do next (Jonny,
   // 2026-10-27). Paid needs none.
@@ -411,6 +416,15 @@ function PaymentReceived({
               {btc && <span className="text-(--color-ink)/70 text-[13px]"> ({btc})</span>}
             </span>
           </div>
+          {rateDifference !== 0 && (
+            <div id="invoice-view--payment-sum-rate" className="flex justify-between gap-3">
+              <span className="text-(--color-ink)/70">Exchange rate difference</span>
+              <span className="tabular-nums">
+                {rateDifference < 0 ? "−" : "+"}
+                {fmtCurrency(Math.abs(rateDifference), cur)}
+              </span>
+            </div>
+          )}
           <div id="invoice-view--payment-sum-outstanding" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">
             <span>Outstanding</span>
             <span className={`tabular-nums ${look.text}`}>

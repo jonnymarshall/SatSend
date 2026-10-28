@@ -379,6 +379,32 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
   });
 
+  // Jonny, 2026-10-27: a visible gap above "Outstanding $0.00" looks like a
+  // maths mistake, so a paid-within-the-allowance gap gets its own row.
+  it("paid a little over: an exchange rate difference row explains the gap", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 100.125 }} btcPrice={50000} />);
+    expect(sumRow("rate")).toMatch(/^Exchange rate difference\+\$0\.13$/);
+    expect(sumRow("outstanding")).toMatch(/\$0\.00$/);
+  });
+
+  it("paid a little under: the difference shows as negative", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, amount_received_fiat: 98 }} btcPrice={50000} />);
+    expect(sumRow("rate")).toMatch(/−\$2\.00$/);
+  });
+
+  it("an exact payment has no exchange rate row", () => {
+    render(<InvoicePaymentView invoice={PAID} btcPrice={50000} />);
+    expect(sumRow("rate")).toBeUndefined();
+  });
+
+  it("underpaid and overpaid don't get the row (their Outstanding is the real gap)", () => {
+    const { unmount } = render(<InvoicePaymentView invoice={UNDERPAID} btcPrice={50000} />);
+    expect(sumRow("rate")).toBeUndefined();
+    unmount();
+    render(<InvoicePaymentView invoice={OVERPAID} btcPrice={50000} />);
+    expect(sumRow("rate")).toBeUndefined();
+  });
+
   it("overpaid: its own state, the sums, and the approved wording", () => {
     const { container } = render(<InvoicePaymentView invoice={OVERPAID} btcPrice={50000} />);
     expect(block()).toHaveAttribute("data-state", "overpaid");

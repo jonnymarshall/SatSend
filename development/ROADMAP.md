@@ -673,13 +673,81 @@ gate on the status string alone.
       payment is detected (it used to stay "Payment detected" until reloaded);
       "Mark as unpaid" removed for blockchain-confirmed payments (it flipped
       straight back and resent the email).
+- [x] A paid invoice whose amount differs within the allowance shows an
+      "Exchange rate difference" row (+ over, − under) between Received and
+      Outstanding, so the sums add up on screen (Jonny, 2026-10-27). The PDF no
+      longer prints a payable QR for underpaid, archived-paid or txid invoices.
 
 **Done when:** a paid/detected invoice never renders a payment QR or a live BTC
 amount, however and whenever its page is loaded.
 
 ---
 
-## Legal and compliance train (**pre-launch**, next after v1.5.2.13-H)
+### ⏳ v1.5.2.21-H — The payment block in emails and PDFs (**pre-launch**)
+
+**Branch:** `v1.5.28/payment-block-emails-pdf` · package `1.5.28` · no migration
+expected.
+
+**Context (Jonny, 2026-10-27).** v1.5.27 redesigned the payment block on the
+client's invoice page. The payment emails and the PDF should match it as
+closely as possible, in information and styling, as the links work did.
+Today the four payment emails (detected and confirmed, to the sender and to
+the client) have a status pill only, no amounts box, no time, no Overpaid
+state, and the client's underpaid email says "We received", which breaks the
+wording rule (never imply SatSend holds funds). The PDF has a plain "Paid in
+bitcoin" panel.
+
+**Scope (decisions agreed 2026-10-27):**
+- [ ] Every payment email gets the block: coloured circle icon and state name
+      (Payment detected violet clock, Paid green tick, Underpaid amber warning,
+      Overpaid blue plus), the Requested / Received / [Exchange rate
+      difference] / Outstanding box, the next-step sentence, "Paid on" or
+      "Seen at", the full address and the full transaction ID.
+- [ ] Icons in emails are small PNGs attached inline, like the logo (email
+      apps strip SVG).
+- [ ] Client emails: "To resolve full settlement of this invoice, reach out to
+      [Sender]." / "To resolve overpayment of this invoice, reach out to
+      [Sender]." Sender's own emails name the client instead.
+- [ ] Remove every "we received" (and similar) from the payment emails.
+- [ ] Email times in UTC, named ("2:54 AM UTC"): the reader's zone is unknown.
+- [ ] Subjects: "Underpaid" replaces "Partial payment"; new Overpaid subjects
+      ("Overpayment received for invoice X").
+- [ ] The PDF's paid panel becomes the same block, drawn natively (react-pdf
+      `Svg` for the icons); its times use the downloader's time zone, passed
+      from the browser.
+- [ ] Manual tests with real sends (Resend) of each state.
+
+---
+
+### ⏳ v1.5.2.22-H — Locked quotes and a tighter payment allowance (**pre-launch**)
+
+**Context (Jonny, 2026-10-27).** A payment counts as paid in full within 5%
+either way: $400 on an $8,000 invoice, which is too generous. The allowance is
+wide because of how payments are valued, not client error: the client pays
+the bitcoin amount shown when they opened the QR, but SatSend values it at the
+exchange rate when it **confirms**, often 10 to 60 minutes later, and the
+price can move 1 to 3% in that time. Tightening the allowance alone would mark
+honest clients underpaid on volatile days. Agreed plan:
+
+**Scope:**
+- [ ] **Lock the quote.** When the client reveals the QR, record the quoted
+      bitcoin amount, price and time (new table, server-written). A quote is
+      valid for about 30 minutes; the page refreshes it after that.
+- [ ] **Judge in bitcoin.** A payment that matches a valid quote is compared in
+      bitcoin against that quote, so price movement drops out. Value it at the
+      quoted price, so an exact payment shows Received equal to Requested and
+      no "Exchange rate difference" row.
+- [ ] **Fallback.** With no valid quote (paid late, or from the PDF, whose QR
+      has no amount), value at the price when the payment was **first seen**,
+      not when it confirmed.
+- [ ] **Tighten the allowance**, for example 1% capped at $25 to $50 (decide
+      the numbers when built). Update the FAQ's "within 5%" answer.
+- [ ] Revisit the "Exchange rate difference" label: with quotes locked, the
+      small gaps left are mostly wallet fees, not the exchange rate.
+
+---
+
+## Legal and compliance train (**pre-launch**, next after v1.5.2.13-H, v1.5.2.21-H and v1.5.2.22-H)
 
 > **Jonny, 2026-10-27:** "I want to make sure I am maximally covered for legal
 > compliance", with a dedicated Terms page and a Legal page, advanced to the
@@ -946,9 +1014,10 @@ payments; that is safe.
 
 ### ⏳ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
 
-**Branch:** `v1.5.28/short-invoice-reference` · package `1.5.28` · new migration
-(next free number: `0038`, since v1.5.27 took `0037`). Renumber the package if another
-item ships between this plan and the branch.
+**Branch:** `v1.5.29/short-invoice-reference` · package `1.5.29` (moved from
+1.5.28 for v1.5.2.21-H) · new migration (the next free number when it starts;
+v1.5.27 took `0037`). Renumber the package if another item ships between this
+plan and the branch.
 
 **Context.** Two linked requests from Jonny (2026-10-26):
 

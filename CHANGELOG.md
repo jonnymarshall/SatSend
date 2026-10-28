@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v1.5.27 — The PDF no longer prints a payable QR once paid.** Underpaid
   invoices, archived paid ones, and any invoice with a transaction now get the
   paid panel instead of "Pay with Bitcoin" and its QR code.
+- **v1.5.27 — "Exchange rate difference" row.** A paid invoice whose amount
+  differs slightly (within the allowance) shows the gap as its own row above
+  "Outstanding $0.00", so the sums add up.
 
 ### Fixed
 
@@ -48,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Docs
 
+- Roadmap: v1.5.2.21-H (the payment block in emails and PDFs, v1.5.28) and
+  v1.5.2.22-H (locked quotes and a tighter payment allowance) added before the
+  legal train; the short invoice reference moves to v1.5.29.
 - **Roadmap: legal and compliance train (pre-launch).** Terms (v1.5.2.8-H) and
   Privacy (v1.5.2.7-H) expanded and moved up to follow v1.5.2.13-H, plus new
   items: `/legal` page with agreeing at sign-up and payer notices (v1.5.2.15-H),
