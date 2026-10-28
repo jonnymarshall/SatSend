@@ -18,6 +18,9 @@ export interface MarkAsMenuProps {
   onMarkUnpaid: (id: string) => void;
   onMarkOverdue: (id: string) => void;
   busy?: boolean;
+  // v1.5.27: the payment was confirmed on the blockchain (it has a txid), so
+  // marking it unpaid can't stick: the next check finds the bitcoin again.
+  paidOnChain?: boolean;
 }
 
 const UNPAID_STATES = new Set(["pending", "payment_detected", "underpaid"]);
@@ -30,15 +33,19 @@ export function MarkAsMenu({
   onMarkUnpaid,
   onMarkOverdue,
   busy,
+  paidOnChain = false,
 }: MarkAsMenuProps) {
   const isPaid = status === "paid";
   const isUnpaid = UNPAID_STATES.has(status);
   const showOverdue = canMarkAsOverdue({ status, due_date: dueDate });
   // "Pending" is the case-#4 reverse (overdue → pending). The paid → pending
   // transition keeps its existing always-on availability for paid invoices.
-  const showPending = isPaid || canMarkAsPending({ status, due_date: dueDate });
+  const showPending = (isPaid && !paidOnChain) || canMarkAsPending({ status, due_date: dueDate });
   // Suppress the duplicate when the row is already in an unpaid state.
   const showPendingItem = showPending && !isUnpaid;
+  // v1.5.27: a blockchain-paid invoice has nothing to mark (not Paid again, not
+  // Unpaid, not Overdue), and an empty menu looks broken. Show no button.
+  if (isPaid && !showPendingItem && !showOverdue) return null;
 
   return (
     <DropdownMenu>

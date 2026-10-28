@@ -3,6 +3,8 @@ import { getMempoolBaseUrl } from "./btc-network";
 export interface MempoolTxStatus {
   confirmed: boolean;
   block_height?: number;
+  /** Unix seconds of the block the tx confirmed in (v1.5.27). */
+  block_time?: number;
 }
 
 export interface MempoolVout {

@@ -40,6 +40,7 @@ const baseInvoice: Invoice = {
   mempool_seen_at: null,
   next_check_at: null,
   overpaid: false,
+  payment_confirmed_at: null,
   pre_archive_status: null,
   published_at: null,
   send_method: null,
@@ -157,6 +158,18 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     });
     expect(text).toContain("Paid in bitcoin (unconfirmed)");
     expect(text).toContain("f4184fc596403b9d638783cf57adfe4c75c605f6");
+    expect(text).not.toContain("does not encode the amount");
+  });
+
+  // v1.5.27: never a payable QR once a payment exists, on the PDF as on the page.
+  it.each([
+    ["underpaid", { status: "underpaid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+    ["archived after paying", { status: "archived" as const, pre_archive_status: "paid" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+    ["pending with a transaction", { status: "pending" as const, btc_txid: "f4184fc596403b9d638783cf57adfe4c75c605f6" }],
+  ])("an invoice %s shows the paid panel, never the payment instructions", async (_label, patch) => {
+    const text = await textFromPdf({ ...baseInvoice, ...patch });
+    expect(text).toContain("Paid in bitcoin");
+    expect(text).not.toContain("Pay with Bitcoin");
     expect(text).not.toContain("does not encode the amount");
   });
 

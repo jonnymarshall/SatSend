@@ -109,6 +109,7 @@ export async function POST(
       btc_price_at_detection: decision.btcPriceAtDetection,
       amount_received_fiat: decision.amountReceivedFiat,
       overpaid: decision.overpaid,
+      payment_confirmed_at: decision.confirmedAt,
     })
     .eq("id", id)
     .eq("status", invoice.status)

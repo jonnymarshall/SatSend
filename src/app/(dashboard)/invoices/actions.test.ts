@@ -732,6 +732,23 @@ describe("markUnpaid", () => {
     expect(payload.status).toBe("pending");
   });
 
+  it("clears the confirmation time so the payer's page shows no stale 'Paid on' (v1.5.27)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { id: "inv-1", status: "paid", user_id: "user-1" },
+    });
+    await markUnpaid("inv-1");
+    const payload = updateChain.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).toHaveProperty("payment_confirmed_at", null);
+  });
+
+  it("refuses an invoice whose payment was confirmed on the blockchain (v1.5.27)", async () => {
+    const { updateChain } = makeSupabase({
+      fetchData: { id: "inv-1", status: "paid", btc_txid: "tx-1", user_id: "user-1" },
+    });
+    await expect(markUnpaid("inv-1")).rejects.toThrow(/confirmed on the blockchain/);
+    expect(updateChain).not.toHaveBeenCalled();
+  });
+
   it("logs a marked_as_unpaid invoice_events row", async () => {
     makeSupabase({ fetchData: { id: "inv-1", status: "paid", user_id: "user-1" } });
     await markUnpaid("inv-1");

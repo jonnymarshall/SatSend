@@ -7,8 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.27 (follow-up) — Clearer payment block on the public invoice.** Each state has its
+  own icon and colour (Payment detected: violet clock; Paid: green tick;
+  Underpaid: amber warning; Overpaid: blue plus). Underpaid and Overpaid show
+  Requested / Received / Difference. The block shows when the payment confirmed
+  ("Paid on", in the payer's time zone) or, before that, when it was seen.
+  Overpaid invoices now say "Overpaid" on the page and its badge, with wording
+  pointing the client to the sender about the extra. A payment that confirms
+  during the visit loads its amount without a reload. Migration 0037 adds
+  `invoices.payment_confirmed_at`, filled from the block's time.
+- **v1.5.27 (follow-up) — Payment fixes found in manual testing.** An open
+  invoice page now checks again on each new block while a payment is detected,
+  so it turns to Paid without a reload (a payment needs 2 confirmations, and
+  nothing used to look after the first). A payment confirmed on the
+  blockchain can no longer be marked unpaid: the next check found the bitcoin
+  again, flipped it back and resent the confirmation email. With nothing
+  left to mark, the "Mark as" button is hidden rather than opening empty. The sums box now
+  shows on every paid invoice, with "Outstanding" ($0.00 when paid, the rest
+  when underpaid, below zero when overpaid), and the transaction ID shows in
+  full except at phone width. The text under the box only says what to do
+  next: none when paid; "To resolve full settlement of this invoice, reach out
+  to [Sender]." when underpaid; "To resolve overpayment of this invoice, reach
+  out to [Sender]." when overpaid.
+- **v1.5.27 — The PDF no longer prints a payable QR once paid.** Underpaid
+  invoices, archived paid ones, and any invoice with a transaction now get the
+  paid panel instead of "Pay with Bitcoin" and its QR code.
+- **v1.5.27 — "Exchange Rate Variance" row.** A paid invoice whose amount
+  differs slightly (within the allowance) shows the gap as its own row above
+  "Outstanding $0.00", so the sums add up. A **?** button beside it (hover,
+  tap or keyboard) explains what it means. The row only appears inside the
+  allowance (95% to 105%); a bigger gap on a paid invoice means the sender
+  marked it paid by hand, and the page says "Marked as paid by [Sender]."
+
+### Fixed
+
+- **v1.5.27 — No payable QR once an invoice is paid (roadmap v1.5.2.13-H).** Once
+  a payment exists (a transaction ID, or a detected / paid / underpaid status),
+  the public invoice shows a "Payment detected", "Paid" or "Underpaid" card with
+  the address, the transaction link and what arrived, instead of a QR code and
+  a live bitcoin amount that changed with the price. The underpaid wording
+  points the client to the sender to settle the rest. A paid invoice no longer
+  asks for a manual amount when the price service is down.
+- Roadmap housekeeping: finished v1.5.2 sections and Appendix A moved to
+  `ROADMAP-ARCHIVE.md`.
+
 ### Docs
 
+- Roadmap: v1.5.2.21-H (the payment block in emails and PDFs, v1.5.28) and
+  v1.5.2.22-H (locked quotes and a tighter payment allowance) added before the
+  legal train; the short invoice reference moves to v1.5.29.
 - **Roadmap: legal and compliance train (pre-launch).** Terms (v1.5.2.8-H) and
   Privacy (v1.5.2.7-H) expanded and moved up to follow v1.5.2.13-H, plus new
   items: `/legal` page with agreeing at sign-up and payer notices (v1.5.2.15-H),

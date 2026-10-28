@@ -50,6 +50,12 @@ export const REVERT_TO_PENDING_AFTER_MS = 60 * 60_000;
 const UNDERPAID_COVERAGE = 0.95;
 const OVERPAID_COVERAGE = 1.05;
 
+/** True when a payment counts as paid in full: 95% to 105% of the total. */
+export function isWithinAllowance(receivedFiat: number, totalFiat: number): boolean {
+  const coverage = receivedFiat / totalFiat;
+  return coverage >= UNDERPAID_COVERAGE && coverage <= OVERPAID_COVERAGE;
+}
+
 // mempool.space (and esplora-style APIs generally) only report whether a tx
 // is confirmed and which block it landed in — not a live confirmation count,
 // since that's relative to the ever-advancing tip. We require the tip to be
@@ -90,6 +96,9 @@ export interface ScheduleDecision {
   // put back to a clean `pending` (caller clears btc_txid and re-anchors the
   // schedule). (v1.4.22-H / M-MONEY-4)
   revertToPending: boolean;
+  // When a paid/underpaid verdict's tx confirmed: the block's own time, else
+  // now. Null for every other decision. Shown to the payer (v1.5.27).
+  confirmedAt: string | null;
 }
 
 const NO_VERDICT = {
@@ -98,6 +107,7 @@ const NO_VERDICT = {
   amountReceivedFiat: null,
   overpaid: false,
   revertToPending: false,
+  confirmedAt: null,
 } as const;
 
 function sumVouts(tx: MempoolTx, address: string): number {
@@ -200,6 +210,9 @@ export function decidePaymentSchedule(
         amountReceivedFiat: receivedFiat,
         overpaid: coverage > OVERPAID_COVERAGE,
         revertToPending: false,
+        confirmedAt: paying.status.block_time
+          ? new Date(paying.status.block_time * 1000).toISOString()
+          : now.toISOString(),
       };
     }
 
@@ -285,6 +298,7 @@ export function decidePaymentSchedule(
       amountReceivedFiat: null,
       overpaid: false,
       revertToPending: true,
+      confirmedAt: null,
     };
   }
 

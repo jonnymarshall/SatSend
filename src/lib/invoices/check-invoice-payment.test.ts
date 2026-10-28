@@ -105,6 +105,16 @@ describe("checkInvoicePayment", () => {
     expect(mockSendDetected).not.toHaveBeenCalled();
   });
 
+  it("records when the payment confirmed, from the block's time (v1.5.27)", async () => {
+    mockFetchAddressTxs.mockResolvedValue([{ ...confirmedTx, status: { ...confirmedTx.status, block_time: 1_793_100_000 } }]);
+    const db = fakeDb("payment_detected");
+    await checkInvoicePayment(db.client, detected, 900_002, NOW);
+    expect(db.updates[0]).toMatchObject({
+      status: "paid",
+      payment_confirmed_at: new Date(1_793_100_000 * 1000).toISOString(),
+    });
+  });
+
   it("defers without writing when mempool.space is unreachable", async () => {
     mockFetchAddressTxs.mockResolvedValue(null);
     const db = fakeDb("payment_detected");

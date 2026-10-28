@@ -520,11 +520,17 @@ export async function markUnpaid(invoiceId: string) {
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("user_id")
+    .select("user_id, status, btc_txid")
     .eq("id", invoiceId)
     .single();
 
   if (!invoice || invoice.user_id !== user!.id) throw new Error("Invoice not found");
+  // v1.5.27: a payment confirmed on the blockchain can't be undone here. The
+  // next payment check would find the bitcoin again, flip it back to paid and
+  // send the confirmation email a second time.
+  if (invoice.status === "paid" && invoice.btc_txid) {
+    throw new Error("This payment was confirmed on the blockchain, so the invoice can't be marked unpaid.");
+  }
 
   const { error } = await supabase
     .from("invoices")
@@ -542,6 +548,7 @@ export async function markUnpaid(invoiceId: string) {
       btc_price_at_detection: null,
       amount_received_fiat: null,
       overpaid: false,
+      payment_confirmed_at: null,
     })
     .eq("id", invoiceId);
 

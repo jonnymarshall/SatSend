@@ -155,6 +155,7 @@ export type Database = {
           mempool_seen_at: string | null
           next_check_at: string | null
           overpaid: boolean
+          payment_confirmed_at: string | null
           pre_archive_status:
             | Database["public"]["Enums"]["invoice_status"]
             | null
@@ -197,6 +198,7 @@ export type Database = {
           mempool_seen_at?: string | null
           next_check_at?: string | null
           overpaid?: boolean
+          payment_confirmed_at?: string | null
           pre_archive_status?:
             | Database["public"]["Enums"]["invoice_status"]
             | null
@@ -239,6 +241,7 @@ export type Database = {
           mempool_seen_at?: string | null
           next_check_at?: string | null
           overpaid?: boolean
+          payment_confirmed_at?: string | null
           pre_archive_status?:
             | Database["public"]["Enums"]["invoice_status"]
             | null

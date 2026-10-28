@@ -35,6 +35,7 @@ const baseInvoice: Invoice = {
   mempool_seen_at: null,
   next_check_at: null,
   overpaid: false,
+  payment_confirmed_at: null,
   pre_archive_status: null,
   published_at: null,
   send_method: null,
