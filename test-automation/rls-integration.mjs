@@ -210,6 +210,38 @@ try {
     `status ${second.status} ${second.text?.slice(0, 200)}`);
   const shortWindow = await guess({ p_invoice_id: invoiceId, p_client_key: conn, p_window_seconds: 0, p_wrong: false });
   check("old guesses age out of the window", shortWindow.json === true, JSON.stringify(shortWindow.json));
+
+  // 6. Locked quotes (v1.5.29, migration 0038): server-only, and a quote from
+  //    the last p_reuse_seconds is handed out again rather than a new one made.
+  const quote = (args, opts = {}) =>
+    rest("rpc/take_invoice_quote", {
+      method: "POST",
+      ...opts,
+      body: {
+        p_invoice_id: invoiceId, p_amount_sats: 100_000, p_btc_price: 50_000, p_total_fiat: 50, p_currency: "USD",
+        p_valid_seconds: 1800, p_reuse_seconds: 60, p_keep_seconds: 86_400, ...args,
+      },
+    });
+  const anonQuote = await quote({}, { key: ANON });
+  check("anon cannot execute take_invoice_quote", !anonQuote.ok, `status ${anonQuote.status}`);
+  const userQuote = await quote({}, { jwt: userA.jwt, key: ANON });
+  check("a signed-in user (even the owner) cannot execute take_invoice_quote", !userQuote.ok, `status ${userQuote.status}`);
+  const first = await quote({});
+  const firstRow = first.json?.[0];
+  check("the server can take a quote, valid for 30 minutes",
+    firstRow && Date.parse(firstRow.expires_at) - Date.parse(firstRow.created_at) === 1_800_000,
+    `status ${first.status} ${first.text?.slice(0, 200)}`);
+  const again = await quote({ p_amount_sats: 99_000 });
+  check("a quote from the last minute is reused", again.json?.[0]?.id === firstRow?.id && again.json?.[0]?.amount_sats === 100_000,
+    JSON.stringify(again.json));
+  const newQuote = await quote({ p_amount_sats: 99_000, p_reuse_seconds: 0 });
+  check("after the reuse window a new quote is made", newQuote.json?.[0]?.id && newQuote.json[0].id !== firstRow?.id,
+    JSON.stringify(newQuote.json));
+  for (const jwt of [undefined, userA.jwt]) {
+    const read = await rest(`invoice_quotes?invoice_id=eq.${invoiceId}&select=id`, { key: ANON, jwt });
+    check(`${jwt ? "the owner" : "anon"} cannot read invoice_quotes`,
+      !read.ok || (Array.isArray(read.json) && read.json.length === 0), `status ${read.status}`);
+  }
 } finally {
   await cleanup();
   if (userA) await deleteUser(userA.id);

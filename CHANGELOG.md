@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.29 — Locked quotes and a tighter Slippage Tolerance (roadmap v1.5.2.22-H).**
+  Clicking "Pay now in Bitcoin" now records a quote: the bitcoin amount shown,
+  the price behind it and a 30-minute expiry (new `invoice_quotes` table and
+  `take_invoice_quote` function, migration 0038). The page shows "This amount
+  is held until …" and fetches a fresh quote when it expires. A payment that
+  matches a quote is judged in bitcoin against it and valued at the quoted
+  price, so an exact payment shows Received equal to Requested. Without a
+  quote, a payment is valued at the price when it was first seen, not when it
+  confirmed. The Slippage Tolerance (Jonny's term for the paid-in-full margin)
+  is now 1% of the total, capped at $25, instead of 5%; the tolerance used is
+  recorded on the invoice so older invoices read as before. "Exchange Rate
+  Variance" is now **Settlement Variance**, and its help names the invoice's
+  Slippage Tolerance. New public page **How payments are settled**
+  (`/payment-settlement`, in the footer), a new FAQ answer, and updated FAQ
+  and How it works wording.
+
+### Changed
+
 - **v1.5.28 — The payment block in emails and PDFs (roadmap v1.5.2.21-H).**
   The four payment emails (detected and confirmed, to the client and to the
   sender) and the PDF's payment panel now match the client's invoice page: the

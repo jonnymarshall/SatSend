@@ -53,4 +53,21 @@ describe("faq content", () => {
     expect(container).toHaveTextContent(/two years after each version is released/i);
     expect(container.querySelector('a[href="https://fsl.software"]')).not.toBeNull();
   });
+
+  // v1.5.29 (roadmap v1.5.2.22-H): Jonny's terms, explained broadly, with the
+  // full page linked; the old 5% is gone.
+  it("explains Slippage Tolerance and Settlement Variance, and links to how payments are settled", () => {
+    const paid = FAQ_GROUPS.find((g) => g.id === "getting-paid")!;
+    const terms = paid.items.find((i) => i.id === "slippage")!;
+    expect(terms.q).toBe("What are Slippage Tolerance and Settlement Variance?");
+    for (const id of ["amount", "wrong-amount", "slippage"]) {
+      const { container, unmount } = render(<>{paid.items.find((i) => i.id === id)!.a}</>);
+      expect(container.querySelector('a[href="/payment-settlement"]')).not.toBeNull();
+      expect(container.textContent).not.toMatch(/5%/);
+      unmount();
+    }
+    const { container } = render(<>{terms.a}</>);
+    expect(container).toHaveTextContent(/1% of the invoice total up to \$25/);
+    expect(container).toHaveTextContent(/Settlement Variance/);
+  });
 });
