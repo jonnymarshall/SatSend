@@ -26,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   again, flipped it back and resent the confirmation email. The sums box now
   shows on every paid invoice, with "Outstanding" ($0.00 when paid, the rest
   when underpaid, below zero when overpaid), and the transaction ID shows in
-  full except at phone width.
+  full except at phone width. The text under the box only says what to do
+  next: none when paid; "To resolve full settlement of this invoice, reach out
+  to [Sender]." when underpaid; "To resolve overpayment of this invoice, reach
+  out to [Sender]." when overpaid.
 
 ### Fixed
 

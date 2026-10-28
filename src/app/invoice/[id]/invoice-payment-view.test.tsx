@@ -288,7 +288,8 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     expectNothingPayable();
     expect(screen.getByRole("heading", { name: /^paid$/i })).toBeInTheDocument();
     expect(document.getElementById("invoice-view--payment-sum-received")!.textContent).toContain("$500.00");
-    expect(container.textContent).toContain("This was received to the bitcoin address for this invoice.");
+    expect(container.textContent).not.toMatch(/was received/);
+    expect(document.getElementById("invoice-view--payment-received-message")).toBeNull();
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });
 
@@ -307,7 +308,7 @@ describe("InvoicePaymentView — no payable QR once paid (v1.5.27)", () => {
     );
     expectNothingPayable();
     expect(container.textContent).toContain(
-      "This was received to the bitcoin address for this invoice, less than the amount requested. To resolve full settlement of this invoice, reach out to Maya Design Ltd.",
+      "To resolve full settlement of this invoice, reach out to Maya Design Ltd.",
     );
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });
@@ -387,7 +388,7 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("received")).toContain("0.00224 BTC");
     expect(sumRow("outstanding")).toMatch(/−\$12\.00$/);
     expect(container.textContent).toContain(
-      "This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra $12.00, reach out to Maya Design Ltd.",
+      "To resolve overpayment of this invoice, reach out to Maya Design Ltd.",
     );
     expect(container.textContent).not.toMatch(/\bwe\b/i);
   });

@@ -365,16 +365,14 @@ function PaymentReceived({
   const outstanding =
     fiat === null || state === "payment_detected" ? null : state === "paid" ? 0 : invoice.total_fiat - fiat;
 
-  let message: string;
+  // The box says what arrived; the text only says what to do next (Jonny,
+  // 2026-10-27). Paid needs none.
+  let message: string | null = null;
   if (state === "underpaid") {
-    message = `${outstanding !== null ? "This" : "Less than the amount requested"} was received to the bitcoin address for this invoice${outstanding !== null ? ", less than the amount requested" : ""}. To resolve full settlement of this invoice, reach out to ${sender}.`;
+    message = `To resolve full settlement of this invoice, reach out to ${sender}.`;
   } else if (state === "overpaid") {
-    message = `This was received to the bitcoin address for this invoice, more than the amount requested. To discuss the extra ${fmtCurrency(-(outstanding ?? 0), cur)}, reach out to ${sender}.`;
-  } else if (state === "paid") {
-    message = outstanding !== null
-      ? "This was received to the bitcoin address for this invoice."
-      : "Payment was received to the bitcoin address for this invoice.";
-  } else {
+    message = `To resolve overpayment of this invoice, reach out to ${sender}.`;
+  } else if (state === "payment_detected") {
     message =
       "A payment to the bitcoin address for this invoice has been seen and is waiting for confirmation, usually within about 20 minutes.";
   }
@@ -423,12 +421,14 @@ function PaymentReceived({
         </div>
       )}
 
-      <p
-        id="invoice-view--payment-received-message"
-        className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${outstanding === null ? "text-center" : ""}`}
-      >
-        {message}
-      </p>
+      {message && (
+        <p
+          id="invoice-view--payment-received-message"
+          className={`text-[15px] leading-[1.55] text-(--color-text-secondary) ${outstanding === null ? "text-center" : ""}`}
+        >
+          {message}
+        </p>
+      )}
 
       <div id="invoice-view--payment-details" className="space-y-3 border-t border-(--color-border) pt-5 text-sm">
         {time && (
