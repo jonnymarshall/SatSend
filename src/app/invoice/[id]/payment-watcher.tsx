@@ -26,6 +26,9 @@ const ACTIVE_POLL_PHASES: ReadonlyArray<{ intervalMs: number; count: number }> =
   { intervalMs: 60_000, count: 1 },
 ];
 
+// v1.5.29: coming back to the page checks at most this often.
+const RETURN_CHECK_GAP_MS = 10_000;
+
 // Returns the wait interval before the (count+1)th poll, or null when exhausted.
 function nextActivePollIntervalMs(count: number): number | null {
   let cumulative = 0;
@@ -102,7 +105,10 @@ export function PaymentWatcher({
     const isVisible = () =>
       typeof document === "undefined" || document.visibilityState === "visible";
 
+    let lastCheckAt = -Infinity;
+
     async function checkRestAndUpdate() {
+      lastCheckAt = Date.now();
       const txs = await fetchAddressTxs(btcAddress);
       if (cancelled) return;
       // mempool.space unreachable — skip this poll; the loop re-arms itself.
@@ -152,11 +158,28 @@ export function PaymentWatcher({
       }, intervalMs);
     }
 
+    // v1.5.29: the amount is held for 30 minutes, so a client often pays from
+    // their wallet or exchange long after the 5 minutes of quick checks, and a
+    // sleeping laptop drops the WebSocket. Coming back to the page (tab shown,
+    // window focused, page restored or woken) checks once straight away, at
+    // most once per RETURN_CHECK_GAP_MS, and reopens a WebSocket that gave up.
+    // Only for someone who clicked Pay now, so visitors cost nothing.
+    function onReturn() {
+      if (cancelled || !paymentRevealed || !isVisible()) return;
+      if (!wsRef.current && !wsReconnectTimer) {
+        wsAttempts = 0;
+        openWebSocket();
+      }
+      if (Date.now() - lastCheckAt < RETURN_CHECK_GAP_MS) return;
+      void checkRestAndUpdate();
+    }
+
     function onVisibilityChange() {
       if (cancelled) return;
       if (!isVisible()) {
         clearActive();
       } else {
+        onReturn();
         // scheduleActivePoll no-ops when paymentRevealed=false, so this
         // resume is safe for window-shoppers.
         scheduleActivePoll();
@@ -267,6 +290,8 @@ export function PaymentWatcher({
     }
 
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onReturn);
+    window.addEventListener("pageshow", onReturn);
 
     checkRestAndUpdate();
     openWebSocket();
@@ -275,6 +300,8 @@ export function PaymentWatcher({
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onReturn);
+      window.removeEventListener("pageshow", onReturn);
       closeWebSocket();
       clearWsReconnect();
       clearActive();

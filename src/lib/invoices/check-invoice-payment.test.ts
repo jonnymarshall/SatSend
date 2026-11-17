@@ -37,6 +37,7 @@ const detected: CheckableInvoice = {
   your_name: "Charles",
   your_company: null,
   your_email: null,
+  btc_price_at_seen: null,
 };
 
 // 250 USD at 50k = 500,000 sats, confirmed 3 blocks deep at tip 900,002.
@@ -52,11 +53,19 @@ const unconfirmedTx = { txid: "tx-1", status: { confirmed: false }, vout: [{ scr
  * Postgres: update().eq("id").eq("status", expected) only matches while the
  * status is still `expected`.
  */
-function fakeDb(initialStatus: string) {
+function fakeDb(initialStatus: string, quotes: unknown[] = [], quotesError: unknown = null) {
   const row = { status: initialStatus };
   const updates: unknown[] = [];
+  const quoteQueries: Record<string, unknown>[] = [];
   const client = {
-    from: () => ({
+    from: (table: string) => ({
+      // invoice_quotes: select(...).eq("invoice_id", id) (v1.5.29)
+      select: () => ({
+        eq: async (col: string, val: unknown) => {
+          quoteQueries.push({ table, [col]: val });
+          return { data: quotesError ? null : quotes, error: quotesError };
+        },
+      }),
       update: (payload: { status?: string }) => {
         const filters: Record<string, unknown> = {};
         const chain = {
@@ -76,7 +85,7 @@ function fakeDb(initialStatus: string) {
     }),
     auth: { admin: { getUserById: async () => ({ data: { user: { email: "owner@example.com" } } }) } },
   };
-  return { client: client as never, row, updates };
+  return { client: client as never, row, updates, quoteQueries };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -134,6 +143,7 @@ describe("checkInvoicePayment", () => {
           amount_received_fiat: 250,
           payment_confirmed_at: new Date(1_793_100_000 * 1000).toISOString(),
           mempool_seen_at: detected.mempool_seen_at,
+          slippage_tolerance_fiat: 2.5,
           your_company: null,
           your_name: "Charles",
           client_company: "Ada Labs",
@@ -141,6 +151,59 @@ describe("checkInvoicePayment", () => {
         },
       }),
     );
+  });
+
+  // v1.5.29 (roadmap v1.5.2.22-H): locked quotes and the price when first seen.
+  it("judges a payment against the client's quote and records which one", async () => {
+    // Quoted at $40,000/BTC: $250 = 625,000 sats. The price is $50,000 now.
+    const quote = {
+      id: "q-1",
+      amount_sats: 625_000,
+      btc_price: 40_000,
+      created_at: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      expires_at: NOW.toISOString(),
+    };
+    mockFetchAddressTxs.mockResolvedValue([{ ...confirmedTx, vout: [{ scriptpubkey_address: ADDR, value: 625_000 }] }]);
+    const db = fakeDb("payment_detected", [quote]);
+    expect(await checkInvoicePayment(db.client, detected, 900_002, NOW)).toBe("transitioned");
+    expect(db.quoteQueries).toEqual([{ table: "invoice_quotes", invoice_id: "inv-1" }]);
+    expect(db.updates[0]).toMatchObject({
+      status: "paid",
+      overpaid: false,
+      amount_received_fiat: 250,
+      btc_price_at_detection: 40_000,
+      payment_quote_id: "q-1",
+      slippage_tolerance_fiat: 2.5,
+    });
+  });
+
+  it("the first sighting records the price when seen", async () => {
+    mockFetchAddressTxs.mockResolvedValue([unconfirmedTx]);
+    const db = fakeDb("pending");
+    await checkInvoicePayment(db.client, { ...detected, status: "pending", mempool_seen_at: null, btc_txid: null }, 900_002, NOW);
+    expect(db.updates[0]).toMatchObject({ status: "payment_detected", btc_price_at_seen: 50_000 });
+  });
+
+  it("values a payment with no quote at the price when it was first seen", async () => {
+    mockFetchAddressTxs.mockResolvedValue([confirmedTx]);
+    const db = fakeDb("payment_detected");
+    // 500,000 sats at $40,000 = $200: underpaid, though it's $250 at today's price.
+    await checkInvoicePayment(db.client, { ...detected, btc_price_at_seen: 40_000 }, 900_002, NOW);
+    expect(db.updates[0]).toMatchObject({ status: "underpaid", amount_received_fiat: 200, btc_price_at_detection: 40_000 });
+  });
+
+  it("defers without writing when the quotes can't be read", async () => {
+    mockFetchAddressTxs.mockResolvedValue([confirmedTx]);
+    const db = fakeDb("payment_detected", [], { message: "boom" });
+    expect(await checkInvoicePayment(db.client, detected, 900_002, NOW)).toBe("error");
+    expect(db.updates).toHaveLength(0);
+  });
+
+  it("doesn't read quotes until a payment has confirmed", async () => {
+    mockFetchAddressTxs.mockResolvedValue([unconfirmedTx]);
+    const db = fakeDb("pending");
+    await checkInvoicePayment(db.client, { ...detected, status: "pending", mempool_seen_at: null, btc_txid: null }, 900_002, NOW);
+    expect(db.quoteQueries).toHaveLength(0);
   });
 
   it("defers without writing when mempool.space is unreachable", async () => {

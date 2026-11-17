@@ -19,6 +19,7 @@ const PAID: PaymentSummaryInvoice = {
   amount_received_fiat: 100,
   payment_confirmed_at: "2026-10-27T12:32:00Z",
   mempool_seen_at: "2026-10-27T12:18:00Z",
+  slippage_tolerance_fiat: 1,
   your_company: "Maya Design Ltd",
   your_name: "Maya",
   client_company: null,
@@ -89,9 +90,9 @@ describe("PaymentStatusEmail", () => {
 
   it("an exchange rate variance comes with its explanation (email has no hover)", async () => {
     const plain = await text(props({ payment: { ...PAID, amount_received_fiat: 100.75 } }));
-    expect(plain).toMatch(/Exchange Rate Variance:\s+\+\$0\.75/);
+    expect(plain).toMatch(/Settlement Variance:\s+\+\$0\.75/);
     expect(plain).toContain("counts as paid in full");
-    expect(await text(props())).not.toContain("Exchange Rate Variance");
+    expect(await text(props())).not.toContain("Settlement Variance");
   });
 
   it("payment detected: no sums, the waiting sentence, when it was seen", async () => {

@@ -74,7 +74,7 @@ const STEPS: Step[] = [
     title: "Your client pays",
     intro: "Your client opens the link and sees a clear invoice, with the total in your currency.",
     points: [
-      "The exact bitcoin amount at the current rate, a QR code, and the address to copy.",
+      "The exact bitcoin amount at the current rate, held for 30 minutes, with a QR code and the address to copy.",
       "They scan the code with any bitcoin wallet and send. No account or sign-up needed.",
       "The bitcoin goes straight to your wallet. SatSend never touches it.",
     ],
@@ -93,7 +93,7 @@ const STEPS: Step[] = [
       "“Payment detected” within seconds of your client sending.",
       "“Paid” once the payment is confirmed, usually within about 20 minutes.",
       "An email to you at each step, and your invoice list updates on its own.",
-      "If the amount is short, the invoice shows Underpaid with what arrived; overpayments are flagged too.",
+      "A payment within 1% (up to $25) counts as paid in full. If it's further short, the invoice shows Underpaid with what arrived; overpayments are flagged too.",
     ],
     image: {
       src: "/marketing/how-it-works/paid.png",
@@ -106,7 +106,7 @@ const STEPS: Step[] = [
 
 const CLIENT_SEES = [
   "A normal-looking invoice with your details, the line items and the total in your currency.",
-  "The exact amount of bitcoin to send at today's rate, with a QR code and the address to copy.",
+  "The exact amount of bitcoin to send at today's rate, held for 30 minutes, with a QR code and the address to copy.",
   "No account and no sign-up. Any bitcoin wallet works.",
   "The page updates by itself once they've paid, and they can download a PDF for their records.",
 ];

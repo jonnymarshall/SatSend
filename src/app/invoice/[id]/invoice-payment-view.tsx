@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { CircleCheck, CircleHelp, CirclePlus, Clock, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import type { PublicInvoice } from "@/lib/invoice-public";
-import { fiatToBtc, buildBip21Uri } from "@/lib/btc-qr";
+import { buildBip21Uri } from "@/lib/btc-qr";
+import Link from "next/link";
+import { useQuote } from "./use-quote";
 import { BtcQrCode } from "@/components/btc-qr-code";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { InvoiceDates } from "@/components/invoice-dates";
@@ -19,10 +21,11 @@ import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
 import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
 import {
-  RATE_VARIANCE_EXPLAINED,
   formatPaymentTime,
   hasPayment,
   paymentSummary,
+  satsToBtc,
+  settlementVarianceExplained,
   shortTxid,
   type PaymentState,
 } from "@/lib/invoices/payment-summary";
@@ -38,6 +41,13 @@ interface Props {
 
 function fmtCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
+}
+
+/** "3:45 PM" in the viewer's time zone. */
+const helpLink = "text-(--color-ink) underline decoration-(--color-brand) underline-offset-4";
+
+function formatHeldUntil(iso: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone }).format(new Date(iso));
 }
 
 
@@ -82,16 +92,13 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
   const cur = invoice.currency;
   const paymentMade = !!invoice.btc_address && hasPayment(status, btcTxid);
   const showBtc = !!invoice.btc_address && !!btcPrice && !paymentMade;
-  const btcAmount = showBtc ? fiatToBtc(invoice.total_fiat, btcPrice!) : null;
-  const btcAmountDisplay = btcAmount !== null
-    ? btcAmount.toFixed(8).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
-    : null;
-  const bip21Uri = showBtc
-    ? buildBip21Uri(
-        invoice.btc_address!,
-        btcAmount!,
-        invoice.invoice_number ?? undefined
-      )
+  // v1.5.29 (roadmap v1.5.2.22-H): the amount is a quote the server recorded
+  // when the client clicked, held for 30 minutes, never one worked out here.
+  const quote = useQuote(invoice.id, showBtc && showPaymentDetails);
+  const ready = quote.status === "ready" ? quote.quote : null;
+  const btcAmountDisplay = ready ? satsToBtc(ready.amountSats) : null;
+  const bip21Uri = ready
+    ? buildBip21Uri(invoice.btc_address!, ready.amountSats / 1e8, invoice.invoice_number ?? undefined)
     : null;
 
   const senderHasInfo = invoice.your_name || invoice.your_company || invoice.your_address || invoice.your_email || invoice.your_tax_id;
@@ -216,6 +223,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
           <Card id="invoice-view--btc-section" className="space-y-6">
             <h2 id="invoice-view--btc-heading" className="font-display tracking-heading text-xl font-semibold">Pay with Bitcoin</h2>
             {showPaymentDetails ? (
+              ready ? (
               <div id="invoice-view--btc-details" className="flex flex-col items-start gap-6 sm:flex-row">
                 <div id="invoice-view--qr-frame" className="self-center rounded-(--radius-md) border border-(--color-border) bg-white p-3 sm:self-start">
                   <BtcQrCode uri={bip21Uri!} size={200} />
@@ -230,7 +238,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                       <CopyButton text={btcAmountDisplay!} label="Copy BTC amount" />
                     </div>
                     <p className="text-sm text-(--color-text-secondary)">
-                      at {fmtCurrency(btcPrice!, "USD")}/BTC
+                      at {fmtCurrency(ready.btcPrice, "USD")}/BTC
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -240,8 +248,29 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                       <CopyButton text={invoice.btc_address!} label="Copy BTC address" />
                     </div>
                   </div>
+                  <p id="invoice-view--quote-held" className="text-sm leading-[1.5] text-(--color-text-secondary)">
+                    This amount is held until {formatHeldUntil(ready.expiresAt, timeZone)}. After that it updates to the
+                    current rate.{" "}
+                    <Link id="invoice-view--quote-help-link" href="/payment-settlement" className={helpLink}>
+                      How payments are settled
+                    </Link>
+                  </p>
                 </div>
               </div>
+              ) : quote.status === "error" ? (
+                <div id="invoice-view--quote-error" className="space-y-3">
+                  <p className="text-sm text-(--color-text-secondary)">
+                    Couldn&apos;t get the bitcoin amount just now. Please try again in a moment.
+                  </p>
+                  <Button id="invoice-view--quote-retry" variant="secondary" onClick={quote.retry}>
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <p id="invoice-view--quote-loading" className="text-sm text-(--color-text-secondary)">
+                  Getting the amount…
+                </p>
+              )
             ) : (
               <Button
                 id="invoice-view--reveal-btc-button"
@@ -298,30 +327,33 @@ const STATE_LOOK: Record<PaymentState, { Icon: LucideIcon; soft: string; text: s
 };
 
 /**
- * Explains the Exchange Rate Variance row (Jonny, 2026-10-27). A button, so it
+ * Explains the Settlement Variance row (Jonny, 2026-10-27). A button, so it
  * works by tap, click and keyboard as well as hover (hover alone fails on
  * phones). 24px target, the WCAG 2.2 minimum. Hover and open take Paid's green,
  * the only state that shows this row (Jonny, 2026-10-27).
  */
-function RateVarianceHelp() {
+function SettlementVarianceHelp({ slippageTolerance }: { slippageTolerance: string }) {
   return (
     <Popover>
       <PopoverTrigger
-        id="invoice-view--rate-variance-help"
+        id="invoice-view--settlement-variance-help"
         openOnHover
         delay={150}
-        aria-label="What is Exchange Rate Variance?"
+        aria-label="What is Settlement Variance?"
         className="-my-1 inline-flex size-6 cursor-help items-center justify-center rounded-full text-(--color-ink)/50 transition-colors hover:text-(--color-success-text) focus-visible:text-(--color-success-text) data-[popup-open]:text-(--color-success-text) focus-visible:outline-2 focus-visible:outline-(--color-brand)"
       >
         <CircleHelp aria-hidden className="size-4" />
       </PopoverTrigger>
-      <PopoverContent id="invoice-view--rate-variance-popover" side="top" className="w-72 gap-1.5 leading-[1.5]">
-        <PopoverTitle className="font-semibold">Exchange Rate Variance</PopoverTitle>
-        {RATE_VARIANCE_EXPLAINED.map((line) => (
+      <PopoverContent id="invoice-view--settlement-variance-popover" side="top" className="w-72 gap-1.5 leading-[1.5]">
+        <PopoverTitle className="font-semibold">Settlement Variance</PopoverTitle>
+        {settlementVarianceExplained(slippageTolerance).map((line) => (
           <p key={line} className="text-(--color-text-secondary)">
             {line}
           </p>
         ))}
+        <Link id="invoice-view--settlement-variance-link" href="/payment-settlement" className={helpLink}>
+          How payments are settled
+        </Link>
       </PopoverContent>
     </Popover>
   );
@@ -376,13 +408,13 @@ function PaymentReceived({
               {sums.receivedBtc && <span className="text-(--color-ink)/70 text-[13px]"> ({sums.receivedBtc})</span>}
             </span>
           </div>
-          {sums.rateVariance && (
-            <div id="invoice-view--payment-sum-rate" className="flex justify-between gap-3">
+          {sums.settlementVariance && (
+            <div id="invoice-view--payment-sum-variance" className="flex justify-between gap-3">
               <span className="flex items-center gap-1 text-(--color-ink)/70">
-                Exchange Rate Variance
-                <RateVarianceHelp />
+                Settlement Variance
+                <SettlementVarianceHelp slippageTolerance={sums.slippageTolerance} />
               </span>
-              <span className="tabular-nums">{sums.rateVariance}</span>
+              <span className="tabular-nums">{sums.settlementVariance}</span>
             </div>
           )}
           <div id="invoice-view--payment-sum-outstanding" className="flex justify-between gap-3 border-t border-(--color-ink)/10 pt-2 font-semibold">

@@ -264,17 +264,19 @@ The fast-path route `/api/invoices/[id]/payment-status` (triggered by path A) **
 
 ---
 
-### Payment amount verification (v1.4.19-H)
+### Payment amount verification (v1.4.19-H, locked quotes v1.5.29)
 
 Both detection paths above (the fast-path route and the cron) run every payment through the same two gates before finalizing a `paid`/`underpaid` verdict — neither path trusts a claimed status on its own:
 
 1. **Confirmation depth ≥ 2 blocks.** mempool.space's API only reports "confirmed: true/false" plus which block a tx landed in — not a live confirmation count, since that's relative to whatever the current tip is. The scheduler fetches the current tip height and computes `tip − block_height + 1`; a tx sitting at depth 1 is treated the same as unconfirmed (still `payment_detected`, no verdict yet).
-2. **Amount coverage, priced at confirmation time.** The paying tx's own vouts to the invoice address are summed to sats, converted to fiat using the BTC price fetched **at the moment the payment is being judged** (not a price locked in at publish — an earlier design considered snapshotting the expected sat amount at publish time, but that would make correctly-priced late payments look wrong purely due to BTC price movement between publish and payment), and compared against `total_fiat` with a 5% tolerance band:
-   - `< 95%` → `underpaid` (a new invoice status, mirrors `paid`/`overdue`; the owner can manually override via the Mark As menu)
-   - `95–105%` → `paid`
-   - `> 105%` → `paid`, plus an `overpaid: true` flag surfaced next to the badge
+2. **Amount coverage, against a locked quote (v1.5.29).** When the client clicks **Pay now in Bitcoin**, `POST /api/invoices/[id]/quote` works out the amount at the current price and records it through `take_invoice_quote` (table `invoice_quotes`, server only; a quote from the last minute is handed out again rather than a new one made). A quote is held for 30 minutes and the page asks for a fresh one when it expires. At the verdict, the paying tx's vouts to the invoice address are summed to sats and matched to the quote made before the payment and still valid then (plus 30 minutes, the background check's slowest interval), closest in amount (`src/lib/invoices/quotes.ts`). A matched payment is judged **in bitcoin** against that quote and valued at its price, so price movement drops out. With no matching quote (paid late, or from the PDF, whose QR has no amount), the payment is valued at the price when it was **first seen** (`btc_price_at_seen`). Either way it is compared with the **Slippage Tolerance**, 1% of the total capped at $25 (`slippageToleranceFiat`):
+   - short by more than it → `underpaid` (the owner can override via the Mark As menu)
+   - within it either way → `paid`; the gap shows as a **Settlement Variance**
+   - over by more than it → `paid`, plus an `overpaid: true` flag
 
-If the BTC price oracle is unavailable at the moment a tx confirms, the verdict is **deferred** (invoice stays `payment_detected`) rather than guessed — the next poll tries again.
+   The tolerance used is recorded on the invoice (`slippage_tolerance_fiat`) with the quote (`payment_quote_id`), so invoices judged under the old 5% band read as before. Quotes are read only once a payment has confirmed. The public page `/payment-settlement` explains all of this for senders and clients.
+
+If no price is available (no quote, no first-seen price and the oracle is down), the verdict is **deferred** (invoice stays `payment_detected`) rather than guessed: the next poll tries again.
 
 The fast-path route additionally requires the invoice's access-code cookie (if one is set) before processing a POST at all, closing off callers who know an invoice ID but not its access code.
 
@@ -373,7 +375,7 @@ All transactional email goes through **Resend** via `src/lib/email/send.ts`. The
 | 3 | **Payment confirmed** | Status transitions → `paid`                     | Same two callsites as above                              | Invoice owner **and** payer (`client_email`) |
 
 Notes:
-- The **payment-detected** and **payment-confirmed** emails are dispatched to **both** recipients per transition: the owner gets an "your client paid invoice X" framing, and the payer gets a "your payment to {sender} has been detected / confirmed" framing. Each transition fires two Resend calls, both from one template (`payment-status-email.tsx`, v1.5.28) with an `audience` of `sender` or `client`. It shows the same payment block as the client's invoice page (state icon, Requested / Received / Outstanding, next step, time in UTC, address, transaction), worked out once by `src/lib/invoices/payment-summary.ts`. The state icon travels inline like the logo (`status-icons-inline.ts`, built by `scripts/email/build-status-icons.tsx`).
+- The **payment-detected** and **payment-confirmed** emails are dispatched to **both** recipients per transition: the owner gets an "your client paid invoice X" framing, and the payer gets a "your payment to {sender} has been detected / confirmed" framing. Each transition fires two Resend calls, both from one template (`payment-status-email.tsx`, v1.5.28) with an `audience` of `sender` or `client`. It shows the same payment block as the client's invoice page (state icon, Requested / Received / Settlement Variance / Outstanding, next step, time in UTC, address, transaction), worked out once by `src/lib/invoices/payment-summary.ts`. The state icon travels inline like the logo (`status-icons-inline.ts`, built by `scripts/email/build-status-icons.tsx`).
 - The owner email is resolved via `supabase.auth.admin.getUserById(invoice.user_id)`; the payer email is the invoice's `client_email`.
 - If `client_email` is blank on an invoice (payer email is optional), every payer-side send is silently skipped — including the invoice-published email and both payment-status emails. The owner copy still goes out.
 - Each email contains the invoice reference, a mempool.space link to the tx, and a link back to the right surface for that recipient (owner → dashboard view, payer → public invoice page).
