@@ -292,15 +292,17 @@ describe("PaymentWatcher", () => {
       await vi.advanceTimersByTimeAsync(30_000);
       expect(mockFetchAddressTxs).not.toHaveBeenCalled();
 
-      // Tab returns to visible — active polling resumes.
+      // Tab returns to visible — one check straight away (v1.5.29), then
+      // active polling resumes.
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
         get: () => "visible",
       });
       document.dispatchEvent(new Event("visibilitychange"));
+      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(5_000);
-      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
+      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
       Object.defineProperty(document, "visibilityState", {
@@ -454,5 +456,92 @@ describe("PaymentWatcher", () => {
     MockWebSocket.last!.onmessage?.({ data: JSON.stringify({ block: { height: 102 } }) });
     await new Promise((r) => setTimeout(r, 30));
     expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
+  });
+
+  // v1.5.29: the amount is held for 30 minutes, so a client often pays from
+  // their wallet or exchange well after the 5 minutes of quick checks. Coming
+  // back to the page checks once, straight away, whatever is left of them.
+  describe("coming back to the page", () => {
+    async function afterQuickChecksRunOut(onStatusChange = vi.fn()) {
+      render(
+        <PaymentWatcher invoiceId="inv-1" btcAddress="tb1qtarget" status="pending" paymentRevealed={true} onStatusChange={onStatusChange} />
+      );
+      await vi.waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(420_000);
+      mockFetchAddressTxs.mockClear();
+    }
+
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+    afterEach(() => vi.useRealTimers());
+
+    it("switching back to the window checks straight away, after the quick checks have run out", async () => {
+      const onStatusChange = vi.fn();
+      await afterQuickChecksRunOut(onStatusChange);
+      mockFetchAddressTxs.mockResolvedValue([unconfirmedTx]);
+      window.dispatchEvent(new Event("focus"));
+      await vi.waitFor(() => expect(onStatusChange).toHaveBeenCalledWith("payment_detected", "tx1"));
+      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
+    });
+
+    it("the tab becoming visible, or the page being shown again, checks too", async () => {
+      await afterQuickChecksRunOut();
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(11_000);
+      window.dispatchEvent(new Event("pageshow"));
+      await vi.waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalledTimes(2));
+    });
+
+    it("checks at most once every 10 seconds, however often the client switches", async () => {
+      await afterQuickChecksRunOut();
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(5_000);
+      window.dispatchEvent(new Event("focus"));
+      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(6_000);
+      window.dispatchEvent(new Event("focus"));
+      expect(mockFetchAddressTxs).toHaveBeenCalledTimes(2);
+    });
+
+    it("doesn't check for someone who hasn't clicked Pay now (no extra calls for visitors)", async () => {
+      render(<PaymentWatcher invoiceId="inv-1" btcAddress="tb1qtarget" status="pending" onStatusChange={vi.fn()} />);
+      await vi.waitFor(() => expect(mockFetchAddressTxs).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(20_000);
+      mockFetchAddressTxs.mockClear();
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(100);
+      expect(mockFetchAddressTxs).not.toHaveBeenCalled();
+    });
+
+    it("reopens the live connection if it had given up", async () => {
+      // A socket that never connects (connecting resets the retry count).
+      const instances: MockWebSocket[] = [];
+      class NeverOpensWebSocket extends MockWebSocket {
+        constructor(...args: ConstructorParameters<typeof MockWebSocket>) {
+          super(...args);
+          Object.defineProperty(this, "onopen", { get: () => null, set: () => {} });
+          instances.push(this);
+        }
+      }
+      vi.stubGlobal("WebSocket", NeverOpensWebSocket);
+      try {
+        await afterQuickChecksRunOut();
+        // The socket drops seven times: the first and six retries, then it gives up.
+        for (let i = 0; i < 7; i++) {
+          instances[instances.length - 1].onclose?.();
+          await vi.advanceTimersByTimeAsync(31_000);
+        }
+        const before = instances.length;
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(instances.length).toBe(before);
+
+        window.dispatchEvent(new Event("focus"));
+        expect(instances.length).toBe(before + 1);
+      } finally {
+        vi.stubGlobal("WebSocket", MockWebSocket);
+      }
+    });
   });
 });

@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `take_invoice_quote` function, migration 0038). The page shows "This amount
   is held until …" and fetches a fresh quote when it expires, checking the real
   clock when the client comes back to the page and every 15 seconds, so a
-  computer that slept past the expiry never shows an expired amount. A payment that
+  computer that slept past the expiry never shows an expired amount. Since a
+  client may now pay well after the 5 minutes of quick payment checks, coming
+  back to the page (tab, window, or waking the computer) checks for the payment
+  straight away, at most once every 10 seconds, and reopens the live connection
+  if it had given up. A payment that
   matches a quote is judged in bitcoin against it and valued at the quoted
   price, so an exact payment shows Received equal to Requested. Without a
   quote, a payment is valued at the price when it was first seen, not when it
