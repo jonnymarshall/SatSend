@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Clicking "Pay now in Bitcoin" now records a quote: the bitcoin amount shown,
   the price behind it and a 30-minute expiry (new `invoice_quotes` table and
   `take_invoice_quote` function, migration 0038). The page shows "This amount
-  is held until …" and fetches a fresh quote when it expires. A payment that
+  is held until …" and fetches a fresh quote when it expires, checking the real
+  clock when the client comes back to the page and every 15 seconds, so a
+  computer that slept past the expiry never shows an expired amount. A payment that
   matches a quote is judged in bitcoin against it and valued at the quoted
   price, so an exact payment shows Received equal to Requested. Without a
   quote, a payment is valued at the price when it was first seen, not when it

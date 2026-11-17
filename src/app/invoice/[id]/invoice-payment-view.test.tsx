@@ -210,6 +210,36 @@ describe("InvoicePaymentView — BTC reveal", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("after the computer sleeps past the held time, asks for a fresh quote on coming back", async () => {
+    // A sleeping laptop pauses timers, so the expiry timer can't be relied on:
+    // coming back to the page must check the real clock.
+    mockFetch
+      .mockImplementationOnce(async () => quoteResponse())
+      .mockImplementation(async () => quoteResponse({ amountSats: 1_100_000 }));
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText("0.01 BTC")).toBeInTheDocument();
+
+    const later = Date.now() + 31 * 60_000;
+    const now = vi.spyOn(Date, "now").mockReturnValue(later);
+    try {
+      fireEvent(document, new Event("visibilitychange"));
+      expect(await screen.findByText("0.011 BTC")).toBeInTheDocument();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("coming back before the held time is up keeps the same quote", async () => {
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText("0.01 BTC")).toBeInTheDocument();
+    fireEvent(document, new Event("visibilitychange"));
+    fireEvent(window, new Event("focus"));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("if the quote can't be had, says so, shows no QR, and can try again", async () => {
     mockFetch.mockImplementationOnce(async () => ({ ok: false, json: async () => ({}) }));
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
