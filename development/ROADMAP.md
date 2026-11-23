@@ -723,35 +723,46 @@ bitcoin" panel.
 
 ---
 
-### ⏳ v1.5.2.22-H — Locked quotes and a tighter payment allowance (**pre-launch**)
+### ✅ v1.5.2.22-H — Locked quotes and a tighter Slippage Tolerance (**pre-launch**)
 
-**Context (Jonny, 2026-10-27).** A payment counts as paid in full within 5%
-either way: $400 on an $8,000 invoice, which is too generous. The allowance is
-wide because of how payments are valued, not client error: the client pays
-the bitcoin amount shown when they opened the QR, but SatSend values it at the
-exchange rate when it **confirms**, often 10 to 60 minutes later, and the
-price can move 1 to 3% in that time. Tightening the allowance alone would mark
-honest clients underpaid on volatile days. Agreed plan:
+**Branch:** `v1.5.29/locked-quotes` · package `1.5.29` · migration `0038_locked_quotes`.
+
+**Context (Jonny, 2026-10-27).** A payment counted as paid in full within 5%
+either way: $400 on an $8,000 invoice, which is too generous. The margin was
+wide because of how payments were valued, not client error: the client pays
+the bitcoin amount shown when they opened the QR, but SatSend valued it at the
+exchange rate when it **confirmed**, often 10 to 60 minutes later.
+
+**Terms (Jonny, 2026-10-28):** the paid-in-full margin is the **Slippage
+Tolerance**, always; the sums-box row is the **Settlement Variance** (was
+"Exchange Rate Variance").
 
 **Scope:**
-- [ ] **Lock the quote.** When the client reveals the QR, record the quoted
-      bitcoin amount, price and time (new table, server-written). A quote is
-      valid for about 30 minutes; the page refreshes it after that.
-- [ ] **Judge in bitcoin.** A payment that matches a valid quote is compared in
-      bitcoin against that quote, so price movement drops out. Value it at the
-      quoted price, so an exact payment shows Received equal to Requested and
-      no "Exchange Rate Variance" row.
-- [ ] **Fallback.** With no valid quote (paid late, or from the PDF, whose QR
-      has no amount), value at the price when the payment was **first seen**,
-      not when it confirmed.
-- [ ] **Tighten the allowance**, for example 1% capped at $25 to $50 (decide
-      the numbers when built). Update the FAQ's "within 5%" answer.
-- [ ] Revisit the "Exchange Rate Variance" label: with quotes locked, the
-      small gaps left are mostly wallet fees, not the exchange rate.
+- [x] **Lock the quote.** "Pay now in Bitcoin" calls `POST /api/invoices/[id]/quote`,
+      which records the amount, price and expiry (`invoice_quotes`, server only,
+      via `take_invoice_quote`; a quote from the last minute is reused). Valid 30
+      minutes; the page asks for a fresh one on expiry and says "held until".
+- [x] **Judge in bitcoin.** A payment matching a quote (made before it, valid then
+      plus 30 minutes for the background check's lag, closest in amount) is
+      judged in sats against it and valued at its price.
+- [x] **Fallback.** No matching quote: valued at the price when first seen
+      (`btc_price_at_seen`).
+- [x] **Tighten:** Slippage Tolerance = 1% of the total, capped at $25 (Jonny,
+      2026-10-28). Recorded per invoice (`slippage_tolerance_fiat`), so invoices
+      judged at 5% read as before.
+- [x] Label renamed to **Settlement Variance**; its help names the invoice's
+      Slippage Tolerance and links to the new page.
+- [x] **Documentation (Jonny, 2026-10-28):** new footer page "How payments are
+      settled" (`/payment-settlement`) for senders and clients; new FAQ answer
+      "What are Slippage Tolerance and Settlement Variance?"; FAQ and How it
+      works no longer say 5%.
 
 ---
 
 ### ⏳ v1.5.2.23-H — Unknown invoice links answer 404 (**pre-launch**, small)
+
+**Branch:** `v1.5.30/unknown-invoice-404` · package `1.5.30` (Jonny, 2026-10-28:
+straight after v1.5.2.22-H). The short invoice reference (v1.5.2.14-H) moves to 1.5.31.
 
 **Context (spotted 2026-10-28, after v1.5.27 shipped).** An unknown invoice
 link (`/invoice/<made-up id>`) shows the "not found" page but answers with
@@ -1030,8 +1041,8 @@ payments; that is safe.
 
 ### ⏳ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
 
-**Branch:** `v1.5.29/short-invoice-reference` · package `1.5.29` (moved from
-1.5.28 for v1.5.2.21-H) · new migration (the next free number when it starts;
+**Branch:** `v1.5.31/short-invoice-reference` · package `1.5.31` (moved from
+1.5.28 for v1.5.2.21-H, then past v1.5.29 and v1.5.30) · new migration (the next free number when it starts;
 v1.5.27 took `0037`). Renumber the package if another item ships between this
 plan and the branch.
 

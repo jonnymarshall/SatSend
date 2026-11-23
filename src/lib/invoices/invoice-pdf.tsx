@@ -19,10 +19,10 @@ import type { Invoice } from "@/lib/invoice-public";
 import { brandColors, statusColors } from "@/lib/brand-colors";
 import { PAYMENT_ICON_NODES } from "./payment-icons";
 import {
-  RATE_VARIANCE_EXPLAINED,
   formatPaymentTime,
   hasPayment,
   paymentSummary,
+  settlementVarianceExplained,
   type PaymentState,
 } from "./payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
@@ -256,10 +256,10 @@ function PaymentBlock({ invoice, timeZone }: { invoice: Invoice; timeZone: strin
                 {sums.receivedBtc ? <Text style={{ color: "#4A4F5E", fontSize: 9 }}> ({sums.receivedBtc})</Text> : null}
               </Text>
             </View>
-            {sums.rateVariance ? (
+            {sums.settlementVariance ? (
               <View style={styles.sumRow}>
-                <Text style={styles.sumLabel}>Exchange Rate Variance</Text>
-                <Text>{sums.rateVariance}</Text>
+                <Text style={styles.sumLabel}>Settlement Variance</Text>
+                <Text>{sums.settlementVariance}</Text>
               </View>
             ) : null}
             <View style={styles.sumTotal}>
@@ -269,10 +269,10 @@ function PaymentBlock({ invoice, timeZone }: { invoice: Invoice; timeZone: strin
           </View>
         ) : null}
 
-        {sums?.rateVariance ? (
+        {sums?.settlementVariance ? (
           <Text style={[styles.note, { marginTop: 0, marginBottom: 10 }]}>
-            <Text style={{ fontWeight: 600, color: C.ink }}>Exchange Rate Variance: </Text>
-            {RATE_VARIANCE_EXPLAINED.join(" ")}
+            <Text style={{ fontWeight: 600, color: C.ink }}>Settlement Variance: </Text>
+            {settlementVarianceExplained(sums.slippageTolerance).join(" ")}
           </Text>
         ) : null}
 
@@ -425,8 +425,8 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl, timeZone }: RenderProp
               </View>
               <Text style={styles.note}>
                 The QR code on this invoice does not encode the amount, because the bitcoin amount is set by the
-                exchange rate when you pay. For the exact amount and a QR code that includes it, use the
-                &quot;View and pay online&quot; link.
+                exchange rate when you pay. For the exact amount, held for 30 minutes, and a QR code that includes
+                it, use the &quot;View and pay online&quot; link.
               </Text>
             </View>
           </View>

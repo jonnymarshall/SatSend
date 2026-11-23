@@ -4,6 +4,7 @@ import { isValidBtcAddress } from "@/lib/invoices";
 import { fetchBtcPrice } from "@/lib/btc-price";
 import { decidePaymentSchedule, type ScheduleDecision } from "@/lib/invoices/payment-schedule";
 import type { PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
+import type { PaymentQuote } from "@/lib/invoices/quotes";
 import { sendPaymentDetectedEmail, sendPaymentConfirmedEmail } from "@/lib/email/send";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Invoice } from "@/lib/invoice-public";
@@ -36,10 +37,11 @@ export type CheckableInvoice = Pick<
   | "your_name"
   | "your_company"
   | "your_email"
+  | "btc_price_at_seen"
 > & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
 
 export const CHECKABLE_COLUMNS =
-  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_company, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email";
+  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_company, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email, btc_price_at_seen";
 
 export const CHECKABLE_STATUSES = ["pending", "payment_detected", "overdue"] as const;
 
@@ -62,11 +64,53 @@ export function paymentAfterDecision(
     amount_received_fiat: decision.amountReceivedFiat,
     payment_confirmed_at: decision.confirmedAt,
     mempool_seen_at: decision.newMempoolSeenAt,
+    slippage_tolerance_fiat: decision.slippageToleranceFiat,
     your_company: inv.your_company,
     your_name: inv.your_name,
     client_company: inv.client_company,
     client_name: inv.client_name,
   };
+}
+
+/**
+ * The columns a decision writes (v1.5.29: shared by the background check and
+ * the payer's route, so the two can't drift). The txid and revert handling stay
+ * with each caller.
+ */
+export function decisionColumns(decision: ScheduleDecision): Database["public"]["Tables"]["invoices"]["Update"] {
+  return {
+    status: decision.newStatus,
+    mempool_seen_at: decision.newMempoolSeenAt,
+    stage_attempt: decision.newStageAttempt,
+    next_check_at: decision.newNextCheckAt,
+    amount_received_sats: decision.amountReceivedSats,
+    btc_price_at_detection: decision.btcPriceAtDetection,
+    amount_received_fiat: decision.amountReceivedFiat,
+    overpaid: decision.overpaid,
+    payment_confirmed_at: decision.confirmedAt,
+    btc_price_at_seen: decision.btcPriceAtSeen,
+    payment_quote_id: decision.paymentQuoteId,
+    slippage_tolerance_fiat: decision.slippageToleranceFiat,
+  };
+}
+
+/**
+ * The quotes the client was shown for an invoice (v1.5.29), or null if they
+ * can't be read: then the caller defers rather than judge without them.
+ */
+export async function loadQuotes(
+  supabase: ReturnType<typeof createAdminClient>,
+  invoiceId: string,
+): Promise<PaymentQuote[] | null> {
+  const { data, error } = await supabase
+    .from("invoice_quotes")
+    .select("id, amount_sats, btc_price, created_at, expires_at")
+    .eq("invoice_id", invoiceId);
+  if (error) {
+    console.error("[payment-check] reading quotes failed", invoiceId, error);
+    return null;
+  }
+  return data ?? [];
 }
 
 export type CheckOutcome =
@@ -128,6 +172,10 @@ export async function checkInvoicePayment(
       // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
     }
 
+    // Quotes only matter for a verdict, so only once a payment has confirmed.
+    const quotes = txs.some((tx) => tx.status.confirmed) ? await loadQuotes(supabase, inv.id) : [];
+    if (quotes === null) return "error";
+
     const decision = decidePaymentSchedule(
       {
         status: inv.status,
@@ -136,6 +184,8 @@ export async function checkInvoicePayment(
         published_at: inv.published_at,
         stage_attempt: inv.stage_attempt,
         total_fiat: inv.total_fiat,
+        btc_price_at_seen: inv.btc_price_at_seen,
+        quotes,
       },
       txs,
       now,
@@ -145,17 +195,7 @@ export async function checkInvoicePayment(
     const statusChanges = decision.newStatus !== inv.status;
     if (writeOnlyOnStatusChange && !statusChanges) return "unchanged";
 
-    const update: Database["public"]["Tables"]["invoices"]["Update"] = {
-      status: decision.newStatus,
-      mempool_seen_at: decision.newMempoolSeenAt,
-      stage_attempt: decision.newStageAttempt,
-      next_check_at: decision.newNextCheckAt,
-      amount_received_sats: decision.amountReceivedSats,
-      btc_price_at_detection: decision.btcPriceAtDetection,
-      amount_received_fiat: decision.amountReceivedFiat,
-      overpaid: decision.overpaid,
-      payment_confirmed_at: decision.confirmedAt,
-    };
+    const update = decisionColumns(decision);
     if (decision.detectedTxid) {
       update.btc_txid = decision.detectedTxid;
     }

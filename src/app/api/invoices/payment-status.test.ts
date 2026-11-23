@@ -9,12 +9,13 @@ const mockUpdate = vi.fn().mockReturnThis();
 const mockEq = vi.fn().mockReturnThis();
 const mockSingle = vi.fn();
 const mockSelect = vi.fn().mockReturnThis();
-const mockFrom = vi.fn(() => ({
+const defaultFrom = () => ({
   select: mockSelect,
   update: mockUpdate,
   eq: mockEq,
   single: mockSingle,
-}));
+});
+const mockFrom = vi.fn(defaultFrom);
 const mockGetUserById = vi.fn().mockResolvedValue({
   data: { user: { id: "owner-1", email: "owner@example.com" } },
 });
@@ -97,6 +98,7 @@ beforeEach(() => {
   mockFetchTipHeight.mockResolvedValue(900_001);
   mockFetchBtcPrice.mockResolvedValue({ price: 50_000, source: "coinbase" });
   mockCookieGet.mockReturnValue(undefined);
+  mockFrom.mockImplementation(defaultFrom);
 });
 
 describe("POST /api/invoices/[id]/payment-status", () => {
@@ -295,6 +297,66 @@ describe("POST /api/invoices/[id]/payment-status", () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ status: "underpaid", amount_received_sats: 50_000 })
       );
+    });
+  });
+
+  // v1.5.29 (roadmap v1.5.2.22-H): the payer's route judges against the quote
+  // the client was shown, like the background check.
+  describe("locked quotes", () => {
+    const quote = {
+      id: "q-1",
+      amount_sats: 625_000, // $250 at $40,000/BTC
+      btc_price: 40_000,
+      created_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+      expires_at: new Date(Date.now() + 20 * 60_000).toISOString(),
+    };
+
+    function withQuotes(result: { data: unknown; error: unknown }) {
+      const quoteEq = vi.fn().mockResolvedValue(result);
+      mockFrom.mockImplementation(((table: string) =>
+        table === "invoice_quotes"
+          ? { select: () => ({ eq: quoteEq }) }
+          : defaultFrom()) as never);
+      return quoteEq;
+    }
+
+    it("judges the payment against the quote and records it", async () => {
+      const quoteEq = withQuotes({ data: [quote], error: null });
+      mockSingle
+        .mockResolvedValueOnce({ data: pendingInvoice, error: null })
+        .mockResolvedValueOnce({ data: { status: "paid" }, error: null });
+      mockFetchTx.mockResolvedValueOnce({
+        txid: "txabc",
+        status: { confirmed: true, block_height: 900_000 },
+        vout: [{ scriptpubkey_address: "tb1qtarget", value: 625_000 }],
+      });
+      mockUpdate.mockReturnValue({ eq: () => ({ eq: () => ({ select: () => ({ single: mockSingle }) }) }) });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
+
+      expect(res.status).toBe(200);
+      expect(quoteEq).toHaveBeenCalledWith("invoice_id", "inv-1");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "paid",
+          overpaid: false,
+          amount_received_fiat: 250,
+          payment_quote_id: "q-1",
+          btc_price_at_detection: 40_000,
+          slippage_tolerance_fiat: 2.5,
+        }),
+      );
+    });
+
+    it("answers 503 and writes nothing when the quotes can't be read", async () => {
+      withQuotes({ data: null, error: { message: "boom" } });
+      mockSingle.mockResolvedValueOnce({ data: pendingInvoice, error: null });
+      mockFetchTx.mockResolvedValueOnce({ ...matchingTx, status: { confirmed: true, block_height: 900_000 } });
+
+      const res = await postRequest("inv-1", { txid: "txabc", status: "paid" });
+
+      expect(res.status).toBe(503);
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 

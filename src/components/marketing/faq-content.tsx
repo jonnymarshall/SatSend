@@ -18,6 +18,13 @@ const SUPPORT = (
   </Link>
 );
 
+// v1.5.29: the full explanation of how payments are judged.
+const SETTLEMENT = (
+  <Link href="/payment-settlement" className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4">
+    how payments are settled
+  </Link>
+);
+
 /** The licence wording, shared by the FAQ and /security (v1.5.25). */
 export const SOURCE_AVAILABLE = (
   <>
@@ -79,7 +86,13 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: "amount",
         q: "How is the bitcoin amount worked out?",
-        a: "You create your invoice in your local currency. When your client opens it, SatSend shows the bitcoin amount at the current rate. Prices move, so a payment within 5% of the invoice still counts as paid in full.",
+        a: (
+          <>
+            You create your invoice in your local currency. When your client clicks Pay now in Bitcoin, SatSend works out
+            the bitcoin amount at the current rate and holds it for 30 minutes, so a price change while they pay
+            doesn&apos;t count against either of you. See {SETTLEMENT}.
+          </>
+        ),
       },
       {
         id: "know-paid",
@@ -89,7 +102,25 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: "wrong-amount",
         q: "What if my client pays the wrong amount?",
-        a: "Anything within 5% of the invoice counts as paid in full. If they pay less, the invoice shows Underpaid with the amount that arrived, so you can ask for the rest. If they pay more than 5% over, it's marked as overpaid so you can settle the difference with them.",
+        a: (
+          <>
+            A payment within the Slippage Tolerance (1% of the invoice, up to $25) counts as paid in full. If they pay
+            less than that, the invoice shows Underpaid with the amount that arrived, so you can ask for the rest. If
+            they pay more, it&apos;s marked Overpaid so you can settle the difference with them. See {SETTLEMENT}.
+          </>
+        ),
+      },
+      {
+        id: "slippage",
+        q: "What are Slippage Tolerance and Settlement Variance?",
+        a: (
+          <>
+            Payments don&apos;t always arrive to the exact amount: some wallets and exchanges take their fee out of what
+            they send, or round it. The Slippage Tolerance is the small margin, 1% of the invoice total up to $25, within
+            which a payment still counts as paid in full. When a payment lands inside it but isn&apos;t exact, the
+            invoice shows the difference as a Settlement Variance, and nothing is outstanding. See {SETTLEMENT}.
+          </>
+        ),
       },
       {
         id: "instalments",

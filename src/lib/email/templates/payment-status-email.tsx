@@ -2,9 +2,9 @@ import { Column, Img, Row, Section, Text } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
 import { statusColors } from "@/lib/brand-colors";
 import {
-  RATE_VARIANCE_EXPLAINED,
   formatPaymentTime,
   paymentSummary,
+  settlementVarianceExplained,
   type PaymentAudience,
   type PaymentSummaryInvoice,
 } from "@/lib/invoices/payment-summary";
@@ -103,16 +103,16 @@ export function PaymentStatusEmail({ audience, payment, invoiceNumber, btcAddres
               </>
             }
           />
-          {sums.rateVariance && <SumRow label="Exchange Rate Variance" value={sums.rateVariance} />}
+          {sums.settlementVariance && <SumRow label="Settlement Variance" value={sums.settlementVariance} />}
           <Section style={{ borderTop: "1px solid rgba(21, 28, 46, 0.1)", marginTop: "6px", paddingTop: "6px" }}>
             <SumRow label="Outstanding" value={sums.outstanding} strong valueColor={colors.text} />
           </Section>
         </Section>
       )}
 
-      {sums?.rateVariance && (
+      {sums?.settlementVariance && (
         <Text style={{ ...body, fontSize: "13px", lineHeight: "1.5", color: EMAIL.textSecondary, margin: "0 0 16px" }}>
-          <strong style={{ color: EMAIL.ink, fontWeight: 600 }}>Exchange Rate Variance:</strong> {RATE_VARIANCE_EXPLAINED.join(" ")}
+          <strong style={{ color: EMAIL.ink, fontWeight: 600 }}>Settlement Variance:</strong> {settlementVarianceExplained(sums.slippageTolerance).join(" ")}
         </Text>
       )}
 

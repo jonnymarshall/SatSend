@@ -40,6 +40,7 @@ const PAYMENT = {
   amount_received_fiat: null,
   payment_confirmed_at: null,
   mempool_seen_at: "2026-10-27T12:18:00Z",
+  slippage_tolerance_fiat: 2.5,
   your_company: null,
   your_name: "Charles",
   client_company: null,

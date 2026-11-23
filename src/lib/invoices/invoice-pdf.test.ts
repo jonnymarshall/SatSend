@@ -46,6 +46,9 @@ const baseInvoice: Invoice = {
   send_method: null,
   sent_at: null,
   stage_attempt: 0,
+  btc_price_at_seen: null,
+  slippage_tolerance_fiat: null,
+  payment_quote_id: null,
 };
 
 async function textFromPdf(invoice: Invoice, appUrl = "https://satsend.test", timeZone?: string): Promise<string> {
@@ -206,7 +209,7 @@ describe("renderInvoicePdf — the payment block (v1.5.28)", () => {
 
   it("a variance comes with its explanation", async () => {
     const text = flat(await textFromPdf({ ...PAID, amount_received_fiat: 7210 }));
-    expect(text).toMatch(/Exchange Rate Variance \+\$10\.00/);
+    expect(text).toMatch(/Settlement Variance \+\$10\.00/);
     expect(text).toContain("counts as paid in full");
   });
 
