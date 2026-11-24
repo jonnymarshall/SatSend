@@ -17,7 +17,10 @@ vi.mock("@/lib/invoice-public", () => ({
   toPublicInvoice: (i: Record<string, unknown>) => i,
 }));
 vi.mock("@/lib/btc-price", () => ({ fetchBtcPrice: (...a: unknown[]) => mockFetchBtcPrice(...a) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+let cookieValues: Record<string, string> = {};
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: (name: string) => (name in cookieValues ? { value: cookieValues[name] } : undefined) }),
+}));
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
@@ -25,11 +28,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 import ClientInvoicePage from "./page";
+import { accessToken } from "@/lib/access-code";
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 const INVOICE = { id: "inv-1", access_code: null, btc_address: "bc1qexample", currency: "USD" };
 
 beforeEach(() => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+  cookieValues = {};
   mockFetchPublicInvoice.mockReset();
   mockFetchBtcPrice.mockReset();
 });
@@ -53,6 +59,23 @@ describe("client invoice page: unknown links answer 404", () => {
     expect(isValidElement(page)).toBe(true);
     expect(page.type).toBe(Suspense);
     expect(isValidElement(page.props.fallback)).toBe(true);
+  });
+
+  // v1.5.31: the link may hold a SatSend reference; the access cookie is named
+  // for the invoice's UUID, so an unlock on the old link carries across.
+  it("on a short link, an invoice unlocked on its UUID link opens without asking again", async () => {
+    mockFetchPublicInvoice.mockResolvedValue({ ...INVOICE, access_code: "SECRET1" });
+    cookieValues[`pb_access_${INVOICE.id}`] = accessToken(INVOICE.id, "SECRET1");
+    mockFetchBtcPrice.mockImplementation(() => new Promise(() => {}));
+    const page = (await ClientInvoicePage(params("ss-7k3qx9ab"))) as ReactElement;
+    expect(mockFetchPublicInvoice).toHaveBeenCalledWith("ss-7k3qx9ab");
+    expect(page.type).toBe(Suspense);
+  });
+
+  it("the code screen on a short link keeps the short link", async () => {
+    mockFetchPublicInvoice.mockResolvedValue({ ...INVOICE, access_code: "SECRET1" });
+    const page = (await ClientInvoicePage(params("ss-7k3qx9ab"))) as ReactElement<{ invoiceKey: string }>;
+    expect(page.props.invoiceKey).toBe("ss-7k3qx9ab");
   });
 
   it("a protected invoice without the access code shows the code screen, not the spinner", async () => {

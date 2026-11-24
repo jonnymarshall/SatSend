@@ -6,6 +6,7 @@ import { fetchPublicInvoice } from "@/lib/invoice-public";
 import { isAccessCodeValid, accessCookieName, accessToken } from "@/lib/access-code";
 import { clientKey } from "@/lib/client-key";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseInvoiceKey, publicInvoicePath } from "@/lib/invoices/reference";
 
 export type AccessCodeState = { error: string | undefined };
 
@@ -15,16 +16,24 @@ export type AccessCodeState = { error: string | undefined };
 const WRONG_GUESSES_PER_WINDOW = 5;
 const WINDOW_SECONDS = 15 * 60;
 
+// v1.5.31: `invoiceKey` is what the client's link holds, a SatSend reference
+// (ss-7k3qx9ab) or an old UUID. Everything behind the code screen (the guess
+// limit, the cookie) uses the invoice's UUID, so unlocking it on one link form
+// unlocks it on the other; the client lands back on the kind of link they used,
+// rebuilt from the invoice rather than echoed from the form.
 export async function verifyAccessCode(
-  invoiceId: string,
+  invoiceKey: string,
   _prevState: AccessCodeState,
   formData: FormData
 ) {
   const submitted = (formData.get("access_code") as string | null)?.trim() ?? null;
-  const invoice = await fetchPublicInvoice(invoiceId);
+  const invoice = await fetchPublicInvoice(invoiceKey);
 
   if (!invoice) redirect("/");
-  if (!invoice.access_code) redirect(`/invoice/${invoiceId}`);
+  const invoiceId = invoice.id;
+  const back =
+    parseInvoiceKey(invoiceKey)?.kind === "reference" ? publicInvoicePath(invoice) : `/invoice/${invoiceId}`;
+  if (!invoice.access_code) redirect(back);
 
   const correct = isAccessCodeValid(invoice.access_code, submitted);
 
@@ -64,5 +73,5 @@ export async function verifyAccessCode(
     path: "/",
   });
 
-  redirect(`/invoice/${invoiceId}`);
+  redirect(back);
 }

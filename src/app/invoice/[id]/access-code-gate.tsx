@@ -8,13 +8,14 @@ import { Card } from "@/components/signal/card";
 import { Input } from "@/components/signal/input";
 
 interface Props {
-  invoiceId: string;
+  /** The link's key: a SatSend reference or an old UUID (v1.5.31). */
+  invoiceKey: string;
 }
 
 const initialState: AccessCodeState = { error: undefined };
 
-export function AccessCodeGate({ invoiceId }: Props) {
-  const boundAction = verifyAccessCode.bind(null, invoiceId);
+export function AccessCodeGate({ invoiceKey }: Props) {
+  const boundAction = verifyAccessCode.bind(null, invoiceKey);
   const [state, formAction, pending] = useActionState(boundAction, initialState);
   const [code, setCode] = useState("");
 

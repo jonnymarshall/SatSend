@@ -112,6 +112,7 @@ const BASE_INVOICE: Invoice = {
   btc_price_at_seen: null,
   slippage_tolerance_fiat: null,
   payment_quote_id: null,
+  reference: "7K3QX9AB",
 };
 
 describe("InvoicePaymentView — download PDF", () => {

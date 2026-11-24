@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LineItem } from "@/lib/invoices";
 import type { Database } from "@/lib/database.types";
+import { parseInvoiceKey } from "@/lib/invoices/reference";
 
 type InvoicesRow = Database["public"]["Tables"]["invoices"]["Row"];
 
@@ -24,12 +25,21 @@ export function toInvoice(row: InvoicesRow): Invoice {
   return { ...row, line_items: (row.line_items ?? []) as unknown as LineItem[] };
 }
 
-export async function fetchPublicInvoice(id: string): Promise<Invoice | null> {
+/**
+ * The invoice a public link points at (v1.5.31): its SatSend reference
+ * ("ss-7k3qx9ab", in any form a person might type) or its old UUID, so links
+ * already in clients' inboxes keep working. Anything else is null without a
+ * database call. Callers use the returned invoice's UUID from here on (access
+ * cookie, realtime, API calls), so both link forms behave the same.
+ */
+export async function fetchPublicInvoice(key: string): Promise<Invoice | null> {
+  const parsed = parseInvoiceKey(key);
+  if (!parsed) return null;
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("invoices")
     .select("*")
-    .eq("id", id)
+    .eq(parsed.kind === "reference" ? "reference" : "id", parsed.kind === "reference" ? parsed.reference : parsed.id)
     .single();
 
   if (error || !data) return null;

@@ -246,6 +246,7 @@ export type Database = {
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at: string | null
+          reference: string
           send_method: string | null
           sent_at: string | null
           slippage_tolerance_fiat: number | null
@@ -292,6 +293,7 @@ export type Database = {
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at?: string | null
+          reference?: string
           send_method?: string | null
           sent_at?: string | null
           slippage_tolerance_fiat?: number | null
@@ -338,6 +340,7 @@ export type Database = {
             | Database["public"]["Enums"]["invoice_status"]
             | null
           published_at?: string | null
+          reference?: string
           send_method?: string | null
           sent_at?: string | null
           slippage_tolerance_fiat?: number | null
@@ -455,6 +458,7 @@ export type Database = {
       }
     }
     Functions: {
+      generate_invoice_reference: { Args: never; Returns: string }
       is_address_registered: { Args: { addr: string }; Returns: boolean }
       is_email_registered: { Args: { p_email: string }; Returns: boolean }
       line_items_valid: { Args: { items: Json }; Returns: boolean }

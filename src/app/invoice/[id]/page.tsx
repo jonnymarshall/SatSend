@@ -18,11 +18,14 @@ export default async function ClientInvoicePage({ params }: Props) {
   const invoice = await fetchPublicInvoice(id);
   if (!invoice) notFound();
 
+  // v1.5.31: the link holds a SatSend reference or an old UUID; the access
+  // cookie is always named for the UUID, so an unlock on one link form opens
+  // the other. The code screen keeps the link the client came in on.
   const cookieStore = await cookies();
-  const storedCode = cookieStore.get(accessCookieName(id))?.value ?? null;
+  const storedCode = cookieStore.get(accessCookieName(invoice.id))?.value ?? null;
 
-  if (!hasAccess(id, invoice.access_code, storedCode)) {
-    return <AccessCodeGate invoiceId={id} />;
+  if (!hasAccess(invoice.id, invoice.access_code, storedCode)) {
+    return <AccessCodeGate invoiceKey={id} />;
   }
 
   // v1.5.30 (roadmap v1.5.2.23-H): everything above runs before the response

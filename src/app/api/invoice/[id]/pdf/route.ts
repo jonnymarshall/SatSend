@@ -21,9 +21,10 @@ export async function GET(
   // HTML page. Return 404 (not 403) so we never confirm the invoice exists, and
   // do it before any caching. This runs against the same cookie the page sets
   // (since v1.5.26 a server-made fingerprint, so codes can't be guessed here).
+  // v1.5.31: `id` may be a SatSend reference; the cookie is named for the UUID.
   const cookieStore = await cookies();
-  const provided = cookieStore.get(accessCookieName(id))?.value ?? null;
-  if (!hasAccess(id, invoice.access_code, provided)) {
+  const provided = cookieStore.get(accessCookieName(invoice.id))?.value ?? null;
+  if (!hasAccess(invoice.id, invoice.access_code, provided)) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 

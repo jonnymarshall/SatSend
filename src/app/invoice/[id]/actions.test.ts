@@ -32,7 +32,7 @@ vi.mock("next/navigation", () => ({
 import { verifyAccessCode } from "./actions";
 
 const ID = "11111111-1111-1111-1111-111111111111";
-const gated = { id: ID, access_code: "SECRET1" };
+const gated = { id: ID, reference: "7K3QX9AB", access_code: "SECRET1" };
 
 function guess(code: string, id = ID) {
   const form = new FormData();
@@ -92,8 +92,10 @@ describe("verifyAccessCode (v1.5.26: guess limit)", () => {
   });
 
   it("counts each invoice separately", async () => {
+    const OTHER = "22222222-2222-2222-2222-222222222222";
+    mockFetchPublic.mockImplementation(async (key: string) => (key === OTHER ? { ...gated, id: OTHER } : gated));
     await guess("WRONG1");
-    await guess("WRONG1", "22222222-2222-2222-2222-222222222222");
+    await guess("WRONG1", OTHER);
     const invoices = mockRpc.mock.calls.map(([, args]) => (args as { p_invoice_id: string }).p_invoice_id);
     expect(new Set(invoices).size).toBe(2);
   });
@@ -110,6 +112,28 @@ describe("verifyAccessCode (v1.5.26: guess limit)", () => {
     await expect(guess("")).rejects.toThrow(`redirect /invoice/${ID}`);
     expect(mockRpc).not.toHaveBeenCalled();
     expect(mockCookieSet).not.toHaveBeenCalled();
+  });
+
+  // v1.5.31: the code screen also sits on short links (/invoice/ss-7k3qx9ab).
+  // Everything behind it uses the invoice's UUID, so an invoice unlocked on one
+  // link form stays unlocked on the other; and the client lands back on the link
+  // they came from.
+  it("on a short link, the limit and the cookie use the invoice's UUID, and it returns to the short link", async () => {
+    await expect(guess("secret1", "ss-7k3qx9ab")).rejects.toThrow("redirect /invoice/ss-7k3qx9ab");
+    expect(mockFetchPublic).toHaveBeenCalledWith("ss-7k3qx9ab");
+    expect(mockRpc.mock.lastCall![1]).toMatchObject({ p_invoice_id: ID });
+    const [name, value] = mockCookieSet.mock.calls[0];
+    expect(name).toBe(`pb_access_${ID}`);
+    expect(value).toBe(accessToken(ID, "SECRET1"));
+  });
+
+  it("returns to the tidy short link however the reference was typed", async () => {
+    await expect(guess("secret1", "SS-7K3QX9AB")).rejects.toThrow("redirect /invoice/ss-7k3qx9ab");
+  });
+
+  it("an invoice without a code, on a short link, opens on the short link", async () => {
+    mockFetchPublic.mockResolvedValue({ ...gated, access_code: null });
+    await expect(guess("", "ss-7k3qx9ab")).rejects.toThrow("redirect /invoice/ss-7k3qx9ab");
   });
 
   it("an unknown invoice goes home", async () => {
