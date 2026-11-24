@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.35 — Invoice page: no repeated "sent" line (roadmap v1.4.22).** The
+  "Sent via email on …" / "Marked as sent on …" line above the buttons is
+  gone; the activity feed's "Invoice sent" / "Marked as sent" entry already
+  says it. (The rest of v1.4.22, a "Published" entry, was made unnecessary by
+  v1.5.19.)
+- **v1.5.35 — Payment watcher double request closed as development-only
+  (roadmap v1.4.21).** A production build makes exactly one mempool.space
+  request when the client's page opens; the extra ones only happen in
+  development mode.
+
 ### Fixed
 
 - **v1.5.34 — Duplicating an invoice leaves no stray draft (roadmap v1.4.25).**
