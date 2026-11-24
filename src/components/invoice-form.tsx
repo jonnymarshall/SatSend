@@ -18,6 +18,7 @@ import { SendMenu } from "@/components/send-menu";
 import { showNotice } from "@/components/notice";
 import { deferredCopy } from "@/lib/copy-when-ready";
 import { clientInvoiceUrl } from "@/lib/invoices/send-feedback";
+import { calendarDateToDateOnly, utcToCalendarDate } from "@/lib/date-only";
 import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
 import { addressNetworkError } from "@/lib/btc-network";
 import { invoiceSchema } from "@/lib/invoices/schema";
@@ -112,6 +113,10 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   const initialState: FormState = {
     ...DEFAULT_STATE,
     ...initialValues,
+    // v1.5.34: the server sends the due date as UTC midnight of that day; the
+    // picker needs local midnight of the same day, or it shows the day before
+    // west of UTC.
+    due_date: initialValues?.due_date ? utcToCalendarDate(initialValues.due_date) : undefined,
     ...(sessionEmail ? { your_email: sessionEmail } : {}),
   };
   const [form, setForm] = useState<FormState>(initialState);
@@ -237,7 +242,9 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       line_items: toLineItems(items),
       tax_percent: parseFloat(form.tax_percent) || 0,
       btc_address: form.btc_address.trim() || undefined,
-      due_date: !form.no_due_date && form.due_date ? form.due_date.toISOString().split("T")[0] : undefined,
+      // v1.5.34: the picked day in the browser's zone (toISOString read it in
+      // UTC: the day before anywhere east of UTC).
+      due_date: !form.no_due_date && form.due_date ? calendarDateToDateOnly(form.due_date) : undefined,
       access_code: form.access_code.trim() || undefined,
     };
   }

@@ -13,7 +13,6 @@ import { clientInvoiceUrl, emailOutcomeMessage } from "@/lib/invoices/send-feedb
 import { MarkAsMenu } from "@/components/mark-as-menu";
 import {
   deleteDraft,
-  duplicateInvoice,
   markOverdue,
   markPaid,
   markUnpaid,
@@ -246,14 +245,14 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
           </Button>
         )}
 
-        <Button
+        {/* v1.5.34: opens a pre-filled New Invoice form; nothing is saved. */}
+        <Link
           id="invoice-actions--duplicate-button"
-          variant="secondary"
-          onClick={() => run(() => duplicateInvoice(invoice.id))}
-          disabled={busy}
+          href={`/invoices/new?from=${invoice.id}`}
+          className={buttonVariants({ variant: "secondary" })}
         >
           Duplicate
-        </Button>
+        </Link>
 
         <Button
           id="invoice-actions--delete-button"

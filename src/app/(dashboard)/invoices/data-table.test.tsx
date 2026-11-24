@@ -10,8 +10,9 @@ const mockReplace = vi.fn((url: string) => {
   const qIdx = url.indexOf("?");
   mockSearchParams = qIdx >= 0 ? new URLSearchParams(url.slice(qIdx + 1)) : new URLSearchParams();
 });
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: mockReplace, refresh: vi.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, refresh: vi.fn() }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => "/invoices",
 }));
@@ -24,7 +25,6 @@ vi.mock("./bulk-actions", () => ({
 vi.mock("./actions", () => ({
   publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
   publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: { reference: "7K3QX9AB" } }),
-  duplicateInvoice: vi.fn().mockResolvedValue(undefined),
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
 }));
@@ -35,7 +35,7 @@ vi.mock("./use-invoice-realtime", () => ({
 
 import { bulkArchive, bulkDelete, bulkMarkPaid, bulkUnarchive } from "./bulk-actions";
 import { showNotice } from "@/components/notice";
-import { publishAndSendEmail, publishAndMarkSent, duplicateInvoice, markOverdue, markUnpaid } from "./actions";
+import { publishAndSendEmail, publishAndMarkSent, markOverdue, markUnpaid } from "./actions";
 
 const baseRow = {
   reference: "7K3QX9AB",
@@ -331,12 +331,13 @@ describe("InvoiceDataTable — per-row actions", () => {
     expect(await screen.findByText(/still a draft/i)).toBeInTheDocument();
   });
 
-  it("calls duplicateInvoice when 'Duplicate' is clicked", async () => {
+  // v1.5.34: Duplicate opens a pre-filled New Invoice form; nothing is saved.
+  it("'Duplicate' opens the New Invoice form filled in from that invoice", async () => {
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[1]); // inv-2 pending
     fireEvent.click(await screen.findByRole("menuitem", { name: /duplicate/i }));
-    await waitFor(() => expect(duplicateInvoice).toHaveBeenCalledWith("inv-2"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/invoices/new?from=inv-2"));
   });
 
   it("hides the publish/send menu items only on rows successfully delivered via email", async () => {

@@ -45,7 +45,6 @@ import { bulkArchive, bulkDelete, bulkMarkPaid, bulkUnarchive } from "./bulk-act
 import {
   publishAndSendEmail,
   publishAndMarkSent,
-  duplicateInvoice,
   markOverdue,
   markUnpaid,
 } from "./actions";
@@ -211,9 +210,10 @@ export function InvoiceDataTable({ data, userId }: Props) {
           }),
         onDelete: (id) => setDeleteTarget([id]),
         onCopyPublicLink: copyPublicLink,
-        onDuplicate: (id) => runRowAction(() => duplicateInvoice(id)),
+        // v1.5.34: opens a pre-filled New Invoice form; nothing is saved.
+        onDuplicate: (id) => router.push(`/invoices/new?from=${id}`),
       }),
-    [runRowAction, copyPublicLink, data]
+    [runRowAction, copyPublicLink, data, router]
   );
 
   const table = useReactTable({

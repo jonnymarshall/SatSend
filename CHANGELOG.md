@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.34 — Duplicating an invoice leaves no stray draft (roadmap v1.4.25).**
+  Duplicate now opens the New Invoice form filled in from the original
+  (`/invoices/new?from=<id>`, the sender's own invoices only), with "A copy of
+  INV-0043. Nothing is saved until you save it." Cancelling leaves nothing
+  behind, and the "NEXT_REDIRECT" error box is gone. The copy gets the next free
+  "(copy)" number and no receiving address, as before.
+- **v1.5.34 — Due dates no longer move by a day.** The invoice form showed the
+  day before for anyone west of UTC, and saved the day before for anyone east
+  of it (the UK in summer included). The form now treats a due date as a
+  calendar day throughout (`src/lib/date-only.ts`).
+
 ### Security
 
 - **v1.5.33 — Strict Content-Security-Policy (roadmap v1.5.2.24-H).** Every

@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { computeInvoiceTotals, LineItem, isValidEmail, lineItemsToJson } from "@/lib/invoices";
@@ -114,32 +113,6 @@ export interface InvoicePayload {
   btc_address?: string;
   due_date?: string;
   access_code?: string;
-}
-
-// v1.4.16: cap matches the DB CHECK constraint (migration 0020) and the form's
-// maxLength. Used by buildDuplicateInvoiceNumber; the input itself is validated
-// by invoiceSchema (max 30).
-const INVOICE_NUMBER_MAX_LENGTH = 30;
-
-// v1.4.23-H: pick a genuinely unique number. The old version appended a fixed
-// "... (copy)", so duplicating an invoice that was already a copy produced the
-// same string again and manufactured duplicate numbers (a live prod bug). Walk
-// " (copy)", " (copy 2)", ... until one is not already taken, trimming the source
-// to fit the 30-char cap. Returns null when source is null/empty so duplicates of
-// unnumbered invoices stay unnumbered.
-function buildDuplicateInvoiceNumber(
-  source: string | null | undefined,
-  taken: Set<string>,
-): string | null {
-  if (!source) return null;
-  for (let n = 1; n <= 999; n++) {
-    const suffix = n === 1 ? " (copy)" : ` (copy ${n})`;
-    const room = INVOICE_NUMBER_MAX_LENGTH - suffix.length;
-    const base = source.length > room ? source.slice(0, room) : source;
-    const candidate = `${base}${suffix}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-  return null;
 }
 
 export async function saveDraft(payload: InvoicePayload): Promise<ActionResult<Invoice>> {
@@ -567,69 +540,6 @@ export async function markUnpaid(invoiceId: string) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/invoices/${invoiceId}`);
-}
-
-export async function duplicateInvoice(invoiceId: string): Promise<ActionResult<undefined>> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: source } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", invoiceId)
-    .single();
-
-  if (!source || source.user_id !== user!.id) throw new Error("Invoice not found");
-
-  // v1.4.25-H: the duplicate copies the source's line items, so it must run the
-  // same cap (a pre-existing oversized invoice must not be duplicated into a new
-  // oversized one).
-  if (toInvoice(source).line_items.length > 100) {
-    return { ok: false, field: "line_items", message: "An invoice can have at most 100 line items." };
-  }
-
-  // Fetch the numbers this user already has so the duplicate gets a free suffix
-  // (v1.4.23-H: the old fixed suffix collided when copying a copy).
-  const { data: takenRows } = await supabase
-    .from("invoices")
-    .select("invoice_number")
-    .eq("user_id", user!.id)
-    .not("invoice_number", "is", null);
-  const taken = new Set((takenRows ?? []).map((r) => r.invoice_number as string));
-
-  const { data: created, error } = await supabase
-    .from("invoices")
-    .insert({
-      user_id: source.user_id,
-      invoice_number: buildDuplicateInvoiceNumber(source.invoice_number, taken),
-      your_name: source.your_name,
-      your_email: source.your_email ?? "",
-      your_company: source.your_company,
-      your_address: source.your_address,
-      your_tax_id: source.your_tax_id,
-      client_name: source.client_name ?? "",
-      client_email: source.client_email ?? "",
-      client_company: source.client_company,
-      client_address: source.client_address,
-      client_tax_id: source.client_tax_id,
-      line_items: source.line_items,
-      tax_percent: source.tax_percent,
-      tax_fiat: source.tax_fiat,
-      subtotal_fiat: source.subtotal_fiat,
-      total_fiat: source.total_fiat,
-      currency: source.currency,
-      btc_address: null,
-      due_date: source.due_date,
-      status: "draft",
-      access_code: source.access_code,
-      btc_txid: null,
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-  revalidatePath("/invoices");
-  redirect(`/invoices/${created.id}/edit`);
 }
 
 export async function markOverdue(invoiceId: string) {

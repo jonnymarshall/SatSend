@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { InvoiceForm } from "./invoice-form";
 import { saveDraft, publishAndMarkSent, publishAndSendEmail } from "@/app/(dashboard)/invoices/actions";
 import { showNotice } from "@/components/notice";
+import { dateOnlyToUtc } from "@/lib/date-only";
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -420,5 +421,30 @@ describe("InvoiceForm BTC address network (fix/address-freshness-check)", () => 
 
     await screen.findByText(/this is a testnet address/i);
     expect(saveDraft).not.toHaveBeenCalled();
+  });
+});
+
+// v1.5.34: the due date is a calendar day. One sent from the server (UTC
+// midnight) must show and save as the same day in any browser time zone; the
+// release check runs this file under several TZ values.
+describe("InvoiceForm — due date keeps its day in every time zone (v1.5.34)", () => {
+  it("a loaded due date shows its own day and saves back unchanged", async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveDraft).mockClear();
+    render(
+      <InvoiceForm
+        initialValues={{
+          client_name: "Acme",
+          line_items: [{ description: "Work", quantity: 1, unit_price: 100 }],
+          due_date: dateOnlyToUtc("2026-06-03"),
+          no_due_date: false,
+        }}
+      />,
+    );
+    // The picker shows the stored day, not the day before (US) or after.
+    expect(screen.getByText(/June 3rd, 2026/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /save draft/i }));
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(saveDraft).mock.calls[0][0].due_date).toBe("2026-06-03");
   });
 });
