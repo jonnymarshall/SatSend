@@ -2,12 +2,11 @@ import type { NextConfig } from "next";
 
 // v1.4.24-H (M-FE-5): browser safety headers, applied to every route.
 //
-// The Content-Security-Policy is deliberately minimal: only frame-ancestors,
-// object-src and base-uri. A broader policy (default-src / connect-src /
-// script-src) would have to whitelist the two live WebSocket origins the app
-// depends on (mempool.space and Supabase Realtime), and a wrong connect-src
-// there would silently stop live payment updates while the page still rendered.
-// The stricter policy is deferred to its own item so it can be tested properly.
+// The Content-Security-Policy here is a minimal baseline (frame-ancestors,
+// object-src, base-uri) for files the proxy doesn't run on, such as images.
+// Pages get the strict, per-request nonce policy from src/proxy.ts
+// (src/lib/csp.ts, v1.5.33), which replaces this header on every response the
+// proxy handles.
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },

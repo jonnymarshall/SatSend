@@ -2529,6 +2529,356 @@ the real client out).
 
 # Appendix A (archived 2026-10-27)
 
+## Pre-launch: payment, links and reference (archived 2026-11-24)
+
+### ✅ v1.5.2.13-H — Paid invoice: hide the payment QR once a txid exists (**pre-launch**)
+
+**Branch:** `v1.5.27/hide-qr-after-txid` · package `1.5.27` · no migration.
+
+> **Jonny, 2026-10-26:** paid an invoice, left the tab open, and when he came
+> back the QR code had changed. Confirmed in the code, and it still happens after
+> payment.
+>
+> **Cause.** Returning to the tab fires `router.refresh()` on every visibility
+> change (`src/lib/realtime/use-invoice-channel.ts:62`, not gated on payment
+> state). The public page re-fetches the live BTC price on each render
+> (`src/app/invoice/[id]/page.tsx:26-33`; `src/lib/btc-price.ts` caches it for
+> 60s), the view recomputes `btcAmount` and `bip21Uri` from `total_fiat` and the
+> new price (`invoice-payment-view.tsx:62-73`), and `BtcQrCode` re-encodes
+> whenever the URI changes (`src/components/btc-qr-code.tsx:14-28`). A paid
+> invoice auto-reveals the BTC block (`invoice-payment-view.tsx:60`), so it keeps
+> showing a fresh, payable-looking amount and QR for an invoice that is already
+> paid.
+
+**Decision:** once a transaction exists, this invoice cannot be paid again, so
+show no payable QR and no live-recomputed BTC amount. Gate on **`btcTxid`**
+(persisted `btc_txid`), which covers both `payment_detected` and `paid`; do not
+gate on the status string alone.
+
+- [x] In `invoice-payment-view.tsx`, when `btcTxid` is set: drop the
+      `BtcQrCode`, the "BTC amount"/"at $X/BTC" block, and the copy that implies
+      the client still owes. Keep the address (for reference), the transaction ID
+      link, and the amount-received figures when recorded.
+- [x] Treat it as a permanent state, not a transient one: the same rule must hold
+      for a txid that arrives mid-session by watcher or realtime UPDATE, and for
+      a paid invoice reopened later from a fresh page load.
+- [x] Do **not** change the visibility-driven `router.refresh()` (it carries
+      status updates) or the amount shown on the dashboard/PDF. Display-only.
+- [x] Tests in `invoice-payment-view.test.tsx`: no txid → QR and amount shown;
+      `payment_detected` with a txid → no QR; `paid` → no QR; a txid arriving via
+      the realtime callback hides it in the same session.
+- [x] Manual: pay a testnet invoice, leave the tab, return after a price move:
+      the QR must not appear or change.
+
+- [x] Shipped as a "Payment detected" / "Paid" / "Underpaid" card: the address
+      for reference, the transaction link, and what arrived when recorded.
+      Wording says the bitcoin "was received to the bitcoin address for this
+      invoice", never "we received" (SatSend holds nothing). Underpaid, Jonny's
+      wording (2026-10-27): "… less than the amount requested. To resolve full
+      settlement of this invoice, reach out to [Sender]." Also fixed: a paid
+      invoice viewed while the price service is down no longer says "please
+      calculate the amount manually".
+- [x] Follow-up in the same release (Jonny, 2026-10-27): the block reads at a glance. An
+      icon and colour per state (detected violet clock, paid green tick,
+      underpaid amber warning, overpaid blue plus), Requested / Received /
+      Difference for under- and overpaid, "Overpaid" as its own state and badge
+      ("To discuss the extra $X, reach out to [Sender]"), and the date and time
+      ("Paid on", from the block's time in new column `payment_confirmed_at`,
+      migration 0037; else "Seen at"). Design chosen from four proposals on a
+      canvas: receipt layout. After manual testing (Jonny, 2026-10-27): the
+      sums box on every paid state, "Outstanding" instead of "Difference"
+      ($0.00 paid, positive underpaid, negative overpaid); transaction ID in
+      full except on phones; the open page rechecks on each new block while a
+      payment is detected (it used to stay "Payment detected" until reloaded);
+      "Mark as unpaid" removed for blockchain-confirmed payments (it flipped
+      straight back and resent the email).
+- [x] A paid invoice whose amount differs within the allowance shows an
+      "Exchange Rate Variance" row (+ over, − under) between Received and
+      Outstanding, so the sums add up on screen (Jonny, 2026-10-27). The PDF no
+      longer prints a payable QR for underpaid, archived-paid or txid invoices.
+
+**Done when:** a paid/detected invoice never renders a payment QR or a live BTC
+amount, however and whenever its page is loaded.
+
+---
+
+### ✅ v1.5.2.21-H — The payment block in emails and PDFs (**pre-launch**)
+
+**Branch:** `v1.5.28/payment-block-emails-pdf` · package `1.5.28` · no migration
+expected.
+
+**Context (Jonny, 2026-10-27).** v1.5.27 redesigned the payment block on the
+client's invoice page. The payment emails and the PDF should match it as
+closely as possible, in information and styling, as the links work did.
+Today the four payment emails (detected and confirmed, to the sender and to
+the client) have a status pill only, no amounts box, no time, no Overpaid
+state, and the client's underpaid email says "We received", which breaks the
+wording rule (never imply SatSend holds funds). The PDF has a plain "Paid in
+bitcoin" panel.
+
+**Scope (decisions agreed 2026-10-27):**
+- [x] Every payment email gets the block: coloured circle icon and state name
+      (Payment detected violet clock, Paid green tick, Underpaid amber warning,
+      Overpaid blue plus), the Requested / Received / [Exchange Rate
+      Variance] / Outstanding box, the next-step sentence, "Paid on" or
+      "Seen at", the full address and the full transaction ID.
+- [x] Icons in emails are small PNGs attached inline, like the logo (email
+      apps strip SVG).
+- [x] Client emails: "To resolve full settlement of this invoice, reach out to
+      [Sender]." / "To resolve overpayment of this invoice, reach out to
+      [Sender]." Sender's own emails name the client instead.
+- [x] Remove every "we received" (and similar) from the payment emails.
+- [x] Email times in UTC, named ("2:54 AM UTC"): the reader's zone is unknown.
+- [x] Subjects: "Underpaid" replaces "Partial payment"; new Overpaid subjects
+      ("Overpayment received for invoice X").
+- [x] The PDF's paid panel becomes the same block, drawn natively (react-pdf
+      `Svg` for the icons); its times use the downloader's time zone, passed
+      from the browser.
+- [x] Manual tests with real sends (Resend) of each state:
+      `manual-tests/v1.5.28-payment-block-emails-pdf.md`, and
+      `scripts/email/send-payment-samples.tsx --to <address>` (the address is
+      only ever typed on the command line; a test fails if a personal address
+      is committed).
+
+---
+
+### ✅ v1.5.2.22-H — Locked quotes and a tighter Slippage Tolerance (**pre-launch**)
+
+**Branch:** `v1.5.29/locked-quotes` · package `1.5.29` · migration `0038_locked_quotes`.
+
+**Context (Jonny, 2026-10-27).** A payment counted as paid in full within 5%
+either way: $400 on an $8,000 invoice, which is too generous. The margin was
+wide because of how payments were valued, not client error: the client pays
+the bitcoin amount shown when they opened the QR, but SatSend valued it at the
+exchange rate when it **confirmed**, often 10 to 60 minutes later.
+
+**Terms (Jonny, 2026-10-28):** the paid-in-full margin is the **Slippage
+Tolerance**, always; the sums-box row is the **Settlement Variance** (was
+"Exchange Rate Variance").
+
+**Scope:**
+- [x] **Lock the quote.** "Pay now in Bitcoin" calls `POST /api/invoices/[id]/quote`,
+      which records the amount, price and expiry (`invoice_quotes`, server only,
+      via `take_invoice_quote`; a quote from the last minute is reused). Valid 30
+      minutes; the page asks for a fresh one on expiry and says "held until".
+- [x] **Judge in bitcoin.** A payment matching a quote (made before it, valid then
+      plus 30 minutes for the background check's lag, closest in amount) is
+      judged in sats against it and valued at its price.
+- [x] **Fallback.** No matching quote: valued at the price when first seen
+      (`btc_price_at_seen`).
+- [x] **Tighten:** Slippage Tolerance = 1% of the total, capped at $25 (Jonny,
+      2026-10-28). Recorded per invoice (`slippage_tolerance_fiat`), so invoices
+      judged at 5% read as before.
+- [x] Label renamed to **Settlement Variance**; its help names the invoice's
+      Slippage Tolerance and links to the new page.
+- [x] **Documentation (Jonny, 2026-10-28):** new footer page "How payments are
+      settled" (`/payment-settlement`) for senders and clients; new FAQ answer
+      "What are Slippage Tolerance and Settlement Variance?"; FAQ and How it
+      works no longer say 5%.
+
+---
+
+### ✅ v1.5.2.23-H — Unknown invoice links answer 404 (**pre-launch**, small)
+
+**Branch:** `v1.5.30/unknown-invoice-404` · package `1.5.30` (Jonny, 2026-10-28:
+straight after v1.5.2.22-H). The short invoice reference (v1.5.2.14-H) moves to 1.5.31.
+
+**Context (spotted 2026-10-28, after v1.5.27 shipped).** An unknown invoice
+link (`/invoice/<made-up id>`) shows the "not found" page but answers with
+HTTP 200, so search engines could index it as a real page. The page calls
+`notFound()`; the status is probably lost to streaming.
+
+**Cause (confirmed 2026-11-24):** the route's `loading.tsx` started streaming
+the response (status 200 already sent) before `notFound()` ran. Next.js then
+adds `<meta name="robots" content="noindex">`, so search engines were already
+kept away; the fix is for correctness (link checkers, monitors, analytics).
+
+- [x] Make an unknown invoice answer 404 (and keep the not-found page): the
+      route-level `loading.tsx` is gone; the page looks the invoice up and checks
+      the access code before the response starts, and the spinner wraps only the
+      bitcoin price lookup (`Suspense`). Malformed ids answer 404 too.
+- [ ] Test: a made-up id returns 404 on satsend.me after deploy.
+
+---
+
+---
+
+### ✅ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
+
+**Decisions (Jonny, 2026-11-24):** the label is **"SatSend reference"**; codes
+are 8 characters with an `SS-` prefix, **uppercase on documents**
+(`SS-7K3QX9AB`) and **lowercase in links** (`/invoice/ss-7k3qx9ab`), any case
+accepted; the copy button copies `SS-7K3QX9AB`. **Built differently from the
+plan below:** the database makes the reference (a trigger, migration 0039)
+rather than the app, so every insert path gets one and the migration is safe to
+apply before the merge; the payment-status and quote API routes keep the UUID
+(only the page knows them, it already has the UUID); dashboard URLs stay on the
+UUID. Manual verification: `manual-tests/v1.5.31-satsend-reference.md`.
+
+**Branch:** `v1.5.31/short-invoice-reference` · package `1.5.31` (moved from
+1.5.28 for v1.5.2.21-H, then past v1.5.29 and v1.5.30) · new migration (the next free number when it starts;
+v1.5.27 took `0037`). Renumber the package if another item ships between this
+plan and the branch.
+
+**Context.** Two linked requests from Jonny (2026-10-26):
+
+1. **Shorter links.** The public invoice URL exposes a 36-character UUID
+   (`.../invoice/d646495a-bae1-4a8d-9e23-a82731cd7d20`). It should use the
+   shortest unique alphanumeric identifier we can safely issue, so the link is
+   easy to read, type and share.
+2. **Show it everywhere.** The same identifier should appear on the invoice
+   itself for both the owner and the client, and in every invoice email and
+   PDF, so either side can quote it instead of the owner's own invoice number
+   (which is often unpredictable or inconsistent between suppliers).
+
+**Approach.** Add a public **reference** to each invoice and keep the UUID as
+the internal primary key. The UUID stays behind the scenes (foreign keys,
+`invoice_events`, `email_events`, realtime channels, logs); every client-facing
+surface swaps the UUID for the reference. This gives the short URL and the
+short printed ID without rewriting every foreign key and realtime channel.
+
+> **Why not make the short string the primary key?** It would ripple through
+> every foreign key, event table, realtime policy and later the API, and any
+> future reference change would become a data migration. A unique indexed
+> column achieves the same visible result with a much smaller blast radius. If
+> the actual primary key must change, treat that as a separate, larger item.
+
+**Decision needed before implementation: the label.** "Invoice ID" is out: it
+is the exact collision with the owner's invoice number that this item is meant
+to remove. Options used in industry:
+
+| Label | Notes |
+|---|---|
+| **SatSend reference** | Names the issuer, so it cannot be mistaken for the owner's invoice number or the client's own reference or PO. **Recommended.** |
+| **Reference** / **Invoice reference** | The standard accounting term, but accounting software often uses "Reference" for the client's PO or buyer reference, so it can still collide. Good as shorthand once the context is clearly SatSend. |
+| **SatSend ID** | Makes ownership clear, but "ID" reads technical. |
+| **Reference number** | Explicit but wordier than "Reference". |
+| **Payment reference** | Banking language; risks confusion with the Bitcoin transaction ID. Avoid. |
+| **Invoice ID** | Avoid, for the collision above. |
+
+Pick one label and use it verbatim on the owner page, the client page, the
+PDF, every email, the dashboard list, support copy and the later API field.
+Where both numbers appear together, label them distinctly (for example
+"Invoice number" for the owner's own number and "SatSend reference" for ours)
+so a client cannot mix them up.
+
+**Part A: short reference and short links**
+
+- [x] **Migration.** Add `invoices.reference text`, nullable at first; backfill
+      every existing row; then add a global unique index and `not null`. New
+      invoices get a reference at creation. Do not remove or rewrite `id`.
+- [x] **Format.** Fixed-length uppercase Crockford base32. The alphabet leaves
+      out `I`, `L`, `O` and `U`, so it cannot be misread as `1` or `0` when
+      read aloud or copied by hand. **Recommended 8 characters** (about 40
+      bits): short enough to read aloud, long enough that collisions stay rare
+      with a unique index and retry. Six characters (about 30 bits) is the
+      practical floor: it still gives roughly a billion combinations, but the
+      collision rate and the enumeration rate both rise, so use it only if
+      link length matters more than those margins. Confirm 8 versus 10 during
+      planning; do not go below 8 without measuring the retry rate.
+- [x] **Generation.** Server-side from `crypto.randomBytes`, retrying on a
+      `23505` unique violation. Do not derive it from the UUID or from an
+      increasing counter: that would leak invoice volume and make references
+      predictable.
+- [x] **Resolver.** One helper (extend `fetchPublicInvoice` or add
+      `fetchInvoiceByIdOrReference`) that matches `reference` first and falls
+      back to `id`. Uppercase the input before lookup, so a hand-typed
+      lowercase reference still works. Every public route uses it:
+      `/invoice/[ref]`, `/api/invoice/[ref]/pdf` and
+      `/api/invoices/[ref]/payment-status`. UUID links already in clients'
+      inboxes keep working; no redirect is needed.
+- [x] **Access cookie.** Resolve to the invoice's UUID before reading or
+      writing `accessCookieName`, so an invoice unlocked through an old UUID
+      link stays unlocked on the new short link, and the other way round.
+- [x] **Realtime.** Keep the channel keyed on the UUID, not the reference, so
+      the existing subscriptions and broadcast policy do not change.
+- [x] **Link builders.** Build new public invoice links from the reference in
+      `src/lib/email/send.ts` and the public PDF route. Pass the reference into
+      the email context instead of reusing `invoiceId` for the URL. The
+      dashboard URL may stay UUID-based (it is not shared with clients); still
+      show the reference there. Decide in the PR whether to switch dashboard
+      URLs too, for consistency.
+- [x] **PDF filename.** Replace the `...${id.slice(-8)}` fallback in
+      `src/lib/invoices/pdf-filename.ts` with the reference, so an invoice
+      without a number still saves with a readable name.
+
+**Part B: show it on every surface**
+
+- [x] **Owner invoice page** (`/invoices/[id]`): a labelled reference with a
+      copy button, next to the owner's invoice number.
+- [x] **Client payment page** (`/invoice/[ref]`): the same label and reference
+      near the heading, quiet enough not to compete with the amount due.
+- [x] **PDF** (`src/lib/invoices/invoice-pdf.tsx`): print it in the header or
+      meta block alongside, not instead of, the owner's invoice number.
+- [x] **Emails.** Add the reference to every invoice template that names the
+      invoice: `invoice_published`, `payment_detected_owner`,
+      `payment_detected_payer`, `payment_confirmed_owner`,
+      `payment_confirmed_payer`, and the overdue templates when v1.4.20 lands.
+      Use one shared row/component so the label and formatting cannot drift.
+      Keep the subject line as it is unless testing shows the reference reads
+      better there; do not make the subject longer.
+- [x] **Invoice list** (`/invoices`): show it in the row, either as a column or
+      under the invoice number. Optional for this item; the required surfaces
+      are the two invoice pages, the emails and the PDF.
+- [x] **Copy affordance.** One click copies the bare reference (no prefix, no
+      URL) and shows the existing "Link copied"-style notice.
+- [x] **Docs.** Update `README.md` and any docs that describe the invoice URL
+      shape.
+
+**Security note.** The reference is an identifier, not a secret. Shortening
+it from a UUID raises the theoretical chance of someone finding an invoice by
+trying references. That is acceptable: private invoices still require the
+access code, wrong guesses are rate-limited (v1.5.2.12-H), and invoices
+without a code are already public by link. Do not weaken either control to
+compensate. At 8 characters with the existing 30 requests per 60 seconds per
+IP limit, enumeration is not practical.
+
+**Tests**
+
+- [x] Format: every generated reference has the agreed length, uses only the
+      Crockford alphabet and is uppercase.
+- [x] Uniqueness: the unique index rejects a duplicate, and the generator
+      retries with a different value.
+- [x] Backfill: every existing invoice has a non-null reference and no two
+      share one (test database first; production at merge).
+- [x] New invoice links in emails contain the reference, not the UUID; the
+      public PDF route builds from the reference.
+- [x] The resolver accepts both forms; an old UUID link opens the same invoice
+      and the access unlock carries across.
+- [x] Owner page, client page, PDF and each email template render the agreed
+      label and the reference.
+- [x] Old UUID links keep working after the migration (regression guard).
+- [x] The copy button writes the bare reference to the clipboard.
+
+**Manual verification**
+
+- [ ] Create and send a test invoice: the email link is short, opens the
+      invoice, and the same reference appears on the page and in the PDF.
+- [ ] Open an invoice using its old UUID link; it still works.
+- [ ] Enter the access code through the old link, then open the new short
+      link; no second code is asked.
+- [ ] Download the PDF with no invoice number set; the filename contains the
+      reference.
+
+**Out of scope**
+
+- Replacing the UUID primary key or changing foreign keys.
+- Sequential or owner-customisable reference numbers; this is an opaque
+  identifier, not a numbering scheme.
+- Replacing the owner's invoice number. The two coexist, and the owner keeps
+  control of their own number.
+- Pretty links (v2.1) and client pages (v2.3). They should consume the
+  reference once it exists, but they are separate items.
+- API changes (v2.8). The API can accept and return the reference when it is
+  built.
+
+**Done when:** every new invoice has a short, unique, human-readable
+reference; every client-facing link, the owner page, the client page, every
+invoice email and the PDF show it under one agreed label; old UUID links still
+resolve; and no UUID appears in a URL or document a client sees.
+
+---
+
 ## Appendix A — Hardening execution detail (folded in from the former HARDENING-ROADMAP.md)
 
 > **`ROADMAP.md` is the single source of truth for sequence.** Every item below

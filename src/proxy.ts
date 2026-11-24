@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { buildCsp, createNonce } from "@/lib/csp";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/invoices"];
 
@@ -8,7 +9,17 @@ function isProtected(path: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request });
+  // v1.5.33 (v1.5.2.24-H): a fresh nonce per request. The policy goes on the
+  // request too, which is where Next reads the nonce for its own scripts.
+  const csp = buildCsp({
+    nonce: createNonce(),
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    isDev: process.env.NODE_ENV === "development",
+  });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("Content-Security-Policy", csp);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy", csp);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
