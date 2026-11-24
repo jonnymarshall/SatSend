@@ -463,6 +463,16 @@ Migration `0025_payment_amount_awareness.sql` (v1.4.19-H — see "Payment amount
 
 ---
 
+## Reporting a security problem
+
+`/.well-known/security.txt` (RFC 9116) points researchers at the Security
+page's "Found a problem?" section. It expires on the date in the file; a unit
+test (`src/security-txt.test.ts`) starts failing two months before, as the
+reminder to renew it. SatSend signs people in by email link. Supabase's password
+route stays technically open (it can't be switched off separately), but every
+new account must confirm its email first, and the integration suites use it on
+the test project.
+
 ## Licence
 
 SatSend is **source available** under the Functional Source License, Version

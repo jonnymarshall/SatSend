@@ -11,6 +11,34 @@
 > below. Open Appendix A when you start a specific hardening item, for its exact
 > steps.
 
+## Launch plan (agreed 2026-11-24)
+
+> **Jonny, 2026-11-24:** Free and Pro **launch together**; multi-currency
+> (v1.5.3-H) is in before launch "so I have max market opportunity"; account
+> deletion is a **button in settings**. Target: Pro built by the end of February
+> 2027, launch **mid March 2027**, gated on the LLC, its EIN, a bank account and
+> the card provider's approval (that paperwork is the critical path, not code).
+> Planning pages: the SatSend Launch Plan and SatSend Launch Team artifacts.
+
+**Order of work** (this overrides the file's top-to-bottom order; each phase
+keeps its own items' order):
+
+1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
+   v1.5.2.24-H stricter CSP, v1.4.25, v1.4.22, v1.4.21, v1.4.26, v1.4.24,
+   v1.4.34 close-out.
+2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
+   multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
+3. **Legal and trust, target 2026-12-31:** v1.5.2.8-H, v1.5.2.7-H,
+   v1.5.2.15-H, v1.5.2.16-H, v1.5.7-H, v1.5.2.20-H, v1.5.2.19-H, v1.5.2.5-H,
+   v1.5.2.6-H.
+4. **Pro, target end of February 2027:** v1.5.5-H and v1.5.6-H decisions,
+   v1.5.2.18-H, v2.0, v1.5.4-H, v2.1, v2.2, v2.3 (and v2.4 to v2.6 if the
+   pricing card keeps promising them; see the note at v2.4).
+5. **Jonny's admin, in parallel from now:** v1.5.0.4-H (DMARC, due), v1.5.8-H
+   (LLC: accountant first), v1.5.2.9-H, Terms inputs, About and Contact text.
+
+After launch: v1.6, v2.7 onward, two-step sign-in (v1.5.2.17-H decision).
+
 ## Product
 
 **SatSend** is Bitcoin-enabled invoicing for freelancers and small businesses.
@@ -918,34 +946,61 @@ payments; that is safe.
 - [ ] Written steps for handling a report (check, switch off, reply, keep a
       record), linked from the Terms' acceptable-use section.
 
-### ⏳ v1.5.2.17-H — Security launch checks (**pre-launch**)
+### ✅ v1.5.2.17-H — Security launch checks (**pre-launch**) · v1.5.32
 
 > From Supabase's security advisor on production (2026-10-27) and the launch
 > security checklist. Small fixes plus settings.
 
-- [ ] **Migration:** revoke `EXECUTE` on `broadcast_invoice_status_change()`
+- [x] **Migration:** revoke `EXECUTE` on `broadcast_invoice_status_change()`
       from `anon` and `authenticated` (it's a trigger function, callable over
       the API today; harmless in practice, but should be closed). Set
       `search_path = ''` on `set_updated_at`, `line_items_valid`,
       `protect_paid_invoice_fields` and `block_non_draft_delete`. Re-run the
       advisor: only the deliberate "RLS on, no policies" notices remain.
-- [ ] **Supabase Auth settings** (Jonny, in the dashboard, Claude lists the
+- [x] **Supabase Auth settings** (Jonny, in the dashboard, Claude lists the
       exact switches): turn **off email + password sign-in** (SatSend only uses
       email links, so a password route is an unused way in; the advisor's
       "leaked password protection" warning then doesn't apply); confirm the
       email-link rate limits and link expiry; production site URL and redirect
       list only.
-- [ ] **Stricter Content-Security-Policy** (deferred from v1.4.24-H): limits
-      which scripts can run, the main defence against script injection stealing
-      a signed-in session. Must allow the live mempool.space and Supabase
-      connections, so test payment updates end to end.
-- [ ] **`/.well-known/security.txt`** pointing at the contact route the
+- [x] **Stricter Content-Security-Policy:** split out to v1.5.2.24-H (a wrong
+      rule silently breaks live payment updates, so it gets its own branch).
+- [x] **`/.well-known/security.txt`** pointing at the contact route the
       Security page names.
-- [ ] **Decide:** optional two-factor sign-in (an authenticator app) for
+- [x] **Decide:** optional two-factor sign-in (an authenticator app) for
       accounts. An email takeover could otherwise change the address on new
       invoices. Recommend: after launch, as its own item.
-- [ ] Add "run the Supabase security advisor" to the `migration-safety` skill's
+- [x] Add "run the Supabase security advisor" to the `migration-safety` skill's
       after-applying steps.
+
+**Shipped in v1.5.32 (2026-11-24):** migration 0040 revokes `EXECUTE` on the
+broadcast trigger function (it still fires: triggers don't need the caller to
+hold EXECUTE, checked on the test DB) and pins `search_path = ''` on the four
+functions. The advisor now shows only the deliberate notices: "RLS enabled, no
+policies" on the four server-only tables and `is_address_registered` for
+signed-in users. **Password sign-in: no change needed.** Supabase has no
+switch that turns off passwords but keeps email links (turning off the Email
+provider kills both). Production's public auth settings show email as the only
+provider and `mailer_autoconfirm: false`, so an account made with a password
+over the API still has to confirm its email first: the same bar as an email
+link. No SatSend user has a password. (The test project's suites sign in with
+passwords, which is why it has to stay available there anyway.)
+`security.txt` points at the Security page's report section until a support
+email exists (v1.5.2.6-H). Two-step sign-in: **after launch**, as its own item.
+
+### ⏳ v1.5.2.24-H — Stricter Content-Security-Policy (**pre-launch**)
+
+> Split out of v1.5.2.17-H. Limits which scripts a page may run, the main
+> defence against injected script stealing a signed-in session.
+
+- [ ] A nonce-based `script-src` (Next.js docs: `node_modules/next/dist/docs/`,
+      Content Security Policy guide). Nonces force dynamic rendering; check the
+      marketing pages' speed afterwards.
+- [ ] `connect-src` allows exactly what the app talks to: Supabase (REST and
+      realtime websocket), mempool.space (REST and websocket), the price feeds.
+- [ ] Prove live payment updates still work end to end on the client's page
+      and the dashboard (the detection e2e suite plus one real look).
+- [ ] Report-only first if in doubt, then enforce.
 
 ### ⏳ v1.5.2.18-H — Commercial hosting, outside services' terms and spending caps (**pre-launch, before Pro**)
 
@@ -1038,7 +1093,10 @@ payments; that is safe.
 
 - [ ] Until built: a support request does it by hand. Document the steps
       (delete the user's invoices, events and email log, then the auth user).
-- [ ] Decide: self-serve "Delete my account" in settings, or support only.
+- [x] Decide: **a "Delete my account" button in settings** (Jonny, 2026-11-24).
+      Type-to-confirm; offer the invoice download first (v1.5.2.20-H); cancels
+      Pro; says clients' invoice links will stop working; keeps only the bare
+      billing records tax law requires.
 - [ ] Decide what happens to invoices a client may still need (warn first; offer
       to export PDFs).
 - [ ] Mention in the privacy policy (v1.5.2.7-H).
@@ -1225,6 +1283,7 @@ resolve; and no UUID appears in a URL or document a client sees.
 
 **Branch:** `v1.5.3/multi-currency`
 
+> **Confirmed for launch (Jonny, 2026-11-24): "max market opportunity".**
 > Moved before launch (Jonny, 2026-10-21): the homepage says "create your invoice
 > in your local currency", which is only true for USD until this ships.
 
@@ -1423,7 +1482,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### 🚫 v2.0: Premium accounts: entitlement + Bitcoin billing (foundation)
+### ⏳ v2.0 — Premium accounts: entitlement + Bitcoin billing (foundation)
+
+> **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
 **Branch:** `v2.0/premium-bitcoin`
 
@@ -1455,7 +1516,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### 🚫 v2.1: Pretty links (owner slug)
+### ⏳ v2.1 — Pretty links (owner slug)
+
+> **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
 **Branch:** `v2.1/pretty-links`
 
@@ -1475,7 +1538,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### 🚫 v2.2: Saved clients + reusable line items
+### ⏳ v2.2 — Saved clients + reusable line items
+
+> **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
 **Branch:** `v2.2/saved-clients`
 
@@ -1500,7 +1565,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### 🚫 v2.3: Client pages
+### ⏳ v2.3 — Client pages
+
+> **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
 **Branch:** `v2.3/client-pages`
 
@@ -1524,6 +1591,11 @@ spam. Four weeks of passing results is the safety margin.
 ---
 
 ### 🚫 v2.4: Custom branding
+
+> **Decision needed (2026-11-24):** the /pricing Pro card promises v2.4
+> (branding), v2.5 (sending from your company name) and v2.6 (reminders). With
+> Free and Pro launching together, either build all three before launch or take
+> them off the card (or mark them "coming soon") until they ship.
 
 **Branch:** `v2.4/custom-branding`
 

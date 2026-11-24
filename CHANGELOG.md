@@ -7,13 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Security
+
+- **v1.5.32 — Security launch checks (roadmap v1.5.2.17-H).** Migration 0040
+  closes the last security-advisor warnings: nobody can call the realtime
+  broadcast trigger function over the API any more (the trigger still fires),
+  and `set_updated_at`, `protect_paid_invoice_fields`, `block_non_draft_delete`
+  and `line_items_valid` now have a fixed, empty `search_path`. Added
+  `/.well-known/security.txt` (RFC 9116), pointing at the Security page's
+  "Found a problem?" section, with a test that fails two months before it
+  expires. The `migration-safety` skill now runs the security advisor after
+  every migration. Password sign-in was reviewed and left as is: Supabase
+  can't turn it off without also turning off email links, and production
+  requires every new account to confirm its email. The stricter Content-Security-Policy
+  moved to its own item, v1.5.2.24-H.
+
+### Changed
+
+- **Roadmap: launch plan (2026-11-24).** Free and Pro launch together (target
+  mid March 2027), multi-currency before launch, account deletion as a settings
+  button. The roadmap now opens with the agreed order of work, and v2.0 to v2.3
+  (Pro) count as launch work.
+
 ### Added
 
 - **v1.5.31 — SatSend reference (roadmap v1.5.2.14-H).** Every invoice has a
   short public reference, shown as "SatSend reference: SS-7K3QX9AB" beside the
   sender's own invoice number on the owner and client invoice pages, the PDF,
-  every invoice email and the invoice list (with a copy button on the owner
-  page). Client links use it: `/invoice/ss-7k3qx9ab` in emails, the PDF, the
+  every invoice email and the invoice list (on the invoice pages, a row styled
+  like the dates). Client links use it: `/invoice/ss-7k3qx9ab` in emails, the PDF, the
   share link, "View public invoice" and every "Copy link". Old UUID links keep
   working, and an access code entered on either link form unlocks both. A
   reference can be typed in any case, with or without `SS-`. Migration 0039:
