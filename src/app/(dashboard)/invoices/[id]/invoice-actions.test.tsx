@@ -220,7 +220,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
     expect(item).not.toHaveAttribute("data-disabled");
   });
 
-  it("renders the 'Sent via email on …' line when send_method='email'", () => {
+  it("no longer repeats 'Sent via email on …' above the buttons (v1.5.35)", () => {
     const invoice = {
       id: "inv-emailed",
       reference: "7K3QX9AB",
@@ -231,10 +231,13 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
       send_method: "email" as const,
     };
     render(<InvoiceActions invoice={invoice} />);
-    expect(screen.getByText(/sent via email on/i)).toBeInTheDocument();
+    // v1.5.35 (roadmap v1.4.22): the activity feed's "Invoice sent" entry says
+    // this; the line above the buttons repeated it.
+    expect(screen.queryByText(/sent via email on/i)).not.toBeInTheDocument();
+    expect(document.getElementById("invoice-actions--delivery-status")).toBeNull();
   });
 
-  it("renders the 'Marked as sent on …' line when send_method='manual'", () => {
+  it("no longer repeats 'Marked as sent on …' above the buttons (v1.5.35)", () => {
     const invoice = {
       id: "inv-manual2",
       reference: "7K3QX9AB",
@@ -245,7 +248,9 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
       send_method: "manual" as const,
     };
     render(<InvoiceActions invoice={invoice} />);
-    expect(screen.getByText(/marked as sent on/i)).toBeInTheDocument();
+    // v1.5.35: the feed's "Marked as sent" entry says this.
+    expect(screen.queryByText(/marked as sent on/i)).not.toBeInTheDocument();
+    expect(document.getElementById("invoice-actions--delivery-status")).toBeNull();
   });
 });
 

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
 import { useState } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
 import { Button, buttonVariants } from "@/components/signal/button";
 import { SendMenu } from "@/components/send-menu";
 import { showNotice } from "@/components/notice";
@@ -80,13 +79,6 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
     }
   }
 
-  const deliveryLine =
-    invoice.sent_at && invoice.send_method
-      ? invoice.send_method === "email"
-        ? `Sent via email on ${format(new Date(invoice.sent_at), "MMM d, yyyy")}`
-        : `Marked as sent on ${format(new Date(invoice.sent_at), "MMM d, yyyy")}`
-      : null;
-
   return (
     <div id="invoice-actions" className="space-y-3">
       {error && (
@@ -107,11 +99,8 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
           {notice}
         </div>
       )}
-      {deliveryLine && (
-        <p id="invoice-actions--delivery-status" className="text-sm text-(--color-text-secondary)">
-          {deliveryLine}
-        </p>
-      )}
+      {/* v1.5.35 (roadmap v1.4.22): no "Sent via email on …" line here; the
+          activity feed's "Invoice sent" / "Marked as sent" entry says it. */}
       <div id="invoice-actions--buttons" className="flex flex-wrap gap-2 sm:gap-3">
         {isDraft && (
           <Link
