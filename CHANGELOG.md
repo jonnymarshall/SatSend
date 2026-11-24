@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **v1.5.33 — Strict Content-Security-Policy (roadmap v1.5.2.24-H).** Every
+  page now tells the browser to run only scripts carrying that request's
+  one-time nonce (plus what they load), and to connect only to SatSend, its
+  Supabase project and mempool.space. Injected script can't run, and couldn't
+  send a session anywhere else if it did. Built in `src/lib/csp.ts`, sent by
+  the proxy with a fresh nonce per request. Checked on a production build:
+  16 pages with no blocked content, both live connections open, and a payment
+  status change reaching an open client page in real time.
+
+### Changed
+
+- **Roadmap:** all six Pro features on the pricing card (v2.0 to v2.6) ship at
+  launch; launch target end of March 2027.
+
+### Security
+
 - **v1.5.32 — Security launch checks (roadmap v1.5.2.17-H).** Migration 0040
   closes the last security-advisor warnings: nobody can call the realtime
   broadcast trigger function over the API any more (the trigger still fires),
