@@ -37,7 +37,7 @@ const PAID: PaymentSummaryInvoice = {
 
 const SAMPLES: [string, PaymentSummaryInvoice][] = [
   ["Payment detected", { ...PAID, status: "payment_detected", amount_received_sats: null, amount_received_fiat: null, payment_confirmed_at: null }],
-  ["Paid (with an Settlement Variance)", PAID],
+  ["Paid (with a Settlement Variance)", PAID],
   ["Underpaid", { ...PAID, status: "underpaid", amount_received_sats: 123_000, amount_received_fiat: 61.5 }],
   ["Overpaid", { ...PAID, overpaid: true, amount_received_sats: 224_000, amount_received_fiat: 112 }],
 ];

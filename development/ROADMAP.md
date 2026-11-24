@@ -1047,7 +1047,17 @@ payments; that is safe.
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
       instead of sideways scrolling. A layout change, so it needs Jonny's decision.
 
-### ⏳ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
+### ✅ v1.5.2.14-H — Short invoice reference in links, invoices, emails and PDFs (**pre-launch**)
+
+**Decisions (Jonny, 2026-11-24):** the label is **"SatSend reference"**; codes
+are 8 characters with an `SS-` prefix, **uppercase on documents**
+(`SS-7K3QX9AB`) and **lowercase in links** (`/invoice/ss-7k3qx9ab`), any case
+accepted; the copy button copies `SS-7K3QX9AB`. **Built differently from the
+plan below:** the database makes the reference (a trigger, migration 0039)
+rather than the app, so every insert path gets one and the migration is safe to
+apply before the merge; the payment-status and quote API routes keep the UUID
+(only the page knows them, it already has the UUID); dashboard URLs stay on the
+UUID. Manual verification: `manual-tests/v1.5.31-satsend-reference.md`.
 
 **Branch:** `v1.5.31/short-invoice-reference` · package `1.5.31` (moved from
 1.5.28 for v1.5.2.21-H, then past v1.5.29 and v1.5.30) · new migration (the next free number when it starts;
@@ -1098,10 +1108,10 @@ so a client cannot mix them up.
 
 **Part A: short reference and short links**
 
-- [ ] **Migration.** Add `invoices.reference text`, nullable at first; backfill
+- [x] **Migration.** Add `invoices.reference text`, nullable at first; backfill
       every existing row; then add a global unique index and `not null`. New
       invoices get a reference at creation. Do not remove or rewrite `id`.
-- [ ] **Format.** Fixed-length uppercase Crockford base32. The alphabet leaves
+- [x] **Format.** Fixed-length uppercase Crockford base32. The alphabet leaves
       out `I`, `L`, `O` and `U`, so it cannot be misread as `1` or `0` when
       read aloud or copied by hand. **Recommended 8 characters** (about 40
       bits): short enough to read aloud, long enough that collisions stay rare
@@ -1110,53 +1120,53 @@ so a client cannot mix them up.
       collision rate and the enumeration rate both rise, so use it only if
       link length matters more than those margins. Confirm 8 versus 10 during
       planning; do not go below 8 without measuring the retry rate.
-- [ ] **Generation.** Server-side from `crypto.randomBytes`, retrying on a
+- [x] **Generation.** Server-side from `crypto.randomBytes`, retrying on a
       `23505` unique violation. Do not derive it from the UUID or from an
       increasing counter: that would leak invoice volume and make references
       predictable.
-- [ ] **Resolver.** One helper (extend `fetchPublicInvoice` or add
+- [x] **Resolver.** One helper (extend `fetchPublicInvoice` or add
       `fetchInvoiceByIdOrReference`) that matches `reference` first and falls
       back to `id`. Uppercase the input before lookup, so a hand-typed
       lowercase reference still works. Every public route uses it:
       `/invoice/[ref]`, `/api/invoice/[ref]/pdf` and
       `/api/invoices/[ref]/payment-status`. UUID links already in clients'
       inboxes keep working; no redirect is needed.
-- [ ] **Access cookie.** Resolve to the invoice's UUID before reading or
+- [x] **Access cookie.** Resolve to the invoice's UUID before reading or
       writing `accessCookieName`, so an invoice unlocked through an old UUID
       link stays unlocked on the new short link, and the other way round.
-- [ ] **Realtime.** Keep the channel keyed on the UUID, not the reference, so
+- [x] **Realtime.** Keep the channel keyed on the UUID, not the reference, so
       the existing subscriptions and broadcast policy do not change.
-- [ ] **Link builders.** Build new public invoice links from the reference in
+- [x] **Link builders.** Build new public invoice links from the reference in
       `src/lib/email/send.ts` and the public PDF route. Pass the reference into
       the email context instead of reusing `invoiceId` for the URL. The
       dashboard URL may stay UUID-based (it is not shared with clients); still
       show the reference there. Decide in the PR whether to switch dashboard
       URLs too, for consistency.
-- [ ] **PDF filename.** Replace the `...${id.slice(-8)}` fallback in
+- [x] **PDF filename.** Replace the `...${id.slice(-8)}` fallback in
       `src/lib/invoices/pdf-filename.ts` with the reference, so an invoice
       without a number still saves with a readable name.
 
 **Part B: show it on every surface**
 
-- [ ] **Owner invoice page** (`/invoices/[id]`): a labelled reference with a
+- [x] **Owner invoice page** (`/invoices/[id]`): a labelled reference with a
       copy button, next to the owner's invoice number.
-- [ ] **Client payment page** (`/invoice/[ref]`): the same label and reference
+- [x] **Client payment page** (`/invoice/[ref]`): the same label and reference
       near the heading, quiet enough not to compete with the amount due.
-- [ ] **PDF** (`src/lib/invoices/invoice-pdf.tsx`): print it in the header or
+- [x] **PDF** (`src/lib/invoices/invoice-pdf.tsx`): print it in the header or
       meta block alongside, not instead of, the owner's invoice number.
-- [ ] **Emails.** Add the reference to every invoice template that names the
+- [x] **Emails.** Add the reference to every invoice template that names the
       invoice: `invoice_published`, `payment_detected_owner`,
       `payment_detected_payer`, `payment_confirmed_owner`,
       `payment_confirmed_payer`, and the overdue templates when v1.4.20 lands.
       Use one shared row/component so the label and formatting cannot drift.
       Keep the subject line as it is unless testing shows the reference reads
       better there; do not make the subject longer.
-- [ ] **Invoice list** (`/invoices`): show it in the row, either as a column or
+- [x] **Invoice list** (`/invoices`): show it in the row, either as a column or
       under the invoice number. Optional for this item; the required surfaces
       are the two invoice pages, the emails and the PDF.
-- [ ] **Copy affordance.** One click copies the bare reference (no prefix, no
+- [x] **Copy affordance.** One click copies the bare reference (no prefix, no
       URL) and shows the existing "Link copied"-style notice.
-- [ ] **Docs.** Update `README.md` and any docs that describe the invoice URL
+- [x] **Docs.** Update `README.md` and any docs that describe the invoice URL
       shape.
 
 **Security note.** The reference is an identifier, not a secret. Shortening
@@ -1169,20 +1179,20 @@ IP limit, enumeration is not practical.
 
 **Tests**
 
-- [ ] Format: every generated reference has the agreed length, uses only the
+- [x] Format: every generated reference has the agreed length, uses only the
       Crockford alphabet and is uppercase.
-- [ ] Uniqueness: the unique index rejects a duplicate, and the generator
+- [x] Uniqueness: the unique index rejects a duplicate, and the generator
       retries with a different value.
-- [ ] Backfill: every existing invoice has a non-null reference and no two
+- [x] Backfill: every existing invoice has a non-null reference and no two
       share one (test database first; production at merge).
-- [ ] New invoice links in emails contain the reference, not the UUID; the
+- [x] New invoice links in emails contain the reference, not the UUID; the
       public PDF route builds from the reference.
-- [ ] The resolver accepts both forms; an old UUID link opens the same invoice
+- [x] The resolver accepts both forms; an old UUID link opens the same invoice
       and the access unlock carries across.
-- [ ] Owner page, client page, PDF and each email template render the agreed
+- [x] Owner page, client page, PDF and each email template render the agreed
       label and the reference.
-- [ ] Old UUID links keep working after the migration (regression guard).
-- [ ] The copy button writes the bare reference to the clipboard.
+- [x] Old UUID links keep working after the migration (regression guard).
+- [x] The copy button writes the bare reference to the clipboard.
 
 **Manual verification**
 
