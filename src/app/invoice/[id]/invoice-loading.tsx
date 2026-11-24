@@ -1,6 +1,7 @@
 import { Spinner } from "@/components/signal/spinner";
 
-export default function Loading() {
+/** The spinner shown while the bitcoin price loads (v1.5.30: no longer a route-level loading.tsx, which forced a 200 on unknown links). */
+export function InvoiceLoading() {
   return (
     <div
       id="invoice-loading"
