@@ -24,7 +24,7 @@
 keeps its own items' order):
 
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
-   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25, v1.4.22, v1.4.21, v1.4.26, v1.4.24,
+   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22, v1.4.21, v1.4.26, v1.4.24,
    v1.4.34 close-out.
 2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
    multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
@@ -460,7 +460,7 @@ The list already has one example of the right pattern: **"Send via email"** is g
 
 ---
 
-### ⏳ v1.4.25 — Duplicate Invoice: No Phantom Draft, No `NEXT_REDIRECT` Dialog
+### ✅ v1.4.25 — Duplicate Invoice: No Phantom Draft, No `NEXT_REDIRECT` Dialog · v1.5.34
 
 **Branch:** `v1.4.25/duplicate-invoice-cleanup`
 
@@ -470,16 +470,30 @@ The list already has one example of the right pattern: **"Send via email"** is g
 2. **`NEXT_REDIRECT` error dialog flashes** during the duplicate action even though the redirect itself works. This is the standard Next.js Server-Action `redirect()` semantics — the throw is meant to be caught silently by the framework, but something in the row-action handler or a global error boundary is surfacing it. Likely auto-fixes when item 1 lands, since the new flow uses a client-side `router.push` rather than a server-side `redirect()`.
 
 **Scope**
-- [ ] Refactor: `duplicateInvoice` no longer INSERTs. Recommended shape — `/invoices/new?from=<source-id>` query param. The new-invoice page server-loads the source (with auth check), passes its sanitised fields as `initialValues` to the existing `<InvoiceForm>`, no server action involved. Sanitisation matches the old action: `btc_address=null`, `btc_txid=null`, `status='draft'`, `invoice_number` via `buildDuplicateInvoiceNumber()` (already constraint-safe per v1.4.16).
-- [ ] Row-action handler in `/invoices` swaps `duplicateInvoice(id)` for a client-side `router.push('/invoices/new?from=<id>')`.
-- [ ] Verify the `NEXT_REDIRECT` dialog is gone. If anything else still surfaces it (e.g. a global toast), filter via `isRedirectError(e)` from `next/navigation`.
+- [x] Refactor: `duplicateInvoice` no longer INSERTs. Recommended shape — `/invoices/new?from=<source-id>` query param. The new-invoice page server-loads the source (with auth check), passes its sanitised fields as `initialValues` to the existing `<InvoiceForm>`, no server action involved. Sanitisation matches the old action: `btc_address=null`, `btc_txid=null`, `status='draft'`, `invoice_number` via `buildDuplicateInvoiceNumber()` (already constraint-safe per v1.4.16).
+- [x] Row-action handler in `/invoices` swaps `duplicateInvoice(id)` for a client-side `router.push('/invoices/new?from=<id>')`.
+- [x] Verify the `NEXT_REDIRECT` dialog is gone. If anything else still surfaces it (e.g. a global toast), filter via `isRedirectError(e)` from `next/navigation`.
 
 **Tests**
-- [ ] Clicking duplicate from `/invoices` writes ZERO rows to the `invoices` table. Navigating to `/invoices/new?from=<id>`, populating the form, then closing the tab leaves the DB unchanged.
-- [ ] `/invoices/new?from=<id>` renders a pre-filled `<InvoiceForm>` (minus `btc_address` and `btc_txid`).
-- [ ] Manual: no `NEXT_REDIRECT` error dialog or console noise during the duplicate flow.
+- [x] Clicking duplicate from `/invoices` writes ZERO rows to the `invoices` table. Navigating to `/invoices/new?from=<id>`, populating the form, then closing the tab leaves the DB unchanged.
+- [x] `/invoices/new?from=<id>` renders a pre-filled `<InvoiceForm>` (minus `btc_address` and `btc_txid`).
+- [x] Manual: no `NEXT_REDIRECT` error dialog or console noise during the duplicate flow.
 
 **Done when:** duplicating an invoice and then clicking Cancel leaves zero rows in the database; the `NEXT_REDIRECT` UI artifact is gone.
+
+**Shipped in v1.5.34 (2026-11-24):** Duplicate opens `/invoices/new?from=<id>`
+(a link on the invoice page, `router.push` in the list); the page loads the
+source only if it's the signed-in sender's (`eq user_id`, plus RLS) and fills
+the form via `duplicateFormValues` (`src/lib/invoices/duplicate.ts`, which now
+holds `buildDuplicateInvoiceNumber`). `duplicateInvoice` is removed, so there's
+no INSERT and no `redirect()` to surface as `NEXT_REDIRECT`. A line "A copy of
+INV-0043. Nothing is saved until you save it." sits under the heading.
+**Also fixed (found while testing):** due dates moved by a day in the form.
+The edit page (and now the copy) showed the day before for anyone west of UTC,
+and saving used `toISOString()`, which saved the day before anywhere east of
+UTC, the UK in summer included. New `src/lib/date-only.ts`; tests pass under
+America/Los_Angeles, Europe/London, Pacific/Auckland and UTC. Due dates saved
+before this may be a day early if they were picked in summer in the UK.
 
 ---
 
