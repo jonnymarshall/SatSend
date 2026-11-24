@@ -40,6 +40,10 @@ description: Safety checklist for authoring and applying Supabase migrations. Us
 - Before production, run the validation queries by hand to confirm existing data
   will pass the new constraints.
 - After applying, confirm the object exists and the grants are correct.
+- Then run Supabase's **security advisor** on the same database (MCP
+  `get_advisors`, type `security`). Only the deliberate notices may remain:
+  "RLS enabled, no policies" on server-only tables, and `is_address_registered`
+  callable by signed-in users. Anything new is fixed before the PR (v1.5.32).
 
 ## Trigger
 
