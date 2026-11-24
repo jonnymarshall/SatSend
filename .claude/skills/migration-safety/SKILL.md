@@ -29,8 +29,14 @@ description: Safety checklist for authoring and applying Supabase migrations. Us
 
 - **Test database first, same session** (`npx supabase db push`) — the integration
   suites need it.
-- **Production at merge**, via the Supabase MCP `apply_migration` tool. This is the
-  agent's job, not deferred (AGENTS.md environment-rules).
+- **Production just before the merge**, via the Supabase MCP `apply_migration`
+  tool, once the PR is approved, for an additive migration (new tables, nullable
+  columns, functions). Merging deploys within minutes, so applying it after the
+  merge leaves new code running against the old database (v1.5.29: about five
+  hours, because the MCP was signed out). Check the MCP is connected first
+  (`list_migrations`). A destructive or non-additive migration needs an agreed
+  order instead. This is the agent's job, not deferred (AGENTS.md
+  environment-rules).
 - Before production, run the validation queries by hand to confirm existing data
   will pass the new constraints.
 - After applying, confirm the object exists and the grants are correct.

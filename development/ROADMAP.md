@@ -759,7 +759,7 @@ Tolerance**, always; the sums-box row is the **Settlement Variance** (was
 
 ---
 
-### ⏳ v1.5.2.23-H — Unknown invoice links answer 404 (**pre-launch**, small)
+### ✅ v1.5.2.23-H — Unknown invoice links answer 404 (**pre-launch**, small)
 
 **Branch:** `v1.5.30/unknown-invoice-404` · package `1.5.30` (Jonny, 2026-10-28:
 straight after v1.5.2.22-H). The short invoice reference (v1.5.2.14-H) moves to 1.5.31.
@@ -769,7 +769,15 @@ link (`/invoice/<made-up id>`) shows the "not found" page but answers with
 HTTP 200, so search engines could index it as a real page. The page calls
 `notFound()`; the status is probably lost to streaming.
 
-- [ ] Make an unknown invoice answer 404 (and keep the not-found page).
+**Cause (confirmed 2026-11-24):** the route's `loading.tsx` started streaming
+the response (status 200 already sent) before `notFound()` ran. Next.js then
+adds `<meta name="robots" content="noindex">`, so search engines were already
+kept away; the fix is for correctness (link checkers, monitors, analytics).
+
+- [x] Make an unknown invoice answer 404 (and keep the not-found page): the
+      route-level `loading.tsx` is gone; the page looks the invoice up and checks
+      the access code before the response starts, and the spinner wraps only the
+      bitcoin price lookup (`Suspense`). Malformed ids answer 404 too.
 - [ ] Test: a made-up id returns 404 on satsend.me after deploy.
 
 ---

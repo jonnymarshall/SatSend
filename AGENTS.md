@@ -18,9 +18,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   `.env.local` at the production database.
 - **Never deploy a preview or branch environment that shares the production
   database** — its cron could write to live data.
-- **Migrations are applied by the agent, not deferred.** After a migration merges,
-  apply it to the owning database in the same session: test via
-  `npx supabase db push`, production via the Supabase MCP `apply_migration` tool.
+- **Migrations are applied by the agent, not deferred.** Apply each migration to
+  the owning database in the same session: test via `npx supabase db push` before
+  the PR, production via the Supabase MCP `apply_migration` tool just before the
+  merge (additive migrations; see the project brief below).
   Production once drifted two releases behind because this was left as a manual
   step.
 <!-- END:environment-rules -->
@@ -37,7 +38,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Before opening a PR:** run the `pre-merge-verification` skill. Bump the version
   **on the branch** (`package.json` = branch version); tag **on merge**.
 - **Migrations:** apply to the **test** database before the PR (`npx supabase db
-  push`); apply to **production at merge** (Supabase MCP `apply_migration`). Never
+  push`). Apply to **production just before the merge** (Supabase MCP
+  `apply_migration`), once the PR is approved and only if the migration is
+  additive (new tables, nullable columns, functions: the old code ignores them).
+  Merging deploys within minutes, so "after merge" always leaves production
+  running new code against an old database; v1.5.29 ran that way for about five
+  hours because the MCP was signed out. Check the MCP is connected first. A
+  destructive or non-additive migration needs an agreed order instead. Never
   defer (see the environment rules above).
 - **Versions** come from `development/ROADMAP.md`. Never re-implement an item
   marked SUPERSEDED.

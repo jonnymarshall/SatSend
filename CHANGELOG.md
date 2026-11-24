@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.30 — Unknown invoice links answer 404 (roadmap v1.5.2.23-H).** A link
+  to an invoice that doesn't exist (`/invoice/<made-up id>`, or a malformed id)
+  showed the not-found page but answered HTTP 200, because the route's
+  `loading.tsx` started streaming the response before the page could call
+  `notFound()`. The route-level `loading.tsx` is gone: the page now looks up the
+  invoice and checks the access code before the response starts, and the
+  spinner (`invoice-loading.tsx`) wraps only the slow part, the bitcoin price
+  lookup, in a `Suspense` boundary. Unknown links now answer 404; real invoices
+  and the access-code screen are unchanged.
+- **AGENTS.md:** an additive production migration is now applied just before
+  the PR is merged, not after: merging deploys within minutes, and v1.5.29's
+  code ran for about five hours against a production database without
+  migration 0038.
+
 ### Changed
 
 - **v1.5.29 — Locked quotes and a tighter Slippage Tolerance (roadmap v1.5.2.22-H).**
