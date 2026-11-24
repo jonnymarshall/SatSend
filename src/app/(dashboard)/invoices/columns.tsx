@@ -16,6 +16,7 @@ import {
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
 import type { InvoiceSummaryRow } from "@/lib/invoice-public";
+import { REFERENCE_LABEL, formatReference, publicInvoicePath } from "@/lib/invoices/reference";
 
 // Derived from the generated types (v1.4.27-H). The table reads the
 // invoice_email_summary view; it only renders this subset.
@@ -23,6 +24,7 @@ export type InvoiceRow = Pick<
   InvoiceSummaryRow,
   | "id"
   | "invoice_number"
+  | "reference"
   | "client_name"
   | "client_email"
   | "total_fiat"
@@ -47,7 +49,8 @@ export interface RowActions {
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
   onDelete: (id: string) => void;
-  onCopyPublicLink: (id: string) => void;
+  /** Copies the client's short link (v1.5.31: by SatSend reference). */
+  onCopyPublicLink: (invoice: { reference: string }) => void;
   onDuplicate: (id: string) => void;
 }
 
@@ -94,12 +97,21 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
       cell: ({ row }) => {
         const invoice = row.original;
         return (
-          <Link
-            href={`/invoices/${invoice.id}`}
-            className="proxy-id--invoice-row--number-link inline-flex min-h-11 items-center font-semibold md:min-h-0 text-(--color-ink) underline-offset-4 decoration-(--color-brand) decoration-2 hover:underline"
-          >
-            {invoice.invoice_number || "—"}
-          </Link>
+          <div className="proxy-id--invoice-row--number">
+            <Link
+              href={`/invoices/${invoice.id}`}
+              className="proxy-id--invoice-row--number-link inline-flex min-h-11 items-center font-semibold md:min-h-0 text-(--color-ink) underline-offset-4 decoration-(--color-brand) decoration-2 hover:underline"
+            >
+              {invoice.invoice_number || "—"}
+            </Link>
+            {/* v1.5.31: the SatSend reference, under the sender's own number. */}
+            <span
+              className="proxy-id--invoice-row--reference block font-mono text-xs tracking-wide text-(--color-text-secondary)"
+              title={REFERENCE_LABEL}
+            >
+              {formatReference(invoice.reference)}
+            </span>
+          </div>
         );
       },
     },
@@ -252,8 +264,8 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
               )}
               {!isDraft && (
                 <>
-                  <DropdownMenuItem render={<Link href={`/invoice/${invoice.id}`} target="_blank">View public invoice</Link>} />
-                  <DropdownMenuItem onClick={() => actions.onCopyPublicLink(invoice.id)}>
+                  <DropdownMenuItem render={<Link href={publicInvoicePath(invoice)} target="_blank">View public invoice</Link>} />
+                  <DropdownMenuItem onClick={() => actions.onCopyPublicLink(invoice)}>
                     Copy public link
                   </DropdownMenuItem>
                   <DropdownMenuItem render={<a href={pdfHref(`/api/invoices/${invoice.id}/pdf`, Intl.DateTimeFormat().resolvedOptions().timeZone)} download>Download PDF</a>} />

@@ -29,6 +29,7 @@ const ownerInvoice = {
   id: "inv-1",
   user_id: "owner-1",
   invoice_number: "INV-DL-001",
+  reference: "7K3QX9AB",
   your_name: "Sender",
   your_email: "s@example.com",
   your_company: null,
@@ -106,7 +107,7 @@ describe("GET /api/invoices/[id]/pdf", () => {
     expect(disposition).toContain('filename="Sender_INV-DL-001_20260420.pdf"');
   });
 
-  it("falls back to the short id when invoice_number is null (UTF-8 encoded for the unicode ellipsis)", async () => {
+  it("falls back to the SatSend reference when invoice_number is null (v1.5.31)", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: { id: "owner-1" } } });
     mockSingle.mockResolvedValueOnce({
       data: { ...ownerInvoice, invoice_number: null, id: "abcd1234efgh5678ijkl9012mnop3456" },
@@ -115,8 +116,7 @@ describe("GET /api/invoices/[id]/pdf", () => {
 
     const res = await getRequest("inv-1");
     const disposition = res.headers.get("content-disposition") ?? "";
-    expect(disposition).toContain("filename*=UTF-8''Sender_%E2%80%A6mnop3456_20260420.pdf");
-    expect(disposition).toContain('filename="Sender__mnop3456_20260420.pdf"');
+    expect(disposition).toContain('filename="Sender_SS-7K3QX9AB_20260420.pdf"');
   });
 
   it("falls back to the authenticated user's email when invoice has no your_company/your_name/your_email", async () => {

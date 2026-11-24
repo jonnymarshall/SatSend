@@ -118,7 +118,7 @@ describe("renderInvoicePdf", () => {
   it("includes the public invoice URL built from the supplied appUrl, labelled 'View and pay online'", async () => {
     const text = await textFromPdf(baseInvoice, "https://satsend.app");
     expect(text).toContain("View and pay online");
-    expect(text).toContain("https://satsend.app/invoice/inv-id-1");
+    expect(text).toContain("https://satsend.app/invoice/ss-7k3qx9ab");
   });
 
   it("explains that the QR code does not encode an amount and points the payer to the public link", async () => {
@@ -173,9 +173,18 @@ describe("renderInvoicePdf — Signal Amber layout (v1.5.5)", () => {
     }
   });
 
+  // v1.5.31: the SatSend reference sits beside, not instead of, the invoice number.
+  it("shows the SatSend reference beside the invoice number, and never the UUID", async () => {
+    const text = await textFromPdf(baseInvoice, "https://satsend.app");
+    expect(text).toContain("SatSend reference");
+    expect(text).toContain("SS-7K3QX9AB");
+    expect(text).toContain(baseInvoice.invoice_number!);
+    expect(text).not.toContain(baseInvoice.id);
+  });
+
   it("keeps the payment link on invoices without a bitcoin address", async () => {
     const text = await textFromPdf({ ...baseInvoice, btc_address: null }, "https://satsend.app");
-    expect(text).toContain("https://satsend.app/invoice/inv-id-1");
+    expect(text).toContain("https://satsend.app/invoice/ss-7k3qx9ab");
   });
 });
 

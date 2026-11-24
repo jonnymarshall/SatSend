@@ -22,9 +22,12 @@ import {
 } from "../actions";
 import { bulkArchive, bulkDelete, bulkUnarchive } from "../bulk-actions";
 import type { Database } from "@/lib/database.types";
+import { publicInvoicePath } from "@/lib/invoices/reference";
 
 interface Invoice {
   id: string;
+  /** The SatSend reference (v1.5.31), for the client's link. */
+  reference: string;
   status: Database["public"]["Enums"]["invoice_status"];
   due_date?: string | null;
   client_email?: string | null;
@@ -124,7 +127,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {!isDraft && (
           <Link
             id="invoice-actions--view-public-button"
-            href={`/invoice/${invoice.id}`}
+            href={publicInvoicePath(invoice)}
             target="_blank"
             className={buttonVariants({ variant: "secondary" })}
           >
@@ -193,7 +196,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
                   setError(res.message);
                   return;
                 }
-                copy.provide(clientInvoiceUrl(id, window.location.origin));
+                copy.provide(clientInvoiceUrl(res.data, window.location.origin));
                 showNotice((await copy.copied) ? "Link copied" : "Marked as sent. Copy the link from View public invoice.");
               });
             }}

@@ -25,6 +25,7 @@ const publishedInvoice = {
   id: "inv-1",
   user_id: "owner-1",
   invoice_number: "INV-PUB-001",
+  reference: "7K3QX9AB",
   your_name: "Sender",
   your_email: "s@example.com",
   your_company: null,

@@ -444,9 +444,13 @@ export async function publishAndSendEmail(
 export async function publishAndMarkSent(
   invoiceId: string,
   opts: { withDownload?: boolean } = {},
-): Promise<ActionResult<{ downloadUrl?: string }>> {
+): Promise<ActionResult<{ downloadUrl?: string; reference: string }>> {
   const { supabase, invoice } = await loadAndAuthorise(invoiceId);
-  const download = opts.withDownload ? { downloadUrl: `/api/invoices/${invoiceId}/pdf` } : {};
+  // v1.5.31: the reference, so "Copy link and mark as sent" copies the short link.
+  const download = {
+    reference: invoice.reference,
+    ...(opts.withDownload ? { downloadUrl: `/api/invoices/${invoiceId}/pdf` } : {}),
+  };
   // Already sent: the first sent date stands, and there's nothing to log.
   if (invoice.status !== "draft" && invoice.sent_at) return { ok: true, data: download };
 

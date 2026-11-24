@@ -1,3 +1,4 @@
+import { publicInvoicePath } from "./reference";
 /*
  * What the Send buttons say afterwards (v1.5.19), shared by the invoice page,
  * the invoice list and the editor. An invoice is a draft or it's sent: if an
@@ -42,7 +43,7 @@ export function emailOutcomeMessage(
   }
 }
 
-/** The page your client opens to view and pay. */
-export function clientInvoiceUrl(invoiceId: string, origin: string): string {
-  return `${origin}/invoice/${invoiceId}`;
+/** The page your client opens to view and pay: by SatSend reference (v1.5.31). */
+export function clientInvoiceUrl(invoice: { reference: string }, origin: string): string {
+  return `${origin}${publicInvoicePath(invoice)}`;
 }

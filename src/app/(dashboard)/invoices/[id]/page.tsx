@@ -14,6 +14,7 @@ import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { getAppUrl } from "@/lib/app-url";
 import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
+import { REFERENCE_LABEL, formatReference, publicInvoicePath } from "@/lib/invoices/reference";
 
 const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
@@ -46,7 +47,8 @@ export default async function InvoiceDetailPage({
       ? emailOutcomeMessage(emailParam, { wasDraft: true, clientEmail: invoice.client_email }).text
       : null;
   const appUrl = getAppUrl();
-  const shareLink = `${appUrl}/invoice/${invoice.id}`;
+  // v1.5.31: the client's link uses the SatSend reference.
+  const shareLink = `${appUrl}${publicInvoicePath(invoice)}`;
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";
   const money = (n: number | string | null) => `$${Number(n).toFixed(2)}`;
@@ -62,6 +64,15 @@ export default async function InvoiceDetailPage({
             <h1 id="invoice-detail--heading" className="font-display tracking-heading text-[28px] leading-tight font-bold break-words md:text-[32px]">
               {invoice.invoice_number || "Invoice"}
             </h1>
+            {/* v1.5.31: the SatSend reference, beside (not instead of) the
+                sender's own invoice number; one click copies it. */}
+            <div id="invoice-detail--reference" className="flex items-center gap-1.5 text-[15px] text-(--color-text-secondary)">
+              <span id="invoice-detail--reference-label">{REFERENCE_LABEL}</span>
+              <span id="invoice-detail--reference-code" className="font-mono font-medium tracking-wide text-(--color-ink)">
+                {formatReference(invoice.reference)}
+              </span>
+              <CopyButton text={formatReference(invoice.reference)} label={`Copy ${REFERENCE_LABEL}`} />
+            </div>
             {invoice.client_email && (
               <p id="invoice-detail--client-email" className="text-[15px] text-(--color-text-secondary)">{invoice.client_email}</p>
             )}

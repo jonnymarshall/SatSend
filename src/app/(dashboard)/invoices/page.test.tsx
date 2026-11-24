@@ -20,6 +20,7 @@ const MOCK_INVOICES = [
   {
     id: "1",
     invoice_number: "INV-001",
+    reference: "7K3QX9AB",
     client_name: "Acme Corp",
     total_fiat: 2500,
     currency: "USD",
@@ -30,6 +31,7 @@ const MOCK_INVOICES = [
   {
     id: "2",
     invoice_number: "INV-002",
+    reference: "7K3QX9AB",
     client_name: "Globex",
     total_fiat: 500,
     currency: "USD",

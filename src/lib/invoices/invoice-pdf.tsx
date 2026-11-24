@@ -26,6 +26,7 @@ import {
   type PaymentState,
 } from "./payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
+import { REFERENCE_LABEL, formatReference, publicInvoicePath } from "./reference";
 import { WORDMARK_DOMAIN_PATH, WORDMARK_NAME_PATH, WORDMARK_VIEWBOX } from "@/lib/brand/wordmark-paths";
 
 /*
@@ -85,6 +86,9 @@ const styles = StyleSheet.create({
   // Same size as the "Pay with Bitcoin" panel title (Jonny's review).
   invoiceNumber: { fontFamily: "Onest", fontWeight: 700, fontSize: 13, marginTop: 2 },
   headerLink: { marginTop: 8, fontSize: 9 },
+  // v1.5.31: the SatSend reference, under the sender's own invoice number.
+  reference: { fontSize: 9, marginTop: 4, color: C.textSecondary },
+  referenceCode: { fontWeight: 600, color: C.ink },
 
   summary: {
     flexDirection: "row",
@@ -330,6 +334,9 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl, timeZone }: RenderProp
           <View style={styles.headerRight}>
             <Text style={styles.eyebrow}>Invoice</Text>
             {invoice.invoice_number ? <Text style={styles.invoiceNumber}>{invoice.invoice_number}</Text> : null}
+            <Text style={styles.reference}>
+              {REFERENCE_LABEL} <Text style={styles.referenceCode}>{formatReference(invoice.reference)}</Text>
+            </Text>
             <View style={[styles.linkWrap, styles.headerLink]}>
               <Link src={publicUrl} style={styles.link}>
                 View invoice on SatSend
@@ -457,7 +464,8 @@ export interface RenderInvoicePdfOptions {
 }
 
 export async function renderInvoicePdf(invoice: Invoice, opts: RenderInvoicePdfOptions): Promise<Buffer> {
-  const publicUrl = `${opts.appUrl.replace(/\/$/, "")}/invoice/${invoice.id}`;
+  // v1.5.31: the client's link uses the SatSend reference.
+  const publicUrl = `${opts.appUrl.replace(/\/$/, "")}${publicInvoicePath(invoice)}`;
   const qrDataUrl = invoice.btc_address
     ? await QRCode.toDataURL(`bitcoin:${invoice.btc_address}`, {
         margin: 0,

@@ -106,3 +106,59 @@ revoke all on function public.set_invoice_reference() from public, anon, authent
 create trigger set_invoice_reference_trigger
   before insert or update of reference on public.invoices
   for each row execute function public.set_invoice_reference();
+
+-- The invoice list reads invoice_email_summary, whose columns were fixed when
+-- it was made, so it gets the reference too. CREATE OR REPLACE may only add
+-- columns at the end; the definition is otherwise unchanged (security_invoker
+-- kept, so RLS still applies to whoever reads it; grants are preserved).
+create or replace view public.invoice_email_summary with (security_invoker = on) as
+ SELECT i.id,
+    i.user_id,
+    i.client_name,
+    i.client_email,
+    i.line_items,
+    i.subtotal_fiat,
+    i.tax_fiat,
+    i.total_fiat,
+    i.currency,
+    i.btc_address,
+    i.status,
+    i.access_code,
+    i.due_date,
+    i.created_at,
+    i.updated_at,
+    i.invoice_number,
+    i.tax_percent,
+    i.your_name,
+    i.your_email,
+    i.your_company,
+    i.your_address,
+    i.your_tax_id,
+    i.client_company,
+    i.client_address,
+    i.client_tax_id,
+    i.btc_txid,
+    i.pre_archive_status,
+    i.next_check_at,
+    i.mempool_seen_at,
+    i.stage_attempt,
+    i.sent_at,
+    i.send_method,
+    i.email_attempted_at,
+    i.amount_received_sats,
+    i.btc_price_at_detection,
+    i.amount_received_fiat,
+    i.overpaid,
+    i.published_at,
+    e.status AS last_publish_email_status,
+    e.error_message AS last_publish_email_error,
+    e.created_at AS last_publish_email_at,
+    i.reference
+   FROM public.invoices i
+     LEFT JOIN LATERAL ( SELECT email_events.status,
+            email_events.error_message,
+            email_events.created_at
+           FROM public.email_events
+          WHERE email_events.invoice_id = i.id AND email_events.email_type = 'invoice_published'::public.email_type
+          ORDER BY email_events.created_at DESC
+         LIMIT 1) e ON true;
