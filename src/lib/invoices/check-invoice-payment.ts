@@ -38,10 +38,11 @@ export type CheckableInvoice = Pick<
   | "your_company"
   | "your_email"
   | "btc_price_at_seen"
+  | "reference"
 > & { status: "pending" | "payment_detected" | "overdue"; btc_address: string };
 
 export const CHECKABLE_COLUMNS =
-  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_company, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email, btc_price_at_seen";
+  "id, user_id, btc_address, status, mempool_seen_at, published_at, stage_attempt, invoice_number, client_name, client_company, client_email, total_fiat, currency, btc_txid, your_name, your_company, your_email, btc_price_at_seen, reference";
 
 export const CHECKABLE_STATUSES = ["pending", "payment_detected", "overdue"] as const;
 
@@ -236,6 +237,7 @@ export async function checkInvoicePayment(
           payerEmail: inv.client_email || null,
           userId: inv.user_id,
           invoiceId: inv.id,
+          reference: inv.reference,
           invoiceNumber: inv.invoice_number,
           senderName: inv.your_name || inv.your_company || inv.your_email || "SatSend user",
           clientName: inv.client_name || "your client",

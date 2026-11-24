@@ -67,10 +67,11 @@ async function main() {
         audience,
         payment,
         invoiceNumber: "INV-SAMPLE",
+        reference: "7K3QX9AB",
         btcAddress: ADDRESS,
         txid: TXID,
         mempoolUrl: mempoolTxUrl(TXID),
-        actionUrl: `${getAppUrl()}/${audience === "client" ? "invoice" : "invoices"}/sample`,
+        actionUrl: `${getAppUrl()}/${audience === "client" ? "invoice/ss-7k3qx9ab" : "invoices/sample"}`,
       });
       const { error } = await resend.emails.send({
         from: getFromAddress(),

@@ -6,6 +6,7 @@ import { LOGO_ATTACHMENT } from "./logo-inline";
 import { statusIconAttachment } from "./status-icons-inline";
 import { paymentState, type PaymentAudience, type PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
+import { publicInvoicePath } from "@/lib/invoices/reference";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 
@@ -175,6 +176,8 @@ export interface SendInvoicePublishedArgs {
   senderName: string;
   clientName: string;
   invoiceId: string;
+  /** The SatSend reference, bare (v1.5.31): the client's link and the email use it. */
+  reference: string;
   invoiceNumber: string | null;
   totalFiat: number;
   currency: string;
@@ -204,8 +207,9 @@ export async function sendInvoicePublishedEmail(args: SendInvoicePublishedArgs):
           senderName: args.senderName,
           clientName: args.clientName,
           invoiceNumber: args.invoiceNumber,
+          reference: args.reference,
           totalDisplay: fmtCurrency(args.totalFiat, args.currency),
-          invoiceUrl: `${getAppUrl()}/invoice/${args.invoiceId}`,
+          invoiceUrl: `${getAppUrl()}${publicInvoicePath(args)}`,
           accessCode: args.accessCode,
           dueDateDisplay: args.dueDateDisplay,
         }),
@@ -219,6 +223,8 @@ export interface SendPaymentStatusArgs {
   payerEmail: string | null;
   userId: string;
   invoiceId: string;
+  /** The SatSend reference, bare (v1.5.31). */
+  reference: string;
   invoiceNumber: string | null;
   senderName: string;
   clientName: string;
@@ -243,11 +249,14 @@ function paymentMessage(args: SendPaymentStatusArgs, audience: PaymentAudience, 
       audience,
       payment: args.payment,
       invoiceNumber: args.invoiceNumber,
+      reference: args.reference,
       btcAddress: args.btcAddress,
       txid: args.txid,
       mempoolUrl: mempoolTxUrl(args.txid),
       actionUrl:
-        audience === "client" ? `${getAppUrl()}/invoice/${args.invoiceId}` : `${getAppUrl()}/invoices/${args.invoiceId}`,
+        // The client's link uses the SatSend reference (v1.5.31); the sender's
+        // goes to their dashboard, which stays on the UUID.
+        audience === "client" ? `${getAppUrl()}${publicInvoicePath(args)}` : `${getAppUrl()}/invoices/${args.invoiceId}`,
     }),
   });
 }

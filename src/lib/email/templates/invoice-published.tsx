@@ -1,9 +1,12 @@
-import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, Panel, PanelRow } from "./layout";
+import { EmailButton, EmailHeading, EmailLayout, EmailLink, EmailText, Panel, PanelRow, ReferenceCode } from "./layout";
+import { REFERENCE_LABEL } from "@/lib/invoices/reference";
 
 export interface InvoicePublishedProps {
   senderName: string;
   clientName: string;
   invoiceNumber: string | null;
+  /** The SatSend reference, bare (v1.5.31). */
+  reference: string;
   totalDisplay: string;
   invoiceUrl: string;
   accessCode: string | null;
@@ -14,6 +17,7 @@ export function InvoicePublishedEmail({
   senderName,
   clientName,
   invoiceNumber,
+  reference,
   totalDisplay,
   invoiceUrl,
   accessCode,
@@ -32,6 +36,7 @@ export function InvoicePublishedEmail({
       <Panel>
         <PanelRow label="Amount due" value={totalDisplay} strong />
         {dueDateDisplay ? <PanelRow label="Due" value={dueDateDisplay} /> : null}
+        <PanelRow label={REFERENCE_LABEL} value={<ReferenceCode reference={reference} />} />
         {accessCode ? (
           <PanelRow
             label="Access code (you'll need this to open the invoice)"

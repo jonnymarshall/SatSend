@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { getAppUrl } from "@/lib/app-url";
 import { statusColors } from "@/lib/brand-colors";
 import { LOGO_CONTENT_ID } from "../logo-inline";
+import { formatReference } from "@/lib/invoices/reference";
 
 /**
  * Signal Amber email frame (v1.5.5, roadmap v1.5.1-H). Email apps ignore
@@ -219,6 +220,14 @@ export function PanelRow({ label, value, strong }: { label: string; value: React
       </span>
     </Text>
   );
+}
+
+/**
+ * The SatSend reference as every invoice email shows it (v1.5.31): always
+ * labelled REFERENCE_LABEL, always this look, so the five templates can't drift.
+ */
+export function ReferenceCode({ reference }: { reference: string }) {
+  return <span style={{ fontFamily: EMAIL.mono, letterSpacing: "0.04em" }}>{formatReference(reference)}</span>;
 }
 
 export function TxidLine({ txid }: { txid: string }) {

@@ -408,6 +408,7 @@ export async function publishAndSendEmail(
     replyTo: invoice.your_email,
     clientName: invoice.client_name || "there",
     invoiceId: invoice.id,
+    reference: invoice.reference,
     invoiceNumber: invoice.invoice_number,
     totalFiat: invoice.total_fiat,
     currency: invoice.currency,
