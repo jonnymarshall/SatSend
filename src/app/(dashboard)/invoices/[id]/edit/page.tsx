@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceForm } from "@/components/invoice-form";
 import { toInvoice } from "@/lib/invoice-public";
+import { dateOnlyToUtc } from "@/lib/date-only";
 
 export default async function EditInvoicePage({
   params,
@@ -43,7 +44,7 @@ export default async function EditInvoicePage({
           line_items: toInvoice(invoice).line_items,
           tax_percent: invoice.tax_percent ? String(invoice.tax_percent) : "",
           btc_address: invoice.btc_address ?? "",
-          due_date: invoice.due_date ? new Date(invoice.due_date) : undefined,
+          due_date: invoice.due_date ? dateOnlyToUtc(invoice.due_date) : undefined,
           no_due_date: !invoice.due_date,
           access_code: invoice.access_code ?? "",
         }}

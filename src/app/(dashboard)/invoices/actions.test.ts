@@ -10,7 +10,6 @@ vi.mock("@/lib/invoice-events", () => ({ logInvoiceEvent: vi.fn().mockResolvedVa
 vi.mock("@/lib/mempool", () => ({ addressHasHistory: vi.fn().mockResolvedValue(false) }));
 
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import { sendInvoicePublishedEmail } from "@/lib/email/send";
 import { logInvoiceEvent } from "@/lib/invoice-events";
 import { addressHasHistory } from "@/lib/mempool";
@@ -22,7 +21,6 @@ import {
   markUnpaid,
   deleteDraft,
   markOverdue,
-  duplicateInvoice,
 } from "./actions";
 
 const VALID_DRAFT = {
@@ -788,156 +786,12 @@ describe("markOverdue", () => {
   });
 });
 
+// v1.5.34 (roadmap v1.4.25): duplicateInvoice is gone. Duplicating no longer
+// saves anything: it opens /invoices/new?from=<id> (see new/page.test.tsx).
 describe("duplicateInvoice", () => {
-  const SOURCE_INVOICE = {
-    id: "inv-src",
-    user_id: "user-1",
-    status: "paid",
-    invoice_number: "INV-001",
-    your_name: "Freelancer",
-    your_email: "me@example.com",
-    your_company: "My Co",
-    your_address: "1 Street",
-    your_tax_id: "TAX-1",
-    client_name: "Acme",
-    client_email: "acme@example.com",
-    client_company: "Acme Co",
-    client_address: "2 Street",
-    client_tax_id: "TAX-2",
-    line_items: [{ description: "Work", quantity: 1, unit_price: 1000 }],
-    tax_percent: 10,
-    tax_fiat: 100,
-    subtotal_fiat: 1000,
-    total_fiat: 1100,
-    currency: "USD",
-    btc_address: "bc1qtest",
-    due_date: "2026-06-01",
-    access_code: "LETMEIN1",
-    btc_txid: "txid-should-clear",
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-02T00:00:00Z",
-  };
-
-  it("inserts a new draft invoice with status=draft, cleared btc_address / btc_txid, and preserved access_code", async () => {
-    const { insertChain, insertSingle } = makeSupabase({
-      fetchData: SOURCE_INVOICE,
-      insertData: { id: "inv-new", status: "draft" },
-    });
-
-    await duplicateInvoice("inv-src");
-
-    const insertArg = insertChain.mock.calls[0][0];
-    expect(insertArg.status).toBe("draft");
-    expect(insertArg.access_code).toBe("LETMEIN1");
-    expect(insertArg.btc_address).toBeNull();
-    expect(insertArg.btc_txid).toBeNull();
-    expect(insertArg.user_id).toBe("user-1");
-    expect(insertArg.client_name).toBe("Acme");
-    expect(insertArg.line_items).toEqual(SOURCE_INVOICE.line_items);
-    expect(insertArg).not.toHaveProperty("id");
-    expect(insertArg).not.toHaveProperty("created_at");
-    expect(insertArg).not.toHaveProperty("updated_at");
-    expect(insertSingle).toHaveBeenCalled();
-  });
-
-  // v1.4.23-H: the suffix is now " (copy)", " (copy 2)", ... chosen so it does
-  // not collide with a number the user already has. Source is trimmed from the
-  // end only when the result would exceed the 30-char cap.
-  it('appends " (copy)" to a short invoice_number without trimming', async () => {
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy)");
-  });
-
-  it("leaves invoice_number null when source has no number", async () => {
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: null },
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    expect(insertChain.mock.calls[0][0].invoice_number).toBeNull();
-  });
-
-  it('skips to " (copy 2)" when " (copy)" is already taken (v1.4.23-H fix)', async () => {
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
-      insertData: { id: "inv-new" },
-      takenInvoiceNumbers: [{ invoice_number: "INV-001 (copy)" }],
-    });
-    await duplicateInvoice("inv-src");
-    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy 2)");
-  });
-
-  it('skips to " (copy 3)" when both earlier copies are taken (v1.4.23-H fix)', async () => {
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: "INV-001" },
-      insertData: { id: "inv-new" },
-      takenInvoiceNumbers: [
-        { invoice_number: "INV-001 (copy)" },
-        { invoice_number: "INV-001 (copy 2)" },
-      ],
-    });
-    await duplicateInvoice("inv-src");
-    expect(insertChain.mock.calls[0][0].invoice_number).toBe("INV-001 (copy 3)");
-  });
-
-  it("does not trim when source is 23 chars — full source + ' (copy)' totals 30 (boundary)", async () => {
-    const source23 = "A".repeat(23);
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: source23 },
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    const result = insertChain.mock.calls[0][0].invoice_number;
-    expect(result).toBe(`${source23} (copy)`);
-    expect(result.length).toBe(30);
-  });
-
-  it("trims a 30-char source to 23 chars + ' (copy)' (worst case)", async () => {
-    const source30 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ-123";
-    const { insertChain } = makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, invoice_number: source30 },
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    const result = insertChain.mock.calls[0][0].invoice_number;
-    expect(result).toBe(`${source30.slice(0, 23)} (copy)`);
-    expect(result.length).toBe(30);
-  });
-
-  it("redirects to /invoices/[new-id]/edit after creating the draft", async () => {
-    makeSupabase({
-      fetchData: SOURCE_INVOICE,
-      insertData: { id: "inv-new" },
-    });
-    await duplicateInvoice("inv-src");
-    expect(redirect).toHaveBeenCalledWith("/invoices/inv-new/edit");
-  });
-
-  it("throws when the invoice belongs to another user", async () => {
-    makeSupabase({
-      fetchData: { ...SOURCE_INVOICE, user_id: "someone-else" },
-    });
-    await expect(duplicateInvoice("inv-src")).rejects.toThrow(/not found/i);
-  });
-
-  it("refuses to duplicate a source with more than 100 line items (v1.4.25-H cap)", async () => {
-    const { insertChain } = makeSupabase({
-      fetchData: {
-        ...SOURCE_INVOICE,
-        line_items: Array.from({ length: 101 }, (_, i) => ({
-          description: `Item ${i}`,
-          quantity: 1,
-          unit_price: 1,
-        })),
-      },
-      insertData: { id: "inv-new" },
-    });
-    const res = await duplicateInvoice("inv-src");
-    expect(res).toMatchObject({ ok: false, field: "line_items" });
-    expect(insertChain).not.toHaveBeenCalled();
+  it("no longer exists as a server action", async () => {
+    const actions = await import("./actions");
+    expect(actions).not.toHaveProperty("duplicateInvoice");
   });
 });
+

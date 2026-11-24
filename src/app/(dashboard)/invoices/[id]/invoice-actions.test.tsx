@@ -13,7 +13,6 @@ vi.mock("../actions", () => ({
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
   deleteDraft: vi.fn().mockResolvedValue(undefined),
-  duplicateInvoice: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 vi.mock("../bulk-actions", () => ({
@@ -27,7 +26,6 @@ import {
   publishAndSendEmail,
   publishAndMarkSent,
   markPaid,
-  duplicateInvoice,
   deleteDraft,
 } from "../actions";
 import { bulkArchive, bulkUnarchive, bulkDelete } from "../bulk-actions";
@@ -51,7 +49,7 @@ describe("InvoiceActions — draft status", () => {
     expect(screen.getByRole("link", { name: /edit draft/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
 
@@ -91,10 +89,10 @@ describe("InvoiceActions — draft status", () => {
     expect(showNotice).not.toHaveBeenCalledWith("Link copied");
   });
 
-  it("calls duplicateInvoice when Duplicate is clicked", async () => {
+  // v1.5.34: Duplicate is a link to a pre-filled New Invoice form; nothing is saved.
+  it("Duplicate links to the New Invoice form filled in from this invoice", () => {
     render(<InvoiceActions invoice={draft} />);
-    fireEvent.click(screen.getByRole("button", { name: /duplicate/i }));
-    await waitFor(() => expect(duplicateInvoice).toHaveBeenCalledWith("inv-d"));
+    expect(screen.getByRole("link", { name: /duplicate/i })).toHaveAttribute("href", "/invoices/new?from=inv-d");
   });
 
   it("calls deleteDraft when Delete is clicked on a draft", async () => {
@@ -260,7 +258,7 @@ describe("InvoiceActions — pending status", () => {
     expect(screen.queryByRole("button", { name: /copy public link/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^mark as$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^archive$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
 
@@ -324,7 +322,7 @@ describe("InvoiceActions — archived status", () => {
   it("still renders View public invoice, Duplicate, Delete for archived", () => {
     render(<InvoiceActions invoice={archived} />);
     expect(screen.getByRole("link", { name: /view public invoice/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
 });
@@ -347,7 +345,7 @@ describe("InvoiceActions — paid status", () => {
     render(<InvoiceActions invoice={paid} />);
     expect(screen.getByRole("link", { name: /view public invoice/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^archive$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /duplicate/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /duplicate/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
 });
