@@ -79,16 +79,17 @@ function mockInvoiceRow(over: Record<string, unknown>) {
 }
 
 // v1.5.31 (roadmap v1.5.2.14-H): the SatSend reference, beside the sender's own
-// invoice number, with a copy button; the share link uses it.
+// invoice number, as a plain row with the dates; the share link uses it.
 describe("InvoiceDetailPage — SatSend reference", () => {
-  it("shows the reference beside the invoice number, with a copy button", async () => {
+  it("shows the reference as a row like Date Sent and Date Due, without a copy button", async () => {
     mockInvoiceRow({});
     render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
-    const ref = document.getElementById("invoice-detail--reference")!;
-    expect(ref).toHaveTextContent("SatSend reference");
-    expect(ref).toHaveTextContent("SS-7K3QX9AB");
+    const ref = document.getElementById("invoice-dates--reference")!;
+    expect(ref).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
+    expect(document.getElementById("invoice-dates")).toContainElement(ref);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("INV-001");
-    expect(ref.querySelector("button")).toBeInTheDocument();
+    expect(ref.querySelector("button")).not.toBeInTheDocument();
+    expect(document.getElementById("invoice-detail--reference")).not.toBeInTheDocument();
   });
 
   it("the share link is the short link, never the UUID", async () => {

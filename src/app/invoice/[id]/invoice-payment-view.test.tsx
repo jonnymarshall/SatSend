@@ -176,9 +176,9 @@ describe("InvoicePaymentView — BTC reveal", () => {
   // beside the sender's own invoice number.
   it("shows the SatSend reference under the heading", () => {
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
-    const ref = document.getElementById("invoice-view--reference")!;
-    expect(ref).toHaveTextContent("SatSend reference");
-    expect(ref).toHaveTextContent("SS-7K3QX9AB");
+    const ref = document.getElementById("invoice-dates--reference")!;
+    expect(ref).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
+    expect(document.getElementById("invoice-dates")).toContainElement(ref);
   });
 
   // v1.5.29 (roadmap v1.5.2.22-H): locked quotes.
