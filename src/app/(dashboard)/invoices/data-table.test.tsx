@@ -23,7 +23,7 @@ vi.mock("./bulk-actions", () => ({
 }));
 vi.mock("./actions", () => ({
   publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
-  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: { reference: "7K3QX9AB" } }),
   duplicateInvoice: vi.fn().mockResolvedValue(undefined),
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
@@ -38,6 +38,7 @@ import { showNotice } from "@/components/notice";
 import { publishAndSendEmail, publishAndMarkSent, duplicateInvoice, markOverdue, markUnpaid } from "./actions";
 
 const baseRow = {
+  reference: "7K3QX9AB",
   client_email: "client@example.com",
   sent_at: null,
   send_method: null,
@@ -298,9 +299,17 @@ describe("InvoiceDataTable — per-row actions", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
     await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-1"));
     await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/invoice/inv-1`),
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/invoice/ss-7k3qx9ab`),
     );
     await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
+  });
+
+  it("each row shows its SatSend reference under the invoice number (v1.5.31)", () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    const refs = document.querySelectorAll(".proxy-id--invoice-row--reference");
+    expect(refs.length).toBeGreaterThan(0);
+    expect(refs[0]).toHaveTextContent("SS-7K3QX9AB");
+    expect(refs[0]).toHaveAttribute("title", "SatSend reference");
   });
 
   it("'Copy public link' also confirms with the notice (v1.5.19)", async () => {
@@ -309,6 +318,8 @@ describe("InvoiceDataTable — per-row actions", () => {
     fireEvent.click(openMenuButtons[1]); // inv-2 pending
     fireEvent.click(await screen.findByRole("menuitem", { name: /copy public link/i }));
     await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
+    // v1.5.31: the short link, by SatSend reference.
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/invoice/ss-7k3qx9ab`);
   });
 
   it("an email that doesn't go out on a draft says it's still a draft (v1.5.19)", async () => {

@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 vi.mock("../actions", () => ({
   publishAndSendEmail: vi.fn().mockResolvedValue({ emailStatus: "sent" }),
-  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: { reference: "7K3QX9AB" } }),
   markPaid: vi.fn().mockResolvedValue(undefined),
   markOverdue: vi.fn().mockResolvedValue(undefined),
   markUnpaid: vi.fn().mockResolvedValue(undefined),
@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe("InvoiceActions — draft status", () => {
-  const draft = { id: "inv-d", status: "draft" as const, client_email: "ada@example.com" };
+  const draft = { id: "inv-d", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
 
   it("renders Edit draft, Send (menu), Duplicate, Delete buttons, and no Publish", () => {
     render(<InvoiceActions invoice={draft} />);
@@ -76,7 +76,7 @@ describe("InvoiceActions — draft status", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /copy link and mark as sent/i }));
     await waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("inv-d"));
     await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://example.test/invoice/inv-d"),
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://example.test/invoice/ss-7k3qx9ab"),
     );
     await waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
   });
@@ -108,6 +108,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("disables 'Send now via email' once email_attempted_at is set (failed prior attempt)", () => {
     const invoice = {
       id: "inv-failed",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -123,6 +124,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("keeps the Send menu visible after manual mark-as-sent, but with only 'Send now via email' enabled", () => {
     const invoice = {
       id: "inv-manual",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -142,6 +144,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("hides the Send menu once the invoice has been successfully delivered via email", () => {
     const invoice = {
       id: "inv-emailed",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -155,6 +158,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("keeps the Send menu visible after manual mark-as-sent EVEN when client_email is empty (Send via email is disabled with tooltip)", () => {
     const invoice = {
       id: "inv-no-email",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "",
       email_attempted_at: null,
@@ -169,7 +173,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 
   it("shows a failed-email alert banner when publishAndSendEmail returns emailStatus='failed'", async () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
-    const invoice = { id: "inv-fail", status: "draft" as const, client_email: "ada@example.com" };
+    const invoice = { id: "inv-fail", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
@@ -180,7 +184,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 
   it("shows a queued-for-delivery notice when publishAndSendEmail returns emailStatus='sent'", async () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "sent" } });
-    const invoice = { id: "inv-ok", status: "draft" as const, client_email: "ada@example.com" };
+    const invoice = { id: "inv-ok", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
@@ -191,6 +195,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("hides the Send menu once the invoice has been manually marked sent AND an email has been attempted (failed)", () => {
     const invoice = {
       id: "inv-manual-then-failed",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T11:00:00Z",
@@ -204,6 +209,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("shows the Send menu for an older invoice that went live without being sent (pre-v1.5.19)", () => {
     const invoice = {
       id: "inv-unpub",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -219,6 +225,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("renders the 'Sent via email on …' line when send_method='email'", () => {
     const invoice = {
       id: "inv-emailed",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -232,6 +239,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("renders the 'Marked as sent on …' line when send_method='manual'", () => {
     const invoice = {
       id: "inv-manual2",
+      reference: "7K3QX9AB",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -244,7 +252,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 });
 
 describe("InvoiceActions — pending status", () => {
-  const pending = { id: "inv-p", status: "pending" as const };
+  const pending = { id: "inv-p", reference: "7K3QX9AB", status: "pending" as const };
 
   it("renders View public invoice, Mark as menu, Archive, Duplicate, Delete (no Copy public link — already on the Share section)", () => {
     render(<InvoiceActions invoice={pending} />);
@@ -263,10 +271,10 @@ describe("InvoiceActions — pending status", () => {
     expect(screen.queryByRole("button", { name: /unarchive/i })).not.toBeInTheDocument();
   });
 
-  it("View public invoice link points to /invoice/<id> and opens in a new tab", () => {
+  it("View public invoice link points to the short link (v1.5.31) and opens in a new tab", () => {
     render(<InvoiceActions invoice={pending} />);
     const link = screen.getByRole("link", { name: /view public invoice/i });
-    expect(link).toHaveAttribute("href", "/invoice/inv-p");
+    expect(link).toHaveAttribute("href", "/invoice/ss-7k3qx9ab");
     expect(link).toHaveAttribute("target", "_blank");
   });
 
@@ -291,7 +299,7 @@ describe("InvoiceActions — pending status", () => {
 });
 
 describe("InvoiceActions — archived status", () => {
-  const archived = { id: "inv-a", status: "archived" as const };
+  const archived = { id: "inv-a", reference: "7K3QX9AB", status: "archived" as const };
 
   it("renders Unarchive (not Archive) and does not render the Mark as menu", () => {
     render(<InvoiceActions invoice={archived} />);
@@ -322,7 +330,7 @@ describe("InvoiceActions — archived status", () => {
 });
 
 describe("InvoiceActions — paid status", () => {
-  const paid = { id: "inv-paid", status: "paid" as const };
+  const paid = { id: "inv-paid", reference: "7K3QX9AB", status: "paid" as const };
 
   it("Mark as menu hides the Paid item (already paid) and offers Unpaid", () => {
     // Overdue is no longer offered for paid invoices: per the four-cases spec

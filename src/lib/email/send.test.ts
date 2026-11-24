@@ -54,6 +54,7 @@ const baseArgs = {
   senderName: "Charles",
   clientName: "Ada",
   invoiceId: "inv-1",
+  reference: "7K3QX9AB",
   invoiceNumber: "INV-001",
   totalFiat: 500,
   currency: "USD",
@@ -192,6 +193,7 @@ describe("sendPaymentDetectedEmail", () => {
     payerEmail: "payer@example.com",
     userId: "user-1",
     invoiceId: "inv-1",
+    reference: "7K3QX9AB",
     invoiceNumber: "INV-1",
     senderName: "Charles",
     clientName: "Ada",
@@ -302,6 +304,7 @@ describe("sendPaymentConfirmedEmail", () => {
     payerEmail: "payer@example.com",
     userId: "user-1",
     invoiceId: "inv-1",
+    reference: "7K3QX9AB",
     invoiceNumber: "INV-1",
     senderName: "Charles",
     clientName: "Ada",
@@ -361,6 +364,7 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
     payerEmail: "payer@example.com",
     userId: "user-1",
     invoiceId: "inv-1",
+    reference: "7K3QX9AB",
     invoiceNumber: "INV-1",
     senderName: "Charles",
     clientName: "Ada",
@@ -385,14 +389,38 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
 
   it("the invoice email's plain text includes the invoice link, written out", async () => {
     await sendInvoicePublishedEmail(baseArgs);
-    expect(mockResendSend.mock.calls[0][0].text).toContain("https://app.test/invoice/inv-1");
+    expect(mockResendSend.mock.calls[0][0].text).toContain("https://app.test/invoice/ss-7k3qx9ab");
+  });
+
+  // v1.5.31 (roadmap v1.5.2.14-H): client links use the SatSend reference, and
+  // every invoice email names it, under the one label.
+  it("the invoice email links by SatSend reference, never the UUID, and shows the reference", async () => {
+    await sendInvoicePublishedEmail(baseArgs);
+    const { text } = mockResendSend.mock.calls[0][0];
+    expect(text).not.toContain("/invoice/inv-1");
+    expect(text).toMatch(/SatSend reference:?\s+SS-7K3QX9AB/);
+  });
+
+  it("payment emails: the client's link uses the reference, the sender's stays on the dashboard; both show it", async () => {
+    await sendPaymentDetectedEmail(paymentArgs);
+    await sendPaymentConfirmedEmail({ ...paymentArgs, payment: CONFIRMED });
+    expect(mockResendSend.mock.calls).toHaveLength(4);
+    for (const [payload] of mockResendSend.mock.calls) {
+      expect(payload.text).toMatch(/SatSend reference:?\s+SS-7K3QX9AB/);
+      if (payload.to === "payer@example.com") {
+        expect(payload.text).toContain("https://app.test/invoice/ss-7k3qx9ab");
+        expect(payload.text).not.toContain("/invoice/inv-1");
+      } else {
+        expect(payload.text).toContain("https://app.test/invoices/inv-1");
+      }
+    }
   });
 
   it("the invoice email shows the invoice link as visible text, not only behind the button", async () => {
     const { render } = await import("@react-email/render");
     await sendInvoicePublishedEmail(baseArgs);
     const html = await render(mockResendSend.mock.calls[0][0].react as React.ReactElement);
-    expect(html).toMatch(/>\s*https:\/\/app\.test\/invoice\/inv-1\s*</);
+    expect(html).toMatch(/>\s*https:\/\/app\.test\/invoice\/ss-7k3qx9ab\s*</);
   });
 
   it("client emails reply to the invoice owner, so replies reach the freelancer", async () => {
@@ -422,6 +450,7 @@ describe("logo embedded in the email (v1.5.12)", () => {
     payerEmail: "payer@example.com",
     userId: "user-1",
     invoiceId: "inv-1",
+    reference: "7K3QX9AB",
     invoiceNumber: "INV-1",
     senderName: "Charles",
     clientName: "Ada",

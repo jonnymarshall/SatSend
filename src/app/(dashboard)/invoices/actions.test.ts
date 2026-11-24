@@ -311,6 +311,14 @@ describe("publish actions — synchronous overdue flip (v1.4.11)", () => {
     expect(payload.status).toBe("overdue");
   });
 
+  // v1.5.31: "Copy link and mark as sent" copies the short link, so the action
+  // hands back the invoice's SatSend reference.
+  it("publishAndMarkSent returns the SatSend reference, for the copied link", async () => {
+    makeSupabase({ fetchData: { ...PUBLISHABLE_INVOICE, reference: "7K3QX9AB" } });
+    const result = await publishAndMarkSent("inv-1");
+    expect(result).toMatchObject({ ok: true, data: { reference: "7K3QX9AB" } });
+  });
+
   it("publishAndMarkSent with a past due_date logs marked_as_overdue", async () => {
     makeSupabase({ fetchData: PAST_DUE_INVOICE });
     await publishAndMarkSent("inv-1");

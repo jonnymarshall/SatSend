@@ -1,5 +1,9 @@
+import { formatReference } from "./reference";
+
 export interface PdfFilenameInput {
   id: string;
+  /** The SatSend reference (v1.5.31): the name when there's no invoice number. */
+  reference?: string | null;
   invoice_number: string | null;
   your_company: string | null;
   your_name: string | null;
@@ -35,6 +39,7 @@ function pickInvoiceName(input: PdfFilenameInput): string {
   if (input.invoice_number && input.invoice_number.trim()) {
     return sanitise(input.invoice_number);
   }
+  if (input.reference) return formatReference(input.reference);
   return `…${input.id.slice(-8)}`;
 }
 

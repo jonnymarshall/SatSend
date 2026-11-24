@@ -43,7 +43,7 @@ export async function POST(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, btc_address, status, user_id, invoice_number, client_name, client_company, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code, btc_price_at_seen"
+      "id, btc_address, status, user_id, invoice_number, client_name, client_company, client_email, total_fiat, currency, mempool_seen_at, published_at, stage_attempt, your_name, your_company, your_email, access_code, btc_price_at_seen, reference"
     )
     .eq("id", id)
     .single();
@@ -134,6 +134,7 @@ export async function POST(
         payerEmail: invoice.client_email || null,
         userId: invoice.user_id,
         invoiceId: invoice.id,
+        reference: invoice.reference,
         invoiceNumber: invoice.invoice_number,
         senderName: invoice.your_name || invoice.your_company || invoice.your_email || "SatSend user",
         clientName: invoice.client_name || "your client",

@@ -31,6 +31,7 @@ function props(over: Partial<PaymentStatusEmailProps> = {}): PaymentStatusEmailP
     audience: "client",
     payment: PAID,
     invoiceNumber: "INV-001",
+    reference: "7K3QX9AB",
     btcAddress: ADDRESS,
     txid: TXID,
     mempoolUrl: `https://mempool.space/testnet4/tx/${TXID}`,

@@ -81,7 +81,23 @@ describe("buildPdfFilename", () => {
     ).toBe("alice_INV-005_20260420.pdf");
   });
 
-  it("falls back to the short id when invoice_number is missing", () => {
+  // v1.5.31: without an invoice number, the file is named by the SatSend
+  // reference, which the client can quote back.
+  it("falls back to the SatSend reference when invoice_number is missing", () => {
+    expect(
+      buildPdfFilename({
+        id: "11111111-2222-3333-4444-555512345678",
+        reference: "7K3QX9AB",
+        invoice_number: null,
+        your_company: "Acme",
+        your_name: null,
+        your_email: null,
+        created_at: "2026-04-20T10:00:00Z",
+      })
+    ).toBe("Acme_SS-7K3QX9AB_20260420.pdf");
+  });
+
+  it("falls back to the short id when there's no invoice number or reference", () => {
     expect(
       buildPdfFilename({
         id: "11111111-2222-3333-4444-555512345678",

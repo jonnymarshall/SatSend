@@ -112,6 +112,7 @@ const BASE_INVOICE: Invoice = {
   btc_price_at_seen: null,
   slippage_tolerance_fiat: null,
   payment_quote_id: null,
+  reference: "7K3QX9AB",
 };
 
 describe("InvoicePaymentView — download PDF", () => {
@@ -121,7 +122,8 @@ describe("InvoicePaymentView — download PDF", () => {
     expect(link).toBeInTheDocument();
     // v1.5.28: with the viewer's time zone, for the payment times.
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    expect(link.getAttribute("href")).toBe(`/api/invoice/inv-1/pdf?tz=${encodeURIComponent(tz)}`);
+    // v1.5.31: by SatSend reference, like every link the client sees.
+    expect(link.getAttribute("href")).toBe(`/api/invoice/ss-7k3qx9ab/pdf?tz=${encodeURIComponent(tz)}`);
     expect(link.hasAttribute("download")).toBe(true);
   });
 });
@@ -168,6 +170,15 @@ describe("InvoicePaymentView — BTC reveal", () => {
     expect(await screen.findByTestId("btc-qr")).toBeInTheDocument();
     expect(screen.getByText(/tb1qtarget/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /pay now in bitcoin/i })).not.toBeInTheDocument();
+  });
+
+  // v1.5.31 (roadmap v1.5.2.14-H): the SatSend reference, under the heading,
+  // beside the sender's own invoice number.
+  it("shows the SatSend reference under the heading", () => {
+    render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
+    const ref = document.getElementById("invoice-dates--reference")!;
+    expect(ref).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
+    expect(document.getElementById("invoice-dates")).toContainElement(ref);
   });
 
   // v1.5.29 (roadmap v1.5.2.22-H): locked quotes.

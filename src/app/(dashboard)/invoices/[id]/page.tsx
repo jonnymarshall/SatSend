@@ -14,6 +14,7 @@ import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { getAppUrl } from "@/lib/app-url";
 import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
+import { publicInvoicePath } from "@/lib/invoices/reference";
 
 const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
@@ -46,7 +47,8 @@ export default async function InvoiceDetailPage({
       ? emailOutcomeMessage(emailParam, { wasDraft: true, clientEmail: invoice.client_email }).text
       : null;
   const appUrl = getAppUrl();
-  const shareLink = `${appUrl}/invoice/${invoice.id}`;
+  // v1.5.31: the client's link uses the SatSend reference.
+  const shareLink = `${appUrl}${publicInvoicePath(invoice)}`;
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";
   const money = (n: number | string | null) => `$${Number(n).toFixed(2)}`;
@@ -66,7 +68,7 @@ export default async function InvoiceDetailPage({
               <p id="invoice-detail--client-email" className="text-[15px] text-(--color-text-secondary)">{invoice.client_email}</p>
             )}
             <div id="invoice-detail--dates" className="pt-1">
-              <InvoiceDates audience="owner" sentAt={invoice.sent_at} dueDate={invoice.due_date} />
+              <InvoiceDates audience="owner" reference={invoice.reference} sentAt={invoice.sent_at} dueDate={invoice.due_date} />
             </div>
           </div>
           {invoice.btc_address &&

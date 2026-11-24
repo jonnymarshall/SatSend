@@ -20,6 +20,7 @@ import { CopyButton } from "@/components/copy-button";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
 import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
+import { referencePath } from "@/lib/invoices/reference";
 import {
   formatPaymentTime,
   hasPayment,
@@ -118,7 +119,8 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
             <h1 id="invoice-view--title" className="font-display tracking-heading text-[26px] leading-tight font-bold break-words sm:text-[30px]">
               {invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice"}
             </h1>
-            <InvoiceDates audience="client" sentAt={invoice.sent_at} dueDate={invoice.due_date} />
+            {/* v1.5.31: quiet, so it doesn't compete with the amount due. */}
+            <InvoiceDates audience="client" reference={invoice.reference} sentAt={invoice.sent_at} dueDate={invoice.due_date} />
           </div>
           <div id="invoice-view--header-actions" className="flex flex-wrap items-center gap-3 sm:flex-col sm:items-end">
             {invoice.btc_address ? (
@@ -135,7 +137,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
             )}
             <a
               id="invoice-view--download-pdf"
-              href={pdfHref(`/api/invoice/${invoice.id}/pdf`, timeZone)}
+              href={pdfHref(`/api/invoice/${referencePath(invoice.reference)}/pdf`, timeZone)}
               download
               className={buttonVariants({ variant: "secondary", size: "sm", className: "h-11 sm:h-9" })}
             >

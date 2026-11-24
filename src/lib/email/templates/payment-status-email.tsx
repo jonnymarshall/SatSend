@@ -9,7 +9,8 @@ import {
   type PaymentSummaryInvoice,
 } from "@/lib/invoices/payment-summary";
 import { statusIconContentId } from "../status-icons-inline";
-import { EMAIL, EmailButton, EmailLayout, EmailLink } from "./layout";
+import { EMAIL, EmailButton, EmailLayout, EmailLink, ReferenceCode } from "./layout";
+import { REFERENCE_LABEL } from "@/lib/invoices/reference";
 
 /**
  * The four payment emails (v1.5.28, roadmap v1.5.2.21-H): detected and
@@ -21,6 +22,8 @@ export interface PaymentStatusEmailProps {
   audience: PaymentAudience;
   payment: PaymentSummaryInvoice;
   invoiceNumber: string | null;
+  /** The SatSend reference, bare (v1.5.31). */
+  reference: string;
   btcAddress: string;
   txid: string;
   mempoolUrl: string;
@@ -63,7 +66,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-export function PaymentStatusEmail({ audience, payment, invoiceNumber, btcAddress, txid, mempoolUrl, actionUrl }: PaymentStatusEmailProps) {
+export function PaymentStatusEmail({ audience, payment, invoiceNumber, reference, btcAddress, txid, mempoolUrl, actionUrl }: PaymentStatusEmailProps) {
   const summary = paymentSummary(payment, { audience });
   const { state, sums, message, time } = summary;
   const colors = statusColors[state];
@@ -123,6 +126,9 @@ export function PaymentStatusEmail({ audience, payment, invoiceNumber, btcAddres
       )}
 
       <Section style={{ borderTop: `1px solid ${EMAIL.border}`, paddingTop: "12px" }}>
+        <DetailRow label={REFERENCE_LABEL}>
+          <ReferenceCode reference={reference} />
+        </DetailRow>
         {time && (
           <DetailRow label={time.label}>
             <span style={{ fontWeight: 500 }}>{formatPaymentTime(time.iso, "UTC")}</span>

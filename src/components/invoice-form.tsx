@@ -325,8 +325,8 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     const copy = deferredCopy();
     void runSendFlow((id) => publishAndMarkSent(id), {
       onFail: () => copy.provide(null),
-      postNavigate: async (_data, id) => {
-        copy.provide(clientInvoiceUrl(id, window.location.origin));
+      postNavigate: async (data) => {
+        copy.provide(clientInvoiceUrl(data, window.location.origin));
         showNotice((await copy.copied) ? "Link copied" : "Marked as sent. Copy the link from View public invoice.");
       },
     });

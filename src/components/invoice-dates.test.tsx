@@ -24,6 +24,21 @@ describe("InvoiceDates", () => {
     expect(screen.getByText(/date due:/i)).toBeInTheDocument();
   });
 
+  // v1.5.31: the SatSend reference is a row in the same style as the dates.
+  it("shows 'SatSend reference:' first, styled like the date rows, when given", () => {
+    render(<InvoiceDates audience="client" reference="7K3QX9AB" sentAt="2026-04-15T12:00:00Z" dueDate="2026-05-15" />);
+    const rows = document.querySelectorAll("#invoice-dates > p");
+    expect(rows[0]).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
+    expect(rows[0].id).toBe("invoice-dates--reference");
+    expect(rows[0].className).toBe(rows[1].className);
+    expect(rows[0].querySelector("span")!.className).toBe(rows[1].querySelector("span")!.className);
+  });
+
+  it("shows no reference row when none is given", () => {
+    render(<InvoiceDates audience="owner" sentAt={null} dueDate={null} />);
+    expect(screen.queryByText(/satsend reference/i)).not.toBeInTheDocument();
+  });
+
   it("shows 'Date Due:' with the date, or 'No due date'", () => {
     const { rerender } = render(<InvoiceDates audience="owner" sentAt={null} dueDate="2026-05-15" />);
     expect(screen.getByText(/may 15,? 2026/i)).toBeInTheDocument();

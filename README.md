@@ -15,7 +15,7 @@ tells you both. Zero transaction fees, nothing to set up.
 
 When a payer sends Bitcoin to an invoice, the invoice's status needs to change from **Pending** → **Payment Detected** → **Paid**. That status lives in our database. Two pages care about it:
 
-- The **payer's page** at `/invoice/[id]` — public, anyone with the link can see it.
+- The **payer's page** at `/invoice/[id]` — public, anyone with the link can see it. Since v1.5.31 the link holds the invoice's **SatSend reference** (`/invoice/ss-7k3qx9ab`); old UUID links still work (see "The SatSend reference" below).
 - The **owner's pages** under `/invoices` — private, only the logged-in invoice owner.
 
 Both pages need to update **as soon as the status changes**, no matter who triggered it.
@@ -321,6 +321,16 @@ File: `src/app/invoice/[id]/use-public-invoice-realtime.ts`
 - The on-page mempool watcher (path A) is still the fastest source for transactions hitting the watched address; this path is the catch-all for cron-driven (path C) and owner-driven (e.g. mark-as-paid) transitions the watcher can't see.
 
 ---
+
+## The SatSend reference (v1.5.31)
+
+Every invoice has a short public reference, separate from the sender's own invoice number, labelled **SatSend reference** everywhere it appears.
+
+- **Stored** in `invoices.reference` as 8 uppercase Crockford base32 characters (no `I`, `L`, `O` or `U`), about a trillion combinations. **Shown** as `SS-7K3QX9AB` on the owner and client invoice pages, the PDF, every invoice email and the invoice list. **Linked** as `/invoice/ss-7k3qx9ab`.
+- **Made by the database** (migration 0039, `set_invoice_reference`): random, generated on insert whatever the insert sends, unique, and never changeable afterwards, because it's already in clients' inboxes.
+- **Read leniently** by `parseInvoiceKey` (`src/lib/invoices/reference.ts`): with or without `SS-`, any case, `I`/`L` read as `1` and `O` as `0`. An old UUID link still opens the invoice; anything else answers 404 without a database lookup.
+- **The UUID stays the primary key.** Foreign keys, realtime channels, the payment and quote API calls, and the access cookie all use it, so an invoice unlocked on its old link stays unlocked on its short link and the other way round. The sender's dashboard URLs stay on the UUID.
+- A PDF with no invoice number is named by the reference (`Maya_SS-7K3QX9AB_20261124.pdf`).
 
 ## Publishing and sending an invoice
 

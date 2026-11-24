@@ -25,6 +25,7 @@ const publishedInvoice = {
   id: "inv-1",
   user_id: "owner-1",
   invoice_number: "INV-PUB-001",
+  reference: "7K3QX9AB",
   your_name: "Sender",
   your_email: "s@example.com",
   your_company: null,
@@ -110,6 +111,19 @@ describe("GET /api/invoice/[id]/pdf (public, unauthenticated)", () => {
       const res = await getRequest("inv-1");
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("application/pdf");
+    });
+
+    // v1.5.31: the PDF can be asked for by SatSend reference; the cookie is
+    // still the one named for the invoice's UUID, so an unlock on either link
+    // form opens it.
+    it("on a short link, reads the cookie for the invoice's UUID, not the link", async () => {
+      mockFetchPublic.mockResolvedValueOnce(gatedInvoice);
+      mockCookieGet.mockImplementation((name: string) =>
+        name === "pb_access_inv-1" ? { value: accessToken("inv-1", "secret1") } : undefined,
+      );
+      const res = await getRequest("ss-7k3qx9ab");
+      expect(res.status).toBe(200);
+      expect(mockFetchPublic).toHaveBeenCalledWith("ss-7k3qx9ab");
     });
 
     it("does not require a cookie when the invoice has no access code", async () => {

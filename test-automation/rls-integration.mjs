@@ -242,6 +242,51 @@ try {
     check(`${jwt ? "the owner" : "anon"} cannot read invoice_quotes`,
       !read.ok || (Array.isArray(read.json) && read.json.length === 0), `status ${read.status}`);
   }
+
+  // 7. The SatSend reference (v1.5.31, migration 0039): the database makes it,
+  //    ignores a value sent in, never lets it change, and keeps it unique.
+  const REF = /^[0-9A-HJKMNP-TV-Z]{8}$/;
+  const refRead = await rest(`invoices?id=in.(${invoiceId},${secondId})&select=id,reference`);
+  const refs = Array.isArray(refRead.json) ? refRead.json.map((r) => r.reference) : [];
+  check("every invoice gets an 8-character Crockford reference", refs.length === 2 && refs.every((r) => REF.test(r ?? "")),
+    JSON.stringify(refRead.json));
+  check("two invoices get different references", refs.length === 2 && refs[0] !== refs[1], JSON.stringify(refs));
+
+  const chosen = await rest("invoices", {
+    method: "POST", jwt: userA.jwt, key: ANON, prefer: "return=representation",
+    body: {
+      user_id: userA.id, status: "draft", invoice_number: `INTTEST3-${Date.now()}`, reference: refs[0] ?? "AAAAAAAA",
+      client_name: "Integration Test", client_email: "rls-int@example.com", currency: "USD",
+      subtotal_fiat: 0, tax_fiat: 0, tax_percent: 0, total_fiat: 0, line_items: [],
+    },
+  });
+  const chosenRow = chosen.json?.[0];
+  if (chosenRow?.id) created.push({ id: chosenRow.id, userId: userA.id });
+  check("a reference sent in on insert is ignored (another invoice's, here)",
+    chosen.ok && REF.test(chosenRow?.reference ?? "") && chosenRow.reference !== refs[0],
+    `status ${chosen.status} ${chosen.text?.slice(0, 200)}`);
+
+  for (const [who, opts] of [["the owner", { jwt: userA.jwt, key: ANON }], ["the server", {}]]) {
+    const change = await rest(`invoices?id=eq.${secondId}`, {
+      method: "PATCH", ...opts, prefer: "return=representation", body: { reference: "ZZZZZZZZ" },
+    });
+    check(`${who} cannot change a reference`, !change.ok, `status ${change.status} ${change.text?.slice(0, 200)}`);
+  }
+  const unchanged = await rest(`invoices?id=eq.${secondId}&select=reference`);
+  check("the reference is unchanged after both attempts", unchanged.json?.[0]?.reference === refs[1],
+    JSON.stringify(unchanged.json));
+  const otherEdit = await rest(`invoices?id=eq.${secondId}`, {
+    method: "PATCH", jwt: userA.jwt, key: ANON, prefer: "return=representation", body: { client_name: "Edited" },
+  });
+  check("editing other fields still works", otherEdit.ok && otherEdit.json?.[0]?.reference === refs[1],
+    `status ${otherEdit.status} ${otherEdit.text?.slice(0, 200)}`);
+
+  for (const fn of ["generate_invoice_reference", "set_invoice_reference"]) {
+    for (const [who, opts] of [["anon", { key: ANON }], ["a signed-in user", { jwt: userA.jwt, key: ANON }]]) {
+      const call = await rest(`rpc/${fn}`, { method: "POST", ...opts, body: {} });
+      check(`${who} cannot execute ${fn}`, !call.ok, `status ${call.status}`);
+    }
+  }
 } finally {
   await cleanup();
   if (userA) await deleteUser(userA.id);

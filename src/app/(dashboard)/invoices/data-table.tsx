@@ -128,8 +128,8 @@ export function InvoiceDataTable({ data, userId }: Props) {
   const [deleteTarget, setDeleteTarget] = React.useState<string[] | null>(null);
   const [archiveFeedback, setArchiveFeedback] = React.useState<string | null>(null);
 
-  const copyPublicLink = React.useCallback((id: string) => {
-    void copyWhenReady(Promise.resolve(clientInvoiceUrl(id, window.location.origin))).then((ok) =>
+  const copyPublicLink = React.useCallback((invoice: { reference: string }) => {
+    void copyWhenReady(Promise.resolve(clientInvoiceUrl(invoice, window.location.origin))).then((ok) =>
       showNotice(ok ? "Link copied" : "Couldn't copy the link. Open the invoice to copy it."),
     );
   }, []);
@@ -183,7 +183,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
               copy.provide(null);
               return result;
             }
-            copy.provide(clientInvoiceUrl(id, window.location.origin));
+            copy.provide(clientInvoiceUrl(result.data, window.location.origin));
             showNotice((await copy.copied) ? "Link copied" : "Marked as sent. Copy the link from the invoice.");
             return result;
           });

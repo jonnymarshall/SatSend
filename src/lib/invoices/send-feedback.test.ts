@@ -30,7 +30,7 @@ describe("emailOutcomeMessage", () => {
 });
 
 describe("clientInvoiceUrl", () => {
-  it("is the client's page on this site", () => {
-    expect(clientInvoiceUrl("abc", "https://satsend.me")).toBe("https://satsend.me/invoice/abc");
+  it("is the client's page on this site, by SatSend reference (v1.5.31)", () => {
+    expect(clientInvoiceUrl({ reference: "7K3QX9AB" }, "https://satsend.me")).toBe("https://satsend.me/invoice/ss-7k3qx9ab");
   });
 });

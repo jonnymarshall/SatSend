@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **v1.5.31 — SatSend reference (roadmap v1.5.2.14-H).** Every invoice has a
+  short public reference, shown as "SatSend reference: SS-7K3QX9AB" beside the
+  sender's own invoice number on the owner and client invoice pages, the PDF,
+  every invoice email and the invoice list (with a copy button on the owner
+  page). Client links use it: `/invoice/ss-7k3qx9ab` in emails, the PDF, the
+  share link, "View public invoice" and every "Copy link". Old UUID links keep
+  working, and an access code entered on either link form unlocks both. A
+  reference can be typed in any case, with or without `SS-`. Migration 0039:
+  `invoices.reference` (8 uppercase Crockford base32 characters), made by the
+  database on insert, unique and unchangeable; existing invoices filled in
+  without touching `updated_at`; `invoice_email_summary` gains the column. A
+  PDF with no invoice number is named by the reference.
+
 ### Fixed
 
 - **v1.5.30 — Unknown invoice links answer 404 (roadmap v1.5.2.23-H).** A link

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const BASE_INVOICE = {
   id: "inv-abc",
+  reference: "7K3QX9AB",
   user_id: "u1",
   invoice_number: "INV-001",
   your_name: null,
@@ -76,6 +77,29 @@ function mockInvoiceRow(over: Record<string, unknown>) {
     makeSupabaseMock({ ...BASE_INVOICE, ...over } as typeof BASE_INVOICE) as never,
   );
 }
+
+// v1.5.31 (roadmap v1.5.2.14-H): the SatSend reference, beside the sender's own
+// invoice number, as a plain row with the dates; the share link uses it.
+describe("InvoiceDetailPage — SatSend reference", () => {
+  it("shows the reference as a row like Date Sent and Date Due, without a copy button", async () => {
+    mockInvoiceRow({});
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    const ref = document.getElementById("invoice-dates--reference")!;
+    expect(ref).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
+    expect(document.getElementById("invoice-dates")).toContainElement(ref);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("INV-001");
+    expect(ref.querySelector("button")).not.toBeInTheDocument();
+    expect(document.getElementById("invoice-detail--reference")).not.toBeInTheDocument();
+  });
+
+  it("the share link is the short link, never the UUID", async () => {
+    mockInvoiceRow({});
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    const share = document.getElementById("invoice-detail--share-link")!;
+    expect(share).toHaveTextContent("/invoice/ss-7k3qx9ab");
+    expect(share).not.toHaveTextContent("inv-abc");
+  });
+});
 
 describe("InvoiceDetailPage — dates", () => {
   it("shows 'Date Sent:' as the day it was sent, not the day it was created (v1.5.19)", async () => {

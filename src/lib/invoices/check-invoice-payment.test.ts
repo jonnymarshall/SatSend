@@ -38,6 +38,7 @@ const detected: CheckableInvoice = {
   your_company: null,
   your_email: null,
   btc_price_at_seen: null,
+  reference: "7K3QX9AB",
 };
 
 // 250 USD at 50k = 500,000 sats, confirmed 3 blocks deep at tip 900,002.

@@ -24,7 +24,7 @@ vi.mock("@/app/(dashboard)/invoices/actions", () => ({
   saveDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id" } }),
   updateDraft: vi.fn().mockResolvedValue({ ok: true, data: {} }),
   publishAndSendEmail: vi.fn().mockResolvedValue({ ok: true, data: { emailStatus: "sent" } }),
-  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+  publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: { reference: "7K3QX9AB" } }),
 }));
 
 describe("InvoiceForm your_email field", () => {
@@ -189,7 +189,8 @@ describe("InvoiceForm Send menu (v1.5.19)", () => {
     await vi.waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("test-id"));
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/test-id"));
     await vi.waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
-    expect(await navigator.clipboard.readText()).toBe(`${window.location.origin}/invoice/test-id`);
+    // v1.5.31: the short link, by SatSend reference.
+    expect(await navigator.clipboard.readText()).toBe(`${window.location.origin}/invoice/ss-7k3qx9ab`);
   });
 
   it("an email that doesn't go out leaves a draft, and its page explains why", async () => {
