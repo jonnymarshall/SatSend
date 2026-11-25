@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **v1.5.38 — Your own invoice pages use the SatSend reference.** The sender's
+  page was `/invoices/<long id>` while the client's link was
+  `/invoice/ss-7k3qx9ab`. Now the sender's pages are `/invoices/ss-7k3qx9ab`
+  and `/invoices/ss-7k3qx9ab/edit`; the list, the invoice page, Duplicate
+  (`/invoices/new?from=ss-…`), the editor and the sender's payment emails all
+  link by reference. Old long-id links (and other spellings of the reference)
+  redirect. The long id stays the database key. Roadmap: v2.6.1 Pro export
+  (date range, CSV or JSON) added as a pre-launch Pro feature.
+
 ### Fixed
 
 - **v1.5.37 — Actions that can't run are greyed out with the reason (roadmap

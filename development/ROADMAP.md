@@ -15,7 +15,8 @@
 
 > **Jonny, 2026-11-24:** Free and Pro **launch together**; multi-currency
 > (v1.5.3-H) is in before launch "so I have max market opportunity"; account
-> deletion is a **button in settings**. All six Pro features ship at launch (2026-11-24).
+> deletion is a **button in settings**. All six Pro features ship at launch (2026-11-24),
+> plus a seventh: date-range export in CSV or JSON, v2.6.1 (Jonny, 2026-11-25).
 > Target: Pro built by mid March 2027, launch **end of March 2027**, gated on the LLC, its EIN, a bank account and
 > the card provider's approval (that paperwork is the critical path, not code).
 > Planning pages: the SatSend Launch Plan and SatSend Launch Team artifacts.
@@ -25,6 +26,7 @@ keeps its own items' order):
 
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
    v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24 (✅ v1.5.37),
+   sender links by reference (✅ v1.5.38, ad hoc), CI speed-up (ad hoc),
    v1.4.34 close-out.
 2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
    multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
@@ -33,7 +35,8 @@ keeps its own items' order):
    v1.5.2.6-H.
 4. **Pro, target end of February 2027:** v1.5.5-H and v1.5.6-H decisions,
    v1.5.2.18-H, v2.0, v1.5.4-H, v2.1 to v2.6 (all six Pro features on the
-   pricing card ship at launch: Jonny, 2026-11-24).
+   pricing card ship at launch: Jonny, 2026-11-24), v2.6.1 Pro export (added
+   2026-11-25).
 5. **Jonny's admin, in parallel from now:** v1.5.0.4-H (DMARC, due), v1.5.8-H
    (LLC: accountant first), v1.5.2.9-H, Terms inputs, About and Contact text.
 
@@ -879,6 +882,15 @@ passwords, which is why it has to stay available there anyway.)
 `security.txt` points at the Security page's report section until a support
 email exists (v1.5.2.6-H). Two-step sign-in: **after launch**, as its own item.
 
+### ✅ v1.5.38 — Your own invoice pages use the SatSend reference (ad hoc) · v1.5.38
+
+Jonny, 2026-11-25: the sender's link was `/invoices/<long id>` while the
+client's was `/invoice/ss-…`. Now the sender's pages are `/invoices/ss-…`
+(and `/edit`), every app link and the sender's payment emails use it, and
+old long-id links redirect. The long id stays the database key.
+
+---
+
 ### ✅ v1.5.2.24-H — Stricter Content-Security-Policy (**pre-launch**) · v1.5.33
 
 > Split out of v1.5.2.17-H. Limits which scripts a page may run, the main
@@ -1386,7 +1398,34 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
+### ⏳ v2.6.1 — Pro export: invoices in a date range, as CSV or JSON
+
+> **Launch work (Jonny, 2026-11-25):** "I want Pro users to be able to download
+> CSVs or json files of all their invoices in a definable date range", built
+> before launch so it can be marketed. The seventh Pro feature on the /pricing card.
+
+**Branch:** `v2.6.1/pro-export`
+
+> **Depends on:** v2.0 (Pro entitlement); builds on the free "download all your
+> invoices" export in v1.5.2.20-H (privacy law: every user gets a full copy,
+> so that one stays free).
+
+**Scope**
+- [ ] Pick a date range (from, to; which date it filters on to be decided:
+      sent date is the likely default) and a format, CSV or JSON.
+- [ ] One row/object per invoice: number, SatSend reference, client, dates,
+      status, currency and amounts, bitcoin amount received, transaction id.
+- [ ] Pro-only (Free gets the full export from v1.5.2.20-H, without range or JSON).
+- [ ] Add it to the /pricing Pro card.
+
+**Done when:** A Pro user downloads a CSV or JSON of their invoices for a chosen date range, and the numbers match the app.
+
+---
+
 ### 🚫 v2.7: Financial reports + export
+
+> **2026-11-25:** the export part is now v2.6.1 (Pro, pre-launch); this item
+> is the reports page, after launch.
 
 **Branch:** `v2.7/reports`
 
