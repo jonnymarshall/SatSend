@@ -200,9 +200,9 @@ export async function sendInvoicePublishedEmail(args: SendInvoicePublishedArgs):
       return await resend.emails.send(await message({
         to: args.to,
         replyTo: args.replyTo,
-        subject: args.invoiceNumber
-          ? `Invoice ${args.invoiceNumber} from ${args.senderName}`
-          : `New invoice from ${args.senderName}`,
+        // v1.5.36 (roadmap v1.4.26): who and how much, so it reads as a
+        // request for payment rather than paperwork.
+        subject: `${args.senderName} sent you an invoice for ${fmtCurrency(args.totalFiat, args.currency)}`,
         react: InvoicePublishedEmail({
           senderName: args.senderName,
           clientName: args.clientName,

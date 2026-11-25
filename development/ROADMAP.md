@@ -24,7 +24,7 @@
 keeps its own items' order):
 
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
-   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26, v1.4.24,
+   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24,
    v1.4.34 close-out.
 2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
    multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
@@ -514,7 +514,7 @@ before this may be a day early if they were picked in summer in the UK.
 
 ---
 
-### ⏳ v1.4.26 — Client `invoice_published` Email: Subject + Body Rework
+### ✅ v1.4.26 — Client `invoice_published` Email: Subject + Body Rework · v1.5.36
 
 **Branch:** `v1.4.26/client-email-rework`
 
@@ -525,20 +525,32 @@ before this may be a day early if they were picked in summer in the UK.
 3. **No in-email guidance on how Bitcoin payment works.** The recipient gets a CTA to view the invoice but no explanation of what to expect when they click through.
 
 **Scope**
-- [ ] **Subject** → `You've received an invoice from <sender>`, where `<sender>` follows the existing fallback chain `your_name || your_company || your_email` (same chain `publishAndSendEmail` already uses for `senderName`).
-- [ ] **Body opening** → drop the "Invoice X from Y" line. Open with `Hi there,` (or `Hi <client_name>,` when `client_name` is set — confirm the current template's recipient-name awareness from v1.4.4).
-- [ ] **Payment instructions paragraph** → add a short section explaining how Bitcoin payment works on SatSend: "Click through to view the invoice. SatSend accepts Bitcoin only — you'll see the BTC address, a QR code, and a live BTC/fiat conversion. Pay from any wallet; we'll detect the payment automatically." Tone matches the existing template.
-- [ ] Update template tests/snapshots in `src/lib/email/templates/`.
+- [x] **Subject** → `You've received an invoice from <sender>`, where `<sender>` follows the existing fallback chain `your_name || your_company || your_email` (same chain `publishAndSendEmail` already uses for `senderName`).
+- [x] **Body opening** → drop the "Invoice X from Y" line. Open with `Hi there,` (or `Hi <client_name>,` when `client_name` is set — confirm the current template's recipient-name awareness from v1.4.4).
+- [x] **Payment instructions paragraph** → add a short section explaining how Bitcoin payment works on SatSend: "Click through to view the invoice. SatSend accepts Bitcoin only — you'll see the BTC address, a QR code, and a live BTC/fiat conversion. Pay from any wallet; we'll detect the payment automatically." Tone matches the existing template.
+- [x] Update template tests/snapshots in `src/lib/email/templates/`.
 
 **Out of scope**
 - Subject variants per state (overdue, etc.) — separate work.
 - Localisation — single-language for now.
 
 **Tests**
-- [ ] Subject snapshot: reads `You've received an invoice from <sender>`, with each of the three fallback-chain branches exercised.
-- [ ] Body snapshot: starts with `Hi there,` or `Hi <client_name>,`; does not contain the substring `Invoice <number> from`; contains a Bitcoin-payment-instructions paragraph.
+- [x] Subject snapshot: reads `You've received an invoice from <sender>`, with each of the three fallback-chain branches exercised.
+- [x] Body snapshot: starts with `Hi there,` or `Hi <client_name>,`; does not contain the substring `Invoice <number> from`; contains a Bitcoin-payment-instructions paragraph.
 
 **Done when:** the published-invoice email subject leads with the recipient's framing; the body greets cleanly without metadata duplication; payment instructions are visible without clicking through.
+
+**Shipped in v1.5.36 (2026-11-24), with Jonny's go-ahead on a different
+subject:** "**<sender> sent you an invoice for <amount>**" (who and how much,
+so it reads as a payment request; the same with or without an invoice number)
+instead of "You've received an invoice from <sender>". The heading is now
+"Invoice INV-001" ("Your invoice" without a number). The greeting already used
+the client's name. A "How to pay" section: open the invoice (and enter the
+access code, when there is one); send the exact bitcoin amount shown, from any
+bitcoin wallet, to the address on the page; you and the sender both get an
+email when it arrives. Then: "The bitcoin amount is worked out at the current
+rate when you open the invoice. Your payment goes straight to <sender>."
+Sample sender: `npx tsx scripts/email/send-invoice-sample.tsx --to <address>`.
 
 ---
 

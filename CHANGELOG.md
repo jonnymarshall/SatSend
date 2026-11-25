@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.36 — The client's invoice email (roadmap v1.4.26).** Subject: "Maya
+  Chen sent you an invoice for $1,380.00" (was "Invoice INV-001 from Maya
+  Chen"), so it reads as a payment request. Heading: the invoice number. New
+  "How to pay" section: open the invoice (with the access code when there is
+  one), send the exact bitcoin amount shown to the address on the page, and
+  both sides get an email when it arrives; the amount uses the current rate,
+  and the payment goes straight to the sender. New sample sender:
+  `scripts/email/send-invoice-sample.tsx`.
+
+### Changed
+
 - **v1.5.35 — Invoice page: no repeated "sent" line (roadmap v1.4.22).** The
   "Sent via email on …" / "Marked as sent on …" line above the buttons is
   gone; the activity feed's "Invoice sent" / "Marked as sent" entry already

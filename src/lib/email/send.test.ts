@@ -392,6 +392,18 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
     expect(mockResendSend.mock.calls[0][0].text).toContain("https://app.test/invoice/ss-7k3qx9ab");
   });
 
+  // v1.5.36 (roadmap v1.4.26): the subject says who and how much, so it reads
+  // as a request for payment, not paperwork.
+  it("the invoice email's subject is '<sender> sent you an invoice for <amount>'", async () => {
+    await sendInvoicePublishedEmail(baseArgs);
+    expect(mockResendSend.mock.calls[0][0].subject).toBe("Charles sent you an invoice for $500.00");
+  });
+
+  it("the subject is the same whether or not the invoice has a number", async () => {
+    await sendInvoicePublishedEmail({ ...baseArgs, invoiceNumber: null });
+    expect(mockResendSend.mock.calls[0][0].subject).toBe("Charles sent you an invoice for $500.00");
+  });
+
   // v1.5.31 (roadmap v1.5.2.14-H): client links use the SatSend reference, and
   // every invoice email names it, under the one label.
   it("the invoice email links by SatSend reference, never the UUID, and shows the reference", async () => {
