@@ -18,7 +18,8 @@ import {
   publishAndSendEmail,
   publishAndMarkSent,
 } from "../actions";
-import { bulkArchive, bulkDelete, bulkUnarchive } from "../bulk-actions";
+import { bulkArchive, bulkUnarchive } from "../bulk-actions";
+import { deleteAvailability } from "@/lib/invoices/action-availability";
 import type { Database } from "@/lib/database.types";
 import { publicInvoicePath } from "@/lib/invoices/reference";
 
@@ -29,6 +30,8 @@ interface Invoice {
   status: Database["public"]["Enums"]["invoice_status"];
   due_date?: string | null;
   client_email?: string | null;
+  /** v1.5.37: a draft without a valid one can't be sent. */
+  btc_address?: string | null;
   sent_at?: string | null;
   send_method?: string | null;
   email_attempted_at?: string | null;
@@ -65,18 +68,15 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
     }
   }
 
+  // v1.5.37 (roadmap v1.4.24): only drafts can be deleted. A non-draft used to
+  // go through bulkDelete, which skipped it, then back to the list as if gone.
+  const canDelete = deleteAvailability(invoice);
   async function handleDelete() {
-    if (isDraft) {
-      await run(async () => {
-        await deleteDraft(invoice.id);
-        router.push("/invoices");
-      });
-    } else {
-      await run(async () => {
-        await bulkDelete([invoice.id]);
-        router.push("/invoices");
-      });
-    }
+    if (!canDelete.ok) return;
+    await run(async () => {
+      await deleteDraft(invoice.id);
+      router.push("/invoices");
+    });
   }
 
   return (
@@ -140,6 +140,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
             isDraft={isDraft}
             emailAttemptedAt={invoice.email_attempted_at ?? null}
             clientEmail={invoice.client_email ?? null}
+            btcAddress={invoice.btc_address ?? null}
             sentAt={invoice.sent_at ?? null}
             sendMethod={invoice.send_method ?? null}
             busy={busy}
@@ -243,14 +244,18 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
           Duplicate
         </Link>
 
-        <Button
-          id="invoice-actions--delete-button"
-          variant="danger"
-          onClick={handleDelete}
-          disabled={busy}
-        >
-          Delete
-        </Button>
+        {/* v1.5.37: a disabled button ignores the mouse, so the hover reason
+            sits on this wrapper. */}
+        <span id="invoice-actions--delete-wrapper" className="inline-flex" title={canDelete.ok ? undefined : canDelete.reason}>
+          <Button
+            id="invoice-actions--delete-button"
+            variant="danger"
+            onClick={handleDelete}
+            disabled={busy || !canDelete.ok}
+          >
+            Delete
+          </Button>
+        </span>
       </div>
     </div>
   );

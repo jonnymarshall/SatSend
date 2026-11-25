@@ -17,6 +17,8 @@ import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
 import type { InvoiceSummaryRow } from "@/lib/invoice-public";
 import { REFERENCE_LABEL, formatReference, publicInvoicePath } from "@/lib/invoices/reference";
+import { deleteAvailability, sendAvailability } from "@/lib/invoices/action-availability";
+import { MenuItemLabel } from "@/components/menu-item-label";
 
 // Derived from the generated types (v1.4.27-H). The table reads the
 // invoice_email_summary view; it only renders this subset.
@@ -27,6 +29,7 @@ export type InvoiceRow = Pick<
   | "reference"
   | "client_name"
   | "client_email"
+  | "btc_address"
   | "total_fiat"
   | "currency"
   | "status"
@@ -241,12 +244,14 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
         // "Send now via email" must still be reachable.
         const allSendActionsDone = !!invoice.sent_at && !!invoice.email_attempted_at;
         const showSendOptions = isDraft || (!isArchived && !allSendActionsDone);
-        const emailDisabled = !!invoice.email_attempted_at || !invoice.client_email;
-        const emailDisabledReason = invoice.email_attempted_at
-          ? "An email has already been attempted for this invoice; multiple sends are not supported."
-          : !invoice.client_email
-          ? "No client email on this invoice, so it can't be sent by email."
-          : undefined;
+        // v1.5.37 (roadmap v1.4.24): the shared rules; unavailable actions are
+        // greyed out with the reason on hover.
+        const send = sendAvailability(invoice);
+        const canDelete = deleteAvailability(invoice);
+        // When sending is blocked for the same reason every way, say it once
+        // (under "Send now via email").
+        const byHandShownReason =
+          send.byHand.ok || (!send.email.ok && send.email.reason === send.byHand.reason) ? undefined : send.byHand.reason;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -274,23 +279,34 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
               {showSendOptions && (
                 <>
                   <DropdownMenuItem
-                    disabled={emailDisabled}
-                    title={emailDisabled ? emailDisabledReason : undefined}
-                    onClick={() => !emailDisabled && actions.onSendEmail(invoice.id)}
+                    disabled={!send.email.ok}
+                    title={send.email.ok ? undefined : send.email.reason}
+                    onClick={() => send.email.ok && actions.onSendEmail(invoice.id)}
                   >
-                    Send now via email
+                    <MenuItemLabel label="Send now via email" reason={send.email.ok ? undefined : send.email.reason} />
                   </DropdownMenuItem>
                   {!invoice.sent_at && (
                     <>
-                      <DropdownMenuItem onClick={() => actions.onDownloadAndMarkSent(invoice.id)}>
-                        Download PDF and mark as sent
+                      <DropdownMenuItem
+                        disabled={!send.byHand.ok}
+                        title={send.byHand.ok ? undefined : send.byHand.reason}
+                        onClick={() => send.byHand.ok && actions.onDownloadAndMarkSent(invoice.id)}
+                      >
+                        <MenuItemLabel
+                          label="Download PDF and mark as sent"
+                          reason={byHandShownReason}
+                        />
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => actions.onCopyLinkAndMarkSent(invoice.id)}
-                        className="flex-col items-start gap-0.5"
+                        disabled={!send.byHand.ok}
+                        title={send.byHand.ok ? undefined : send.byHand.reason}
+                        onClick={() => send.byHand.ok && actions.onCopyLinkAndMarkSent(invoice.id)}
                       >
-                        <span>Copy link and mark as sent</span>
-                        <span className="text-xs text-(--color-text-secondary)">Share the link yourself</span>
+                        <MenuItemLabel
+                          label="Copy link and mark as sent"
+                          reason={byHandShownReason}
+                          hint="Share the link yourself"
+                        />
                       </DropdownMenuItem>
                     </>
                   )}
@@ -325,10 +341,12 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => actions.onDelete(invoice.id)}
+                disabled={!canDelete.ok}
+                title={canDelete.ok ? undefined : canDelete.reason}
+                onClick={() => canDelete.ok && actions.onDelete(invoice.id)}
                 variant="destructive"
               >
-                Delete
+                <MenuItemLabel label="Delete" reason={canDelete.ok ? undefined : canDelete.reason} />
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

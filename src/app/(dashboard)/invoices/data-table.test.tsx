@@ -39,6 +39,7 @@ import { publishAndSendEmail, publishAndMarkSent, markOverdue, markUnpaid } from
 
 const baseRow = {
   reference: "7K3QX9AB",
+  btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
   client_email: "client@example.com",
   sent_at: null,
   send_method: null,
@@ -329,6 +330,45 @@ describe("InvoiceDataTable — per-row actions", () => {
     fireEvent.click(openMenuButtons[0]);
     fireEvent.click(await screen.findByRole("menuitem", { name: /send now via email/i }));
     expect(await screen.findByText(/still a draft/i)).toBeInTheDocument();
+  });
+
+  // v1.5.37 (roadmap v1.4.24): actions that can't run are greyed out with the
+  // reason on hover, instead of failing or silently doing nothing.
+  it("a draft without a bitcoin address: every send option is greyed out with the reason", async () => {
+    const rows = [{ ...MOCK_INVOICES[0], btc_address: null }];
+    render(<InvoiceDataTable data={rows} userId="u1" />);
+    fireEvent.click(screen.getAllByRole("button", { name: /open menu/i })[0]);
+    const REASON = "Add a bitcoin address to this draft before sending it.";
+    for (const name of [/send now via email/i, /download pdf and mark as sent/i, /copy link and mark as sent/i]) {
+      const item = await screen.findByRole("menuitem", { name });
+      expect(item).toHaveAttribute("data-disabled");
+      expect(item).toHaveAttribute("title", REASON);
+      fireEvent.click(item);
+    }
+    // Disabled items ignore the mouse, so the reason is shown, once.
+    expect(screen.getAllByText(REASON)).toHaveLength(1);
+    expect(screen.getByRole("menuitem", { name: /send now via email/i })).toHaveTextContent(REASON);
+    expect(publishAndSendEmail).not.toHaveBeenCalled();
+    expect(publishAndMarkSent).not.toHaveBeenCalled();
+  });
+
+  it("Delete is greyed out on a sent invoice, pointing to Archive, and opens no dialog", async () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    fireEvent.click(screen.getAllByRole("button", { name: /open menu/i })[2]); // inv-3 paid
+    const del = await screen.findByRole("menuitem", { name: /^delete/i });
+    expect(del).toHaveAttribute("data-disabled");
+    expect(del).toHaveAttribute("title", "Only drafts can be deleted. You can archive a sent invoice instead.");
+    expect(del).toHaveTextContent("Only drafts can be deleted. You can archive a sent invoice instead.");
+    fireEvent.click(del);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("Delete stays available on a draft", async () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    fireEvent.click(screen.getAllByRole("button", { name: /open menu/i })[0]); // inv-1 draft
+    const del = await screen.findByRole("menuitem", { name: /^delete$/i });
+    expect(del).not.toHaveAttribute("data-disabled");
+    expect(del).toHaveTextContent(/^Delete$/);
   });
 
   // v1.5.34: Duplicate opens a pre-filled New Invoice form; nothing is saved.

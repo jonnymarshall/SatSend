@@ -24,7 +24,7 @@
 keeps its own items' order):
 
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
-   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24,
+   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24 (✅ v1.5.37),
    v1.4.34 close-out.
 2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
    multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
@@ -447,7 +447,7 @@ still drive the Send menu.
 
 ---
 
-### ⏳ v1.4.24 — `/invoices` Row Actions: Disable Unavailable Actions with Hover Explanation
+### ✅ v1.4.24 — `/invoices` Row Actions: Disable Unavailable Actions with Hover Explanation · v1.5.37
 
 **Branch:** `v1.4.24/row-actions-disabled-with-tooltip`
 
@@ -456,24 +456,39 @@ still drive the Send menu.
 The list already has one example of the right pattern: **"Send via email"** is greyed out when `client_email` is missing. We need to extend that pattern to cover every precondition, and add a hover tooltip so the user knows *why* an action is disabled. Reuse the **exact wording** shown on the edit page so the user sees consistent language across surfaces.
 
 **Scope**
-- [ ] Audit every row action exposed from `/invoices` and identify each precondition. Starter list:
+- [x] Audit every row action exposed from `/invoices` and identify each precondition. Starter list:
   - Publish (any variant) → requires `btc_address` (drafts only).
   - Publish-and-send-email → also requires `client_email`.
   - Mark-paid → requires status ∈ {pending, overdue, underpaid (post-v1.4.19)}.
   - Mark-unpaid → requires status='paid'.
   - Delete-draft → requires status='draft'.
   - (Confirm: archive, duplicate, mark-overdue — likely no preconditions but worth a sweep.)
-- [ ] Centralise availability into a single helper, `getRowActionAvailability(invoice): Record<ActionName, { ok: true } | { ok: false, reason: string }>`. The closest existing pattern is `canPublishInvoice` in `src/lib/invoices/can-publish.ts` — extend that or factor a new sibling, and **make `canPublishInvoice` consume the same source of truth** so the edit-page error wording and the list-tooltip wording are guaranteed to stay in sync.
-- [ ] In the row-action menu (likely a `RowActions` component referenced from `src/app/(dashboard)/invoices/columns.tsx`), pipe the per-action `reason` into the menu item: `disabled={!availability.ok}` plus a `<Tooltip>` (shadcn/ui Tooltip if installed; else inline `title=`) showing `availability.reason`.
-- [ ] Unify the existing "Send via email when no `client_email`" disable path through the same helper — don't keep two implementations.
+- [x] Centralise availability into a single helper, `getRowActionAvailability(invoice): Record<ActionName, { ok: true } | { ok: false, reason: string }>`. The closest existing pattern is `canPublishInvoice` in `src/lib/invoices/can-publish.ts` — extend that or factor a new sibling, and **make `canPublishInvoice` consume the same source of truth** so the edit-page error wording and the list-tooltip wording are guaranteed to stay in sync.
+- [x] In the row-action menu (likely a `RowActions` component referenced from `src/app/(dashboard)/invoices/columns.tsx`), pipe the per-action `reason` into the menu item: `disabled={!availability.ok}` plus a `<Tooltip>` (shadcn/ui Tooltip if installed; else inline `title=`) showing `availability.reason`.
+- [x] Unify the existing "Send via email when no `client_email`" disable path through the same helper — don't keep two implementations.
 
 **Tests**
-- [ ] Unit on `getRowActionAvailability`: for each action × each missing-precondition, returns `{ ok: false, reason: "<edit-page wording>" }`. Asserts wording matches the constants/messages used by `canPublishInvoice` so a future copy change in one place updates both.
-- [ ] Component on the row-action menu: a draft with no `btc_address` renders **Publish** disabled with a tooltip whose text matches the edit-page error wording.
-- [ ] Component: a paid invoice renders **Mark as Paid** disabled, **Mark as Unpaid** enabled.
-- [ ] Component: a draft with no `client_email` renders **Send via email** disabled (regression guard for the existing behaviour, now routed through the new helper).
+- [x] Unit on `getRowActionAvailability`: for each action × each missing-precondition, returns `{ ok: false, reason: "<edit-page wording>" }`. Asserts wording matches the constants/messages used by `canPublishInvoice` so a future copy change in one place updates both.
+- [x] Component on the row-action menu: a draft with no `btc_address` renders **Publish** disabled with a tooltip whose text matches the edit-page error wording.
+- [x] Component: a paid invoice renders **Mark as Paid** disabled, **Mark as Unpaid** enabled.
+- [x] Component: a draft with no `client_email` renders **Send via email** disabled (regression guard for the existing behaviour, now routed through the new helper).
 
 **Done when:** No action in the `/invoices` row menu can be executed against an invoice that doesn't satisfy its preconditions; disabled actions surface a hover tooltip explaining the missing prerequisite, with wording consistent with the edit page; the "send via email when no client_email" behaviour is unified through the same helper rather than living as a one-off.
+
+**Shipped in v1.5.37 (2026-11-24).** `src/lib/invoices/action-availability.ts`
+(`sendAvailability`, `deleteAvailability`, `REASONS`) is read by the list's row
+menu, the invoice page's Send menu and its Delete button. The audit found two
+real gaps: (1) a draft without a valid bitcoin address offered all three send
+options and the server then refused; (2) **Delete on a sent invoice silently
+did nothing**: the list's bulk delete skipped it, and the invoice page then went
+back to the list as if it were gone. Both are now greyed out with the reason.
+Everything else in the menu was already hidden when it doesn't apply, and stays
+so. **Changed from the plan:** disabled items and buttons ignore the mouse
+(`pointer-events: none`), so a hover tooltip could never show (the existing
+"no client email" reason never had); phones have no hover either. So menu
+reasons are shown as a small grey second line (`MenuItemLabel`), once when all
+three send options share it; the invoice page's Delete keeps a hover reason on
+a wrapper around the button.
 
 ---
 

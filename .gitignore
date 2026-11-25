@@ -56,3 +56,8 @@ supabase/.temp/
 
 # test-automation local state (counters etc.)
 test-automation/.state.json
+
+# Local scratch files (never commit)
+.tmp/
+.tmp-dev.log
+development/design-inspiration.md

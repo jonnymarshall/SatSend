@@ -9,6 +9,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { sendAvailability } from "@/lib/invoices/action-availability";
+import { MenuItemLabel } from "@/components/menu-item-label";
+
+// Placeholders that pass the shared rules, used when the caller (the invoice
+// form) checks the address and client email fields itself.
+const ADDRESS_CHECKED_ELSEWHERE = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+const EMAIL_CHECKED_ELSEWHERE = "checked@elsewhere.invalid";
+
 /**
  * The Send menu (v1.5.19, was PublishMenu). An invoice is a draft or it's sent:
  * every option here sends it, makes the client's link live and records its sent
@@ -19,6 +27,16 @@ export interface SendMenuProps {
   isDraft: boolean;
   emailAttemptedAt: string | null;
   clientEmail: string | null;
+  /**
+   * v1.5.37: the saved invoice's bitcoin address, so a draft without a valid one
+   * can't be sent from the invoice page.
+   */
+  btcAddress?: string | null;
+  /**
+   * v1.5.37: the invoice form. Nothing is greyed out for a missing address or
+   * client email; clicking shows the error under the field instead.
+   */
+  checksFieldsItself?: boolean;
   sentAt?: string | null;
   sendMethod?: string | null;
   onSendEmail: (id: string) => void;
@@ -32,6 +50,8 @@ export function SendMenu({
   invoiceId,
   emailAttemptedAt,
   clientEmail,
+  btcAddress,
+  checksFieldsItself = false,
   sentAt,
   onSendEmail,
   onDownloadAndMarkSent,
@@ -39,12 +59,18 @@ export function SendMenu({
   triggerVariant = "primary",
   busy,
 }: SendMenuProps) {
-  const emailDisabled = !!emailAttemptedAt || !clientEmail;
-  const emailDisabledReason = emailAttemptedAt
-    ? "An email has already been attempted for this invoice; multiple sends are not supported."
-    : !clientEmail
-    ? "No client email on this invoice, so it can't be sent by email."
-    : undefined;
+  // v1.5.37 (roadmap v1.4.24): the shared rules. The form checks the address
+  // and client email itself, so placeholders that pass stand in for them.
+  const { email, byHand } = sendAvailability({
+    status: "draft",
+    btc_address: checksFieldsItself ? ADDRESS_CHECKED_ELSEWHERE : (btcAddress ?? null),
+    client_email: checksFieldsItself ? EMAIL_CHECKED_ELSEWHERE : clientEmail,
+    email_attempted_at: emailAttemptedAt,
+  });
+  // When sending is blocked for the same reason every way, say it once (under
+  // "Send now via email").
+  const byHandShownReason =
+    byHand.ok || (!email.ok && email.reason === byHand.reason) ? undefined : byHand.reason;
   // Once it's been sent by hand, the hand-sent options have nothing left to do;
   // only "Send now via email" can still add something.
   const showManualSendOptions = !sentAt;
@@ -61,24 +87,33 @@ export function SendMenu({
       <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem
           id={`send-menu--email-${invoiceId}`}
-          disabled={emailDisabled}
-          title={emailDisabled ? emailDisabledReason : undefined}
-          onClick={() => !emailDisabled && onSendEmail(invoiceId)}
+          disabled={!email.ok}
+          title={email.ok ? undefined : email.reason}
+          onClick={() => email.ok && onSendEmail(invoiceId)}
         >
-          Send now via email
+          <MenuItemLabel label="Send now via email" reason={email.ok ? undefined : email.reason} />
         </DropdownMenuItem>
         {showManualSendOptions && (
           <>
-            <DropdownMenuItem id={`send-menu--download-${invoiceId}`} onClick={() => onDownloadAndMarkSent(invoiceId)}>
-              Download PDF and mark as sent
+            <DropdownMenuItem
+              id={`send-menu--download-${invoiceId}`}
+              disabled={!byHand.ok}
+              title={byHand.ok ? undefined : byHand.reason}
+              onClick={() => byHand.ok && onDownloadAndMarkSent(invoiceId)}
+            >
+              <MenuItemLabel label="Download PDF and mark as sent" reason={byHandShownReason} />
             </DropdownMenuItem>
             <DropdownMenuItem
               id={`send-menu--copy-link-${invoiceId}`}
-              onClick={() => onCopyLinkAndMarkSent(invoiceId)}
-              className="flex-col items-start gap-0.5"
+              disabled={!byHand.ok}
+              title={byHand.ok ? undefined : byHand.reason}
+              onClick={() => byHand.ok && onCopyLinkAndMarkSent(invoiceId)}
             >
-              <span>Copy link and mark as sent</span>
-              <span className="text-xs text-(--color-text-secondary)">Share the link yourself</span>
+              <MenuItemLabel
+                label="Copy link and mark as sent"
+                reason={byHandShownReason}
+                hint="Share the link yourself"
+              />
             </DropdownMenuItem>
           </>
         )}

@@ -19,6 +19,7 @@ function renderMenu(props: Partial<SendMenuProps> = {}) {
       isDraft
       emailAttemptedAt={null}
       clientEmail="ada@example.com"
+      btcAddress="bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"
       onSendEmail={onSendEmail}
       onDownloadAndMarkSent={onDownloadAndMarkSent}
       onCopyLinkAndMarkSent={onCopyLinkAndMarkSent}
@@ -81,5 +82,33 @@ describe("SendMenu: email gating", () => {
   it("disables email when there is no client email", () => {
     renderMenu({ clientEmail: "" });
     expect(item(/send now via email/i)).toHaveAttribute("data-disabled");
+  });
+});
+
+// v1.5.37 (roadmap v1.4.24): on the invoice page, a draft without a valid
+// bitcoin address can't be sent any way; the items say why on hover.
+describe("SendMenu: a draft without a bitcoin address", () => {
+  it("greys out every option with the reason", () => {
+    renderMenu({ btcAddress: null });
+    const REASON = "Add a bitcoin address to this draft before sending it.";
+    for (const name of [/send now via email/i, /download pdf and mark as sent/i, /copy link and mark as sent/i]) {
+      expect(item(name)).toHaveAttribute("data-disabled");
+      expect(item(name)).toHaveAttribute("title", REASON);
+      fireEvent.click(item(name));
+    }
+    expect(screen.getAllByText(REASON)).toHaveLength(1);
+    expect(item(/send now via email/i)).toHaveTextContent(REASON);
+    expect(onSendEmail).not.toHaveBeenCalled();
+    expect(onDownloadAndMarkSent).not.toHaveBeenCalled();
+    expect(onCopyLinkAndMarkSent).not.toHaveBeenCalled();
+  });
+
+  it("the invoice form checks its fields itself: nothing is greyed out for a missing address or client email", () => {
+    renderMenu({ checksFieldsItself: true, btcAddress: undefined, clientEmail: "" });
+    for (const name of [/send now via email/i, /download pdf and mark as sent/i, /copy link and mark as sent/i]) {
+      expect(item(name)).not.toHaveAttribute("data-disabled");
+    }
+    fireEvent.click(item(/send now via email/i));
+    expect(onSendEmail).toHaveBeenCalledWith("inv-1");
   });
 });
