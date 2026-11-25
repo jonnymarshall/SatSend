@@ -6,7 +6,7 @@ import { canPublishInvoice } from "@/lib/invoices/can-publish";
  * The invoice list's row menu, the invoice page's Send menu and its Delete
  * button all read this, so an action is never offered and then refused (or,
  * for Delete on a sent invoice, quietly skipped). Unavailable actions are shown
- * greyed out with the reason on hover.
+ * greyed out with the reason as a visible second line (MenuItemLabel).
  *
  * Actions that simply don't apply (Mark as paid on a paid invoice, Unarchive on
  * one that isn't archived) stay hidden, as before.
