@@ -6,7 +6,7 @@ import { LOGO_ATTACHMENT } from "./logo-inline";
 import { statusIconAttachment } from "./status-icons-inline";
 import { paymentState, type PaymentAudience, type PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
 import { mempoolTxUrl } from "@/lib/btc-network";
-import { publicInvoicePath } from "@/lib/invoices/reference";
+import { publicInvoicePath, senderInvoicePath } from "@/lib/invoices/reference";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 
@@ -254,9 +254,9 @@ function paymentMessage(args: SendPaymentStatusArgs, audience: PaymentAudience, 
       txid: args.txid,
       mempoolUrl: mempoolTxUrl(args.txid),
       actionUrl:
-        // The client's link uses the SatSend reference (v1.5.31); the sender's
-        // goes to their dashboard, which stays on the UUID.
-        audience === "client" ? `${getAppUrl()}${publicInvoicePath(args)}` : `${getAppUrl()}/invoices/${args.invoiceId}`,
+        // Both links use the SatSend reference: the client's page (v1.5.31) and
+        // the sender's own (v1.5.38).
+        audience === "client" ? `${getAppUrl()}${publicInvoicePath(args)}` : `${getAppUrl()}${senderInvoicePath(args)}`,
     }),
   });
 }

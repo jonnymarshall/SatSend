@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { InvoiceForm } from "@/components/invoice-form";
 import { toInvoice } from "@/lib/invoice-public";
 import { dateOnlyToUtc } from "@/lib/date-only";
+import { findOwnInvoice } from "@/lib/invoices/own-invoice";
+import { senderInvoicePath } from "@/lib/invoices/reference";
 
 export default async function EditInvoicePage({
   params,
@@ -13,21 +15,18 @@ export default async function EditInvoicePage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: invoice } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user!.id)
-    .single();
-
-  if (!invoice) notFound();
-  if (invoice.status !== "draft") redirect(`/invoices/${id}`);
+  // v1.5.38: addressed by SatSend reference; old UUID links redirect.
+  const found = await findOwnInvoice(supabase, user!.id, id);
+  if (!found) notFound();
+  const { invoice, canonical } = found!;
+  if (invoice.status !== "draft") redirect(senderInvoicePath(invoice));
+  if (!canonical) redirect(senderInvoicePath(invoice, "edit"));
 
   return (
     <div id="invoice-form-page" className="space-y-6">
       <h1 id="invoice-form-page--heading" className="font-display tracking-heading text-[28px] leading-tight font-bold md:text-[32px]">Edit Invoice</h1>
       <InvoiceForm
-        invoiceId={id}
+        invoiceId={invoice.id}
         sessionEmail={user!.email}
         initialValues={{
           invoice_number: invoice.invoice_number ?? "",

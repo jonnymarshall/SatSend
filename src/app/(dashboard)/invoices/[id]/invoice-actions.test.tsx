@@ -92,7 +92,7 @@ describe("InvoiceActions — draft status", () => {
   // v1.5.34: Duplicate is a link to a pre-filled New Invoice form; nothing is saved.
   it("Duplicate links to the New Invoice form filled in from this invoice", () => {
     render(<InvoiceActions invoice={draft} />);
-    expect(screen.getByRole("link", { name: /duplicate/i })).toHaveAttribute("href", "/invoices/new?from=inv-d");
+    expect(screen.getByRole("link", { name: /duplicate/i })).toHaveAttribute("href", "/invoices/new?from=ss-7k3qx9ab");
   });
 
   it("calls deleteDraft when Delete is clicked on a draft", async () => {

@@ -231,7 +231,7 @@ export async function updateDraft(
     throw new Error(error.message);
   }
   revalidatePath("/dashboard");
-  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
   return { ok: true, data: toInvoice(data) };
 }
 
@@ -322,7 +322,7 @@ async function applyPublishUpdate(
   }
 
   revalidatePath("/dashboard");
-  revalidatePath(`/invoices/${invoice.id}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
 }
 
 // v1.5.9 (v1.5.0.6-H): the send actions also run on an invoice that is already
@@ -338,7 +338,7 @@ async function applySendUpdate(
   const { error } = await supabase.from("invoices").update(sendFields).eq("id", invoice.id);
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
-  revalidatePath(`/invoices/${invoice.id}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
 }
 
 // v1.5.19 (roadmap v1.5.2.0.1-H): an invoice is a draft or it's sent. There is
@@ -471,7 +471,7 @@ export async function markPaid(invoiceId: string) {
   });
 
   revalidatePath("/dashboard");
-  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
 }
 
 export async function deleteDraft(invoiceId: string) {
@@ -539,7 +539,7 @@ export async function markUnpaid(invoiceId: string) {
   });
 
   revalidatePath("/dashboard");
-  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
 }
 
 export async function markOverdue(invoiceId: string) {

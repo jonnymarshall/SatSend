@@ -4,6 +4,7 @@ import {
   formatReference,
   referencePath,
   publicInvoicePath,
+  senderInvoicePath,
   parseInvoiceKey,
 } from "./reference";
 
@@ -61,5 +62,16 @@ describe("parseInvoiceKey", () => {
     ["SS-7K3Q-X9AB", "a hyphen inside"],
   ])("rejects %s (%s) without a lookup", (input) => {
     expect(parseInvoiceKey(input)).toBeNull();
+  });
+});
+
+// v1.5.38: the sender's own pages use the reference too, so one invoice has one
+// name in every link.
+describe("senderInvoicePath", () => {
+  it("is /invoices/ss-<reference>", () => {
+    expect(senderInvoicePath({ reference: "7K3QX9AB" })).toBe("/invoices/ss-7k3qx9ab");
+  });
+  it("can point at the edit page", () => {
+    expect(senderInvoicePath({ reference: "7K3QX9AB" }, "edit")).toBe("/invoices/ss-7k3qx9ab/edit");
   });
 });

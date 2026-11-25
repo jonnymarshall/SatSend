@@ -22,8 +22,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 
 vi.mock("@/app/(dashboard)/invoices/actions", () => ({
-  saveDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id" } }),
-  updateDraft: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+  saveDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id", reference: "7K3QX9AB" } }),
+  updateDraft: vi.fn().mockResolvedValue({ ok: true, data: { id: "test-id", reference: "7K3QX9AB" } }),
   publishAndSendEmail: vi.fn().mockResolvedValue({ ok: true, data: { emailStatus: "sent" } }),
   publishAndMarkSent: vi.fn().mockResolvedValue({ ok: true, data: { reference: "7K3QX9AB" } }),
 }));
@@ -188,7 +188,7 @@ describe("InvoiceForm Send menu (v1.5.19)", () => {
     await user.type(screen.getByPlaceholderText(/bc1q/i), VALID_ADDRESS);
     await chooseCopyLink(user);
     await vi.waitFor(() => expect(publishAndMarkSent).toHaveBeenCalledWith("test-id"));
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/test-id"));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/ss-7k3qx9ab"));
     await vi.waitFor(() => expect(showNotice).toHaveBeenCalledWith("Link copied"));
     // v1.5.31: the short link, by SatSend reference.
     expect(await navigator.clipboard.readText()).toBe(`${window.location.origin}/invoice/ss-7k3qx9ab`);
@@ -203,7 +203,7 @@ describe("InvoiceForm Send menu (v1.5.19)", () => {
     await user.type(document.getElementById("input-client-email")!, "client@example.com");
     await user.click(screen.getByRole("button", { name: /^send/i }));
     await user.click(await screen.findByRole("menuitem", { name: /send now via email/i }));
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/test-id?email=failed"));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/invoices/ss-7k3qx9ab?email=failed"));
   });
 
   async function chooseCopyLink(user: ReturnType<typeof userEvent.setup>) {

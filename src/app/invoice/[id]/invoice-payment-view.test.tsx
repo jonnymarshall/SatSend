@@ -217,11 +217,12 @@ describe("InvoicePaymentView — BTC reveal", () => {
       .mockImplementation(async () => quoteResponse({ amountSats: 1_100_000 }));
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
     fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
-    // Real timers: under a full CI run this has taken just over the default
-    // 1 s wait (v1.5.37), so allow more.
-    expect(await screen.findByText("0.011 BTC", {}, { timeout: 5000 })).toBeInTheDocument();
+    // Real timers: under a full run on a busy machine this has taken over 1 s
+    // (CI, v1.5.37) and then over the whole default 5 s test limit (locally,
+    // v1.5.38), so it gets its own, longer limit.
+    expect(await screen.findByText("0.011 BTC", {}, { timeout: 12_000 })).toBeInTheDocument();
     expect(mockFetch).toHaveBeenCalledTimes(2);
-  });
+  }, 15_000);
 
   it("after the computer sleeps past the held time, asks for a fresh quote on coming back", async () => {
     // A sleeping laptop pauses timers, so the expiry timer can't be relied on:

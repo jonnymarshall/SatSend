@@ -413,7 +413,7 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
     expect(text).toMatch(/SatSend reference:?\s+SS-7K3QX9AB/);
   });
 
-  it("payment emails: the client's link uses the reference, the sender's stays on the dashboard; both show it", async () => {
+  it("payment emails: the client's link uses the reference, the sender's goes to their own page by reference; both show it", async () => {
     await sendPaymentDetectedEmail(paymentArgs);
     await sendPaymentConfirmedEmail({ ...paymentArgs, payment: CONFIRMED });
     expect(mockResendSend.mock.calls).toHaveLength(4);
@@ -423,7 +423,8 @@ describe("deliverability (v1.5.0.2-H): plain-text part and Reply-To", () => {
         expect(payload.text).toContain("https://app.test/invoice/ss-7k3qx9ab");
         expect(payload.text).not.toContain("/invoice/inv-1");
       } else {
-        expect(payload.text).toContain("https://app.test/invoices/inv-1");
+        expect(payload.text).toContain("https://app.test/invoices/ss-7k3qx9ab");
+        expect(payload.text).not.toContain("/invoices/inv-1");
       }
     }
   });

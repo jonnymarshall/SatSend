@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceDates } from "@/components/invoice-dates";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
@@ -14,7 +14,8 @@ import { toInvoice } from "@/lib/invoice-public";
 import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { getAppUrl } from "@/lib/app-url";
 import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
-import { publicInvoicePath } from "@/lib/invoices/reference";
+import { publicInvoicePath, senderInvoicePath } from "@/lib/invoices/reference";
+import { findOwnInvoice } from "@/lib/invoices/own-invoice";
 
 const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
@@ -32,14 +33,13 @@ export default async function InvoiceDetailPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: invoice } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user!.id)
-    .single();
-
-  if (!invoice) notFound();
+  // v1.5.38: addressed by SatSend reference; old UUID links redirect.
+  const found = await findOwnInvoice(supabase, user!.id, id);
+  if (!found) notFound();
+  const { invoice, canonical } = found!;
+  if (!canonical) {
+    redirect(senderInvoicePath(invoice) + (emailParam ? `?email=${encodeURIComponent(emailParam)}` : ""));
+  }
 
   const items: LineItem[] = toInvoice(invoice).line_items;
   const emailProblem =
