@@ -122,7 +122,7 @@ export async function POST(
     return NextResponse.json({ error: "Failed to update invoice" }, { status: 500 });
   }
 
-  revalidatePath(`/invoices/${id}`);
+  revalidatePath("/invoices/[id]", "layout"); // v1.5.38: pages are addressed by reference
   revalidatePath("/invoices");
 
   if (decision.newStatus !== invoice.status) {

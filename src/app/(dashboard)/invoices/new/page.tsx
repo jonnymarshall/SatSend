@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceForm } from "@/components/invoice-form";
 import { duplicateFormValues } from "@/lib/invoices/duplicate";
+import { findOwnInvoice } from "@/lib/invoices/own-invoice";
 
 // v1.5.34 (roadmap v1.4.25): Duplicate opens this page with ?from=<id>, filled
 // in from the original. Nothing is saved until the sender saves, so cancelling
@@ -20,12 +21,8 @@ export default async function NewInvoicePage({
   let copiedFrom: string | null = null;
   if (from) {
     // Only the signed-in sender's own invoice (RLS also enforces this).
-    const { data: source } = await supabase
-      .from("invoices")
-      .select("*")
-      .eq("id", from)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // v1.5.38: ?from= is the SatSend reference (an old UUID still works).
+    const source = (await findOwnInvoice(supabase, user.id, from))?.invoice;
     if (!source) notFound();
 
     const { data: takenRows } = await supabase

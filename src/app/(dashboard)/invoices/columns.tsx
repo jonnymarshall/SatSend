@@ -16,7 +16,7 @@ import {
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { canMarkAsOverdue, canMarkAsPending } from "@/lib/invoices/overdue-actions";
 import type { InvoiceSummaryRow } from "@/lib/invoice-public";
-import { REFERENCE_LABEL, formatReference, publicInvoicePath } from "@/lib/invoices/reference";
+import { REFERENCE_LABEL, formatReference, publicInvoicePath, referencePath, senderInvoicePath } from "@/lib/invoices/reference";
 import { deleteAvailability, sendAvailability } from "@/lib/invoices/action-availability";
 import { MenuItemLabel } from "@/components/menu-item-label";
 
@@ -54,7 +54,8 @@ export interface RowActions {
   onDelete: (id: string) => void;
   /** Copies the client's short link (v1.5.31: by SatSend reference). */
   onCopyPublicLink: (invoice: { reference: string }) => void;
-  onDuplicate: (id: string) => void;
+  /** Gets the link form of the SatSend reference ("ss-7k3qx9ab"), v1.5.38. */
+  onDuplicate: (ref: string) => void;
 }
 
 function sortableHeader(label: string) {
@@ -102,7 +103,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
         return (
           <div className="proxy-id--invoice-row--number">
             <Link
-              href={`/invoices/${invoice.id}`}
+              href={senderInvoicePath(invoice)}
               className="proxy-id--invoice-row--number-link inline-flex min-h-11 items-center font-semibold md:min-h-0 text-(--color-ink) underline-offset-4 decoration-(--color-brand) decoration-2 hover:underline"
             >
               {invoice.invoice_number || "—"}
@@ -263,9 +264,9 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
               }
             />
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuItem render={<Link href={`/invoices/${invoice.id}`}>View invoice</Link>} />
+              <DropdownMenuItem render={<Link href={senderInvoicePath(invoice)}>View invoice</Link>} />
               {isDraft && (
-                <DropdownMenuItem render={<Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>} />
+                <DropdownMenuItem render={<Link href={senderInvoicePath(invoice, "edit")}>Edit</Link>} />
               )}
               {!isDraft && (
                 <>
@@ -337,7 +338,7 @@ export function buildColumns(actions: RowActions): ColumnDef<InvoiceRow>[] {
                   Archive
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => actions.onDuplicate(invoice.id)}>
+              <DropdownMenuItem onClick={() => actions.onDuplicate(referencePath(invoice.reference))}>
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuItem

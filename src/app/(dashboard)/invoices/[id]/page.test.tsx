@@ -45,6 +45,7 @@ function makeSupabaseMock(invoiceData: typeof BASE_INVOICE) {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: invoiceData }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: invoiceData }),
     })),
   };
 }
@@ -54,8 +55,14 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => makeSupabaseMock(BASE_INVOICE)),
 }));
 
+const { redirect } = vi.hoisted(() => ({
+  redirect: vi.fn((to: string) => {
+    throw new Error(`REDIRECT ${to}`);
+  }),
+}));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
+  redirect,
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
 }));
 vi.mock("@/lib/btc-network", () => ({ getMempoolBaseUrl: () => "https://mempool.space" }));
@@ -83,7 +90,7 @@ function mockInvoiceRow(over: Record<string, unknown>) {
 describe("InvoiceDetailPage — SatSend reference", () => {
   it("shows the reference as a row like Date Sent and Date Due, without a copy button", async () => {
     mockInvoiceRow({});
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     const ref = document.getElementById("invoice-dates--reference")!;
     expect(ref).toHaveTextContent("SatSend reference: SS-7K3QX9AB");
     expect(document.getElementById("invoice-dates")).toContainElement(ref);
@@ -94,7 +101,7 @@ describe("InvoiceDetailPage — SatSend reference", () => {
 
   it("the share link is the short link, never the UUID", async () => {
     mockInvoiceRow({});
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     const share = document.getElementById("invoice-detail--share-link")!;
     expect(share).toHaveTextContent("/invoice/ss-7k3qx9ab");
     expect(share).not.toHaveTextContent("inv-abc");
@@ -104,7 +111,7 @@ describe("InvoiceDetailPage — SatSend reference", () => {
 describe("InvoiceDetailPage — dates", () => {
   it("shows 'Date Sent:' as the day it was sent, not the day it was created (v1.5.19)", async () => {
     mockInvoiceRow({ sent_at: "2026-04-20T09:00:00Z", send_method: "manual" });
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.getByText(/date sent:/i)).toBeInTheDocument();
     expect(screen.getAllByText(/apr(il)? 20,? 2026/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/apr(il)? 15,? 2026/i)).not.toBeInTheDocument();
@@ -112,7 +119,7 @@ describe("InvoiceDetailPage — dates", () => {
 
   it("a draft shows no Date Sent (v1.5.19)", async () => {
     mockInvoiceRow({ status: "draft", sent_at: null });
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.queryByText(/date sent/i)).not.toBeInTheDocument();
   });
 
@@ -120,7 +127,7 @@ describe("InvoiceDetailPage — dates", () => {
     mockInvoiceRow({ status: "draft", sent_at: null });
     render(
       await InvoiceDetailPage({
-        params: Promise.resolve({ id: "inv-abc" }),
+        params: Promise.resolve({ id: "ss-7k3qx9ab" }),
         searchParams: Promise.resolve({ email: "failed" }),
       }),
     );
@@ -128,7 +135,7 @@ describe("InvoiceDetailPage — dates", () => {
   });
 
   it("shows 'Date Due:' label with formatted date when due_date is present", async () => {
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.getByText(/date due:/i)).toBeInTheDocument();
     expect(screen.getByText(/may 15,? 2026/i)).toBeInTheDocument();
   });
@@ -138,7 +145,7 @@ describe("InvoiceDetailPage — dates", () => {
     vi.mocked(createClient).mockResolvedValueOnce(
       makeSupabaseMock({ ...BASE_INVOICE, due_date: null }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.getByText(/no due date/i)).toBeInTheDocument();
   });
 });
@@ -155,7 +162,7 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(mockPaymentWatcher).not.toHaveBeenCalled();
   });
 
@@ -168,7 +175,7 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(mockPaymentWatcher).not.toHaveBeenCalled();
   });
 
@@ -181,7 +188,7 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(mockPaymentWatcher).toHaveBeenCalledTimes(1);
   });
 
@@ -194,7 +201,7 @@ describe("InvoiceDetailPage — PaymentWatcher gating (v1.4.12 hotfix)", () => {
         btc_address: "tb1qtest",
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(mockPaymentWatcher).toHaveBeenCalledTimes(1);
   });
 });
@@ -210,7 +217,7 @@ describe("InvoiceDetailPage — under/overpaid amount indicator", () => {
         amount_received_fiat: 250,
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.getByText(/received \$250(\.00)? of \$1,?000(\.00)?/i)).toBeInTheDocument();
   });
 
@@ -225,7 +232,7 @@ describe("InvoiceDetailPage — under/overpaid amount indicator", () => {
         overpaid: true,
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.getByText(/overpaid by \$200(\.00)?/i)).toBeInTheDocument();
   });
 
@@ -240,9 +247,37 @@ describe("InvoiceDetailPage — under/overpaid amount indicator", () => {
         overpaid: false,
       }) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
-    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "inv-abc" }) }));
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
     expect(screen.queryByText(/received \$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/overpaid by/i)).not.toBeInTheDocument();
   });
 });
 
+
+// v1.5.38: the sender's page is /invoices/ss-<reference>, like the client's
+// link. Old UUID links (and other spellings) redirect to it.
+describe("InvoiceDetailPage — address by SatSend reference", () => {
+  it("an old UUID link redirects to the reference, keeping ?email=", async () => {
+    mockInvoiceRow({ status: "draft", sent_at: null });
+    await expect(
+      InvoiceDetailPage({
+        params: Promise.resolve({ id: "0b1e7c2a-1111-4222-8333-444455556666" }),
+        searchParams: Promise.resolve({ email: "failed" }),
+      }),
+    ).rejects.toThrow("REDIRECT /invoices/ss-7k3qx9ab?email=failed");
+  });
+
+  it("another spelling of the reference redirects to the lowercase form", async () => {
+    mockInvoiceRow({});
+    await expect(InvoiceDetailPage({ params: Promise.resolve({ id: "SS-7K3QX9AB" }) })).rejects.toThrow(
+      "REDIRECT /invoices/ss-7k3qx9ab",
+    );
+  });
+
+  it("the reference link itself renders without a redirect", async () => {
+    redirect.mockClear();
+    mockInvoiceRow({});
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
+    expect(redirect).not.toHaveBeenCalled();
+  });
+});

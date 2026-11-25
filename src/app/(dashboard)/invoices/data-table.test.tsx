@@ -313,6 +313,20 @@ describe("InvoiceDataTable — per-row actions", () => {
     expect(refs[0]).toHaveAttribute("title", "SatSend reference");
   });
 
+  // v1.5.38: your own invoice pages are addressed by the SatSend reference.
+  it("row links, View, Edit and Duplicate use the reference, never the UUID", async () => {
+    render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
+    const numberLink = screen.getByRole("link", { name: "INV-001" });
+    expect(numberLink).toHaveAttribute("href", "/invoices/ss-7k3qx9ab");
+    fireEvent.click(screen.getAllByRole("button", { name: /open menu/i })[0]); // inv-1 draft
+    const view = await screen.findByRole("menuitem", { name: /view invoice/i });
+    expect(view.closest("a") ?? view).toHaveAttribute("href", "/invoices/ss-7k3qx9ab");
+    const edit = screen.getByRole("menuitem", { name: /^edit$/i });
+    expect(edit.closest("a") ?? edit).toHaveAttribute("href", "/invoices/ss-7k3qx9ab/edit");
+    fireEvent.click(screen.getByRole("menuitem", { name: /duplicate/i }));
+    expect(mockPush).toHaveBeenCalledWith("/invoices/new?from=ss-7k3qx9ab");
+  });
+
   it("'Copy public link' also confirms with the notice (v1.5.19)", async () => {
     render(<InvoiceDataTable data={MOCK_INVOICES} userId="u1" />);
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
@@ -377,7 +391,7 @@ describe("InvoiceDataTable — per-row actions", () => {
     const openMenuButtons = screen.getAllByRole("button", { name: /open menu/i });
     fireEvent.click(openMenuButtons[1]); // inv-2 pending
     fireEvent.click(await screen.findByRole("menuitem", { name: /duplicate/i }));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/invoices/new?from=inv-2"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/invoices/new?from=ss-7k3qx9ab"));
   });
 
   it("hides the publish/send menu items only on rows successfully delivered via email", async () => {

@@ -31,6 +31,14 @@ export function publicInvoicePath(invoice: { reference: string }): string {
   return `/invoice/${referencePath(invoice.reference)}`;
 }
 
+/**
+ * The sender's own page for an invoice (v1.5.38): "/invoices/ss-7k3qx9ab", or
+ * its edit page. One invoice, one name in every link.
+ */
+export function senderInvoicePath(invoice: { reference: string }, page?: "edit"): string {
+  return `/invoices/${referencePath(invoice.reference)}${page ? `/${page}` : ""}`;
+}
+
 export type InvoiceKey = { kind: "reference"; reference: string } | { kind: "id"; id: string };
 
 /**

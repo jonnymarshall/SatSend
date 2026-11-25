@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-// v1.5.34 (roadmap v1.4.25): Duplicate opens /invoices/new?from=<id>. The page
+// v1.5.34 (roadmap v1.4.25): Duplicate opens /invoices/new?from=<ref> (v1.5.38:
+// the SatSend reference, was the UUID). The page
 // fills the form from the original, only if it's the signed-in sender's own,
 // and writes nothing to the database.
 
@@ -26,6 +27,7 @@ vi.mock("next/navigation", () => ({
 
 const SOURCE = {
   id: "inv-src",
+  reference: "7K3QX9AB",
   user_id: "user-1",
   status: "paid",
   invoice_number: "INV-001",
@@ -91,7 +93,7 @@ describe("New Invoice page", () => {
   });
 
   it("with ?from, fills the form from the sender's own invoice and saves nothing", async () => {
-    render(await NewInvoicePage({ searchParams: Promise.resolve({ from: "inv-src" }) }));
+    render(await NewInvoicePage({ searchParams: Promise.resolve({ from: "ss-7k3qx9ab" }) }));
     const props = formProps.mock.calls[0][0] as { invoiceId?: string; initialValues: Record<string, unknown> };
     expect(props.invoiceId).toBeUndefined();
     expect(props.initialValues).toMatchObject({
@@ -104,13 +106,18 @@ describe("New Invoice page", () => {
   });
 
   it("only loads an invoice that belongs to the signed-in sender", async () => {
-    await NewInvoicePage({ searchParams: Promise.resolve({ from: "inv-src" }) });
-    expect(calls).toContain("eq id=inv-src");
+    await NewInvoicePage({ searchParams: Promise.resolve({ from: "ss-7k3qx9ab" }) });
+    expect(calls).toContain("eq reference=7K3QX9AB");
     expect(calls).toContain("eq user_id=user-1");
   });
 
+  it("an old ?from=<uuid> link still works", async () => {
+    await NewInvoicePage({ searchParams: Promise.resolve({ from: "0b1e7c2a-1111-4222-8333-444455556666" }) });
+    expect(calls).toContain("eq id=0b1e7c2a-1111-4222-8333-444455556666");
+  });
+
   it("says where the copy came from", async () => {
-    render(await NewInvoicePage({ searchParams: Promise.resolve({ from: "inv-src" }) }));
+    render(await NewInvoicePage({ searchParams: Promise.resolve({ from: "ss-7k3qx9ab" }) }));
     expect(document.getElementById("invoice-form-page--copied-from")).toHaveTextContent("INV-001");
   });
 

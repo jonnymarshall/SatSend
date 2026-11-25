@@ -21,7 +21,7 @@ import {
 import { bulkArchive, bulkUnarchive } from "../bulk-actions";
 import { deleteAvailability } from "@/lib/invoices/action-availability";
 import type { Database } from "@/lib/database.types";
-import { publicInvoicePath } from "@/lib/invoices/reference";
+import { publicInvoicePath, referencePath, senderInvoicePath } from "@/lib/invoices/reference";
 
 interface Invoice {
   id: string;
@@ -105,7 +105,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {isDraft && (
           <Link
             id="invoice-actions--edit-draft-button"
-            href={`/invoices/${invoice.id}/edit`}
+            href={senderInvoicePath(invoice, "edit")}
             className={buttonVariants({ variant: "secondary" })}
           >
             Edit draft
@@ -238,7 +238,7 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
         {/* v1.5.34: opens a pre-filled New Invoice form; nothing is saved. */}
         <Link
           id="invoice-actions--duplicate-button"
-          href={`/invoices/new?from=${invoice.id}`}
+          href={`/invoices/new?from=${referencePath(invoice.reference)}`}
           className={buttonVariants({ variant: "secondary" })}
         >
           Duplicate

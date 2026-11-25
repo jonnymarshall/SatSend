@@ -15,6 +15,7 @@ import {
   InvoicePayload,
 } from "@/app/(dashboard)/invoices/actions";
 import { SendMenu } from "@/components/send-menu";
+import { senderInvoicePath } from "@/lib/invoices/reference";
 import { showNotice } from "@/components/notice";
 import { deferredCopy } from "@/lib/copy-when-ready";
 import { clientInvoiceUrl } from "@/lib/invoices/send-feedback";
@@ -268,11 +269,11 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       if (invoiceId) {
         const res = await updateDraft(invoiceId, payload);
         if (!res.ok) return handleFieldError(res);
-        router.push(`/invoices/${invoiceId}`);
+        router.push(senderInvoicePath(res.data));
       } else {
         const res = await saveDraft(payload);
         if (!res.ok) return handleFieldError(res);
-        router.push(`/invoices/${res.data.id}`);
+        router.push(senderInvoicePath(res.data));
       }
     } catch {
       setErrors({ _form: "Something went wrong. Please try again." });
@@ -289,12 +290,13 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     action: (id: string) => Promise<ActionResult<T>>,
     {
       postNavigate,
-      pathFor = (id) => `/invoices/${id}`,
+      pathFor = (page) => page,
       onFail,
       byEmail,
     }: {
       postNavigate?: (data: T, id: string) => void;
-      pathFor?: (id: string, data: T) => string;
+      /** Where to go afterwards, given the invoice's own page (v1.5.38: by reference). */
+      pathFor?: (page: string, data: T) => string;
       onFail?: () => void;
       byEmail?: boolean;
     } = {},
@@ -306,22 +308,17 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     setSaving(true);
     try {
       const payload = buildPayload();
-      let id = invoiceId;
-      if (id) {
-        const res = await updateDraft(id, payload);
-        if (!res.ok) return handleFieldError(res);
-      } else {
-        const res = await saveDraft(payload);
-        if (!res.ok) return handleFieldError(res);
-        id = res.data.id;
-      }
-      const result = await action(id!);
+      const res = invoiceId ? await updateDraft(invoiceId, payload) : await saveDraft(payload);
+      if (!res.ok) return handleFieldError(res);
+      const id = res.data.id;
+      const page = senderInvoicePath(res.data);
+      const result = await action(id);
       if (!result.ok) {
         onFail?.();
         return handleFieldError(result);
       }
-      router.push(pathFor(id!, result.data));
-      postNavigate?.(result.data, id!);
+      router.push(pathFor(page, result.data));
+      postNavigate?.(result.data, id);
     } catch {
       onFail?.();
       setErrors({ _form: "Something went wrong. Please try again." });
@@ -334,7 +331,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     runSendFlow((id) => publishAndSendEmail(id), {
       byEmail: true,
       // Not sent: it's still a draft; its page says why.
-      pathFor: (id, data) => (data.emailStatus === "sent" ? `/invoices/${id}` : `/invoices/${id}?email=${data.emailStatus}`),
+      pathFor: (page, data) => (data.emailStatus === "sent" ? page : `${page}?email=${data.emailStatus}`),
     });
   const handleCopyLinkAndMarkSent = () => {
     // Start the copy inside the click (Safari); supply the link once it's sent.

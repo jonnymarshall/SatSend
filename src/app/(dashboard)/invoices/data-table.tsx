@@ -211,7 +211,7 @@ export function InvoiceDataTable({ data, userId }: Props) {
         onDelete: (id) => setDeleteTarget([id]),
         onCopyPublicLink: copyPublicLink,
         // v1.5.34: opens a pre-filled New Invoice form; nothing is saved.
-        onDuplicate: (id) => router.push(`/invoices/new?from=${id}`),
+        onDuplicate: (ref) => router.push(`/invoices/new?from=${ref}`),
       }),
     [runRowAction, copyPublicLink, data, router]
   );
