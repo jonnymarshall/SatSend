@@ -4,7 +4,8 @@
  *
  *   npx tsx scripts/email/send-invoice-sample.tsx --to <address>
  *
- * Two samples: with and without an access code. Subjects start "[Sample]".
+ * Two samples, with and without an access code, each with the real subject
+ * plus "[Sample]" in front.
  * Uses .env.local (Resend key, sender); nothing is printed from it.
  * The address is only ever typed on the command line: never put it in a file.
  */
@@ -48,7 +49,8 @@ async function main() {
     const { error } = await resend.emails.send({
       from: getFromAddress(),
       to,
-      subject: `[Sample] ${senderName} sent you an invoice for ${totalDisplay} (${label})`,
+      // The same subject a real client gets; only "[Sample]" is added.
+      subject: `[Sample] ${senderName} sent you an invoice for ${totalDisplay}`,
       react,
       text: await render(react, { plainText: true }),
       attachments: [LOGO_ATTACHMENT],
