@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **v1.5.37 — Actions that can't run are greyed out with the reason (roadmap
+  v1.4.24).** A draft without a bitcoin address no longer offers its send
+  options (the server refused them); the menu says "Add a bitcoin address to
+  this draft before sending it." Delete on a sent invoice is greyed out with
+  "Only drafts can be deleted. You can archive a sent invoice instead." (it
+  used to do nothing; on the invoice page it went back to the list as if the
+  invoice had been deleted). One rule list (`action-availability.ts`) serves
+  the invoice list, the invoice page's Send menu and its Delete button. Menu
+  reasons show as a second line, since disabled items can't show a hover
+  tooltip (the "no client email" reason now shows too).
+
 ### Changed
 
 - **v1.5.36 — The client's invoice email (roadmap v1.4.26).** Subject: "Maya
