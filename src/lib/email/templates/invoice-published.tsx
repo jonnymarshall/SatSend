@@ -23,12 +23,12 @@ export function InvoicePublishedEmail({
   accessCode,
   dueDateDisplay,
 }: InvoicePublishedProps) {
-  const label = invoiceNumber ? `Invoice ${invoiceNumber}` : "A new invoice";
+  // v1.5.36 (roadmap v1.4.26): the subject carries who and how much, so the
+  // heading is the invoice itself rather than a repeat of the subject.
+  const heading = invoiceNumber ? `Invoice ${invoiceNumber}` : "Your invoice";
   return (
     <EmailLayout preview={`${senderName} has sent you an invoice for ${totalDisplay}, payable in bitcoin.`}>
-      <EmailHeading>
-        {label} from {senderName}
-      </EmailHeading>
+      <EmailHeading>{heading}</EmailHeading>
       <EmailText>Hi {clientName},</EmailText>
       <EmailText>
         {senderName} has sent you an invoice for <strong>{totalDisplay}</strong>, payable in bitcoin.
@@ -44,6 +44,21 @@ export function InvoicePublishedEmail({
           />
         ) : null}
       </Panel>
+      {/* v1.5.36: how bitcoin payment works, before the client clicks through.
+          SatSend never holds the money: it goes straight to the sender. */}
+      <EmailText>
+        <strong>How to pay</strong>
+        <br />
+        1. Open the invoice with the button below{accessCode ? " and enter the access code" : ""}.
+        <br />
+        2. Send the exact bitcoin amount shown, from any bitcoin wallet, to the address on the page.
+        <br />
+        3. You and {senderName} will both get an email when the payment arrives.
+      </EmailText>
+      <EmailText muted small>
+        The bitcoin amount is worked out at the current rate when you open the invoice. Your payment goes
+        straight to {senderName}.
+      </EmailText>
       <EmailButton href={invoiceUrl}>View and pay</EmailButton>
       <EmailText muted small>
         Or open this link: <EmailLink href={invoiceUrl}>{invoiceUrl}</EmailLink>
