@@ -83,3 +83,27 @@ describe("SendMenu: email gating", () => {
     expect(item(/send now via email/i)).toHaveAttribute("data-disabled");
   });
 });
+
+// v1.5.37 (roadmap v1.4.24): on the invoice page, a draft without a valid
+// bitcoin address can't be sent any way; the items say why on hover.
+describe("SendMenu: a draft without a bitcoin address", () => {
+  it("greys out every option with the reason", () => {
+    renderMenu({ btcAddress: null });
+    const REASON = "Add a bitcoin address to this draft before sending it.";
+    for (const name of [/send now via email/i, /download pdf and mark as sent/i, /copy link and mark as sent/i]) {
+      expect(item(name)).toHaveAttribute("data-disabled");
+      expect(item(name)).toHaveAttribute("title", REASON);
+      fireEvent.click(item(name));
+    }
+    expect(screen.getAllByText(REASON)).toHaveLength(1);
+    expect(item(/send now via email/i)).toHaveTextContent(REASON);
+    expect(onSendEmail).not.toHaveBeenCalled();
+    expect(onDownloadAndMarkSent).not.toHaveBeenCalled();
+    expect(onCopyLinkAndMarkSent).not.toHaveBeenCalled();
+  });
+
+  it("without a btcAddress prop (the form, which checks the field itself) nothing is greyed out for it", () => {
+    renderMenu();
+    expect(item(/download pdf and mark as sent/i)).not.toHaveAttribute("data-disabled");
+  });
+});

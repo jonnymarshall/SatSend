@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 describe("InvoiceActions — draft status", () => {
-  const draft = { id: "inv-d", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
+  const draft = { id: "inv-d", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "draft" as const, client_email: "ada@example.com" };
 
   it("renders Edit draft, Send (menu), Duplicate, Delete buttons, and no Publish", () => {
     render(<InvoiceActions invoice={draft} />);
@@ -106,7 +106,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("disables 'Send now via email' once email_attempted_at is set (failed prior attempt)", () => {
     const invoice = {
       id: "inv-failed",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -122,7 +122,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("keeps the Send menu visible after manual mark-as-sent, but with only 'Send now via email' enabled", () => {
     const invoice = {
       id: "inv-manual",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -142,7 +142,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("hides the Send menu once the invoice has been successfully delivered via email", () => {
     const invoice = {
       id: "inv-emailed",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -156,7 +156,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("keeps the Send menu visible after manual mark-as-sent EVEN when client_email is empty (Send via email is disabled with tooltip)", () => {
     const invoice = {
       id: "inv-no-email",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "",
       email_attempted_at: null,
@@ -171,7 +171,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 
   it("shows a failed-email alert banner when publishAndSendEmail returns emailStatus='failed'", async () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "failed" } });
-    const invoice = { id: "inv-fail", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
+    const invoice = { id: "inv-fail", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
@@ -182,7 +182,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 
   it("shows a queued-for-delivery notice when publishAndSendEmail returns emailStatus='sent'", async () => {
     vi.mocked(publishAndSendEmail).mockResolvedValueOnce({ ok: true, data: { emailStatus: "sent" } });
-    const invoice = { id: "inv-ok", reference: "7K3QX9AB", status: "draft" as const, client_email: "ada@example.com" };
+    const invoice = { id: "inv-ok", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "draft" as const, client_email: "ada@example.com" };
     render(<InvoiceActions invoice={invoice} />);
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /send now via email/i }));
@@ -193,7 +193,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("hides the Send menu once the invoice has been manually marked sent AND an email has been attempted (failed)", () => {
     const invoice = {
       id: "inv-manual-then-failed",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T11:00:00Z",
@@ -207,7 +207,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("shows the Send menu for an older invoice that went live without being sent (pre-v1.5.19)", () => {
     const invoice = {
       id: "inv-unpub",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -223,7 +223,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("no longer repeats 'Sent via email on …' above the buttons (v1.5.35)", () => {
     const invoice = {
       id: "inv-emailed",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: "2026-04-28T10:00:00Z",
@@ -240,7 +240,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
   it("no longer repeats 'Marked as sent on …' above the buttons (v1.5.35)", () => {
     const invoice = {
       id: "inv-manual2",
-      reference: "7K3QX9AB",
+      reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt",
       status: "pending" as const,
       client_email: "ada@example.com",
       email_attempted_at: null,
@@ -255,7 +255,7 @@ describe("InvoiceActions — v1.4.8 send-via-email gating", () => {
 });
 
 describe("InvoiceActions — pending status", () => {
-  const pending = { id: "inv-p", reference: "7K3QX9AB", status: "pending" as const };
+  const pending = { id: "inv-p", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "pending" as const };
 
   it("renders View public invoice, Mark as menu, Archive, Duplicate, Delete (no Copy public link — already on the Share section)", () => {
     render(<InvoiceActions invoice={pending} />);
@@ -294,15 +294,24 @@ describe("InvoiceActions — pending status", () => {
     await waitFor(() => expect(bulkArchive).toHaveBeenCalledWith(["inv-p"]));
   });
 
-  it("calls bulkDelete when Delete is clicked on a non-draft", async () => {
+  // v1.5.37 (roadmap v1.4.24): only drafts can be deleted. It used to call
+  // bulkDelete, which skipped the invoice, then went back to the list as if
+  // it had been deleted.
+  it("Delete is greyed out on a non-draft, says why, and does nothing", async () => {
     render(<InvoiceActions invoice={pending} />);
-    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
-    await waitFor(() => expect(bulkDelete).toHaveBeenCalledWith(["inv-p"]));
+    const del = screen.getByRole("button", { name: /delete/i });
+    expect(del).toBeDisabled();
+    // A disabled button ignores the mouse, so the hover reason sits on its wrapper.
+    expect(del.parentElement).toHaveAttribute("title", "Only drafts can be deleted. You can archive a sent invoice instead.");
+    fireEvent.click(del);
+    expect(bulkDelete).not.toHaveBeenCalled();
+    expect(deleteDraft).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 });
 
 describe("InvoiceActions — archived status", () => {
-  const archived = { id: "inv-a", reference: "7K3QX9AB", status: "archived" as const };
+  const archived = { id: "inv-a", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "archived" as const };
 
   it("renders Unarchive (not Archive) and does not render the Mark as menu", () => {
     render(<InvoiceActions invoice={archived} />);
@@ -333,7 +342,7 @@ describe("InvoiceActions — archived status", () => {
 });
 
 describe("InvoiceActions — paid status", () => {
-  const paid = { id: "inv-paid", reference: "7K3QX9AB", status: "paid" as const };
+  const paid = { id: "inv-paid", reference: "7K3QX9AB", btc_address: "tb1q9dx7sdre8fll42wu2aq6zm28c3refs9yst4fdt", status: "paid" as const };
 
   it("Mark as menu hides the Paid item (already paid) and offers Unpaid", () => {
     // Overdue is no longer offered for paid invoices: per the four-cases spec
