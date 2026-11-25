@@ -12,9 +12,10 @@ import {
 import { sendAvailability } from "@/lib/invoices/action-availability";
 import { MenuItemLabel } from "@/components/menu-item-label";
 
-// A valid address, used only so the shared rules skip the address check when
-// the caller (the invoice form) validates the field itself.
+// Placeholders that pass the shared rules, used when the caller (the invoice
+// form) checks the address and client email fields itself.
 const ADDRESS_CHECKED_ELSEWHERE = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+const EMAIL_CHECKED_ELSEWHERE = "checked@elsewhere.invalid";
 
 /**
  * The Send menu (v1.5.19, was PublishMenu). An invoice is a draft or it's sent:
@@ -28,10 +29,14 @@ export interface SendMenuProps {
   clientEmail: string | null;
   /**
    * v1.5.37: the saved invoice's bitcoin address, so a draft without a valid one
-   * can't be sent from the invoice page. Left out by the invoice form, which
-   * checks the field itself as you type.
+   * can't be sent from the invoice page.
    */
   btcAddress?: string | null;
+  /**
+   * v1.5.37: the invoice form. Nothing is greyed out for a missing address or
+   * client email; clicking shows the error under the field instead.
+   */
+  checksFieldsItself?: boolean;
   sentAt?: string | null;
   sendMethod?: string | null;
   onSendEmail: (id: string) => void;
@@ -46,6 +51,7 @@ export function SendMenu({
   emailAttemptedAt,
   clientEmail,
   btcAddress,
+  checksFieldsItself = false,
   sentAt,
   onSendEmail,
   onDownloadAndMarkSent,
@@ -53,12 +59,12 @@ export function SendMenu({
   triggerVariant = "primary",
   busy,
 }: SendMenuProps) {
-  // v1.5.37 (roadmap v1.4.24): the shared rules. Without btcAddress (the form)
-  // the address check is skipped by passing a placeholder that passes it.
+  // v1.5.37 (roadmap v1.4.24): the shared rules. The form checks the address
+  // and client email itself, so placeholders that pass stand in for them.
   const { email, byHand } = sendAvailability({
     status: "draft",
-    btc_address: btcAddress === undefined ? ADDRESS_CHECKED_ELSEWHERE : btcAddress,
-    client_email: clientEmail,
+    btc_address: checksFieldsItself ? ADDRESS_CHECKED_ELSEWHERE : (btcAddress ?? null),
+    client_email: checksFieldsItself ? EMAIL_CHECKED_ELSEWHERE : clientEmail,
     email_attempted_at: emailAttemptedAt,
   });
   // When sending is blocked for the same reason every way, say it once (under

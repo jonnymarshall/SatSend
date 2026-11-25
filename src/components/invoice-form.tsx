@@ -201,7 +201,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     tax_percent: "input-tax-percent",
   };
 
-  function validate(isPublish: boolean): boolean {
+  function validate(isPublish: boolean, { byEmail = false }: { byEmail?: boolean } = {}): boolean {
     const errs: Record<string, string> = {};
     // Single source of truth: the same schema the server actions use (v1.4.29.2-H),
     // so client and server rules cannot drift.
@@ -217,6 +217,8 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     if (btc && !isValidBtcAddress(btc)) errs.btc_address = "Invalid BTC address";
     else if (btc && addressNetworkError(btc)) errs.btc_address = addressNetworkError(btc)!;
     if (isPublish && !btc) errs.btc_address = "BTC address is required to send";
+    if (byEmail && !form.client_email.trim() && !errs.client_email)
+      errs.client_email = "Client email is required to send by email";
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstKey = Object.keys(errs)[0];
@@ -289,9 +291,15 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       postNavigate,
       pathFor = (id) => `/invoices/${id}`,
       onFail,
-    }: { postNavigate?: (data: T, id: string) => void; pathFor?: (id: string, data: T) => string; onFail?: () => void } = {},
+      byEmail,
+    }: {
+      postNavigate?: (data: T, id: string) => void;
+      pathFor?: (id: string, data: T) => string;
+      onFail?: () => void;
+      byEmail?: boolean;
+    } = {},
   ) {
-    if (!validate(true)) {
+    if (!validate(true, { byEmail })) {
       onFail?.();
       return;
     }
@@ -324,6 +332,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
 
   const handleSendEmail = () =>
     runSendFlow((id) => publishAndSendEmail(id), {
+      byEmail: true,
       // Not sent: it's still a draft; its page says why.
       pathFor: (id, data) => (data.emailStatus === "sent" ? `/invoices/${id}` : `/invoices/${id}?email=${data.emailStatus}`),
     });
@@ -600,6 +609,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           isDraft
           emailAttemptedAt={null}
           clientEmail={form.client_email || null}
+          checksFieldsItself
           sentAt={null}
           sendMethod={null}
           busy={saving}

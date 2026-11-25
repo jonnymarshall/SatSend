@@ -18,7 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invoice had been deleted). One rule list (`action-availability.ts`) serves
   the invoice list, the invoice page's Send menu and its Delete button. Menu
   reasons show as a second line, since disabled items can't show a hover
-  tooltip (the "no client email" reason now shows too).
+  tooltip (the "no client email" reason now shows too). On the new/edit
+  invoice form nothing in the Send menu is greyed out: a missing bitcoin
+  address or client email shows its error under the field, as the address
+  already did.
 
 ### Changed
 

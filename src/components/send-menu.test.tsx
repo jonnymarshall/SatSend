@@ -19,6 +19,7 @@ function renderMenu(props: Partial<SendMenuProps> = {}) {
       isDraft
       emailAttemptedAt={null}
       clientEmail="ada@example.com"
+      btcAddress="bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"
       onSendEmail={onSendEmail}
       onDownloadAndMarkSent={onDownloadAndMarkSent}
       onCopyLinkAndMarkSent={onCopyLinkAndMarkSent}
@@ -102,8 +103,12 @@ describe("SendMenu: a draft without a bitcoin address", () => {
     expect(onCopyLinkAndMarkSent).not.toHaveBeenCalled();
   });
 
-  it("without a btcAddress prop (the form, which checks the field itself) nothing is greyed out for it", () => {
-    renderMenu();
-    expect(item(/download pdf and mark as sent/i)).not.toHaveAttribute("data-disabled");
+  it("the invoice form checks its fields itself: nothing is greyed out for a missing address or client email", () => {
+    renderMenu({ checksFieldsItself: true, btcAddress: undefined, clientEmail: "" });
+    for (const name of [/send now via email/i, /download pdf and mark as sent/i, /copy link and mark as sent/i]) {
+      expect(item(name)).not.toHaveAttribute("data-disabled");
+    }
+    fireEvent.click(item(/send now via email/i));
+    expect(onSendEmail).toHaveBeenCalledWith("inv-1");
   });
 });

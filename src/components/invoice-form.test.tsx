@@ -211,12 +211,28 @@ describe("InvoiceForm Send menu (v1.5.19)", () => {
     await user.click(await screen.findByRole("menuitem", { name: /copy link and mark as sent/i }));
   }
 
-  it("disables 'Send now via email' when no client_email is filled in", async () => {
+  // Nothing in the form's Send menu is greyed out: a missing field shows its
+  // error under the field instead, like the bitcoin address (v1.5.37).
+  it("'Send now via email' with no client email shows the error under the email field and sends nothing", async () => {
+    vi.mocked(publishAndSendEmail).mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(screen.getByPlaceholderText(/bc1q/i), VALID_ADDRESS);
+    await user.click(screen.getByRole("button", { name: /^send/i }));
+    const item = await screen.findByRole("menuitem", { name: /send now via email/i });
+    expect(item).not.toHaveAttribute("data-disabled");
+    await user.click(item);
+    expect(await screen.findByText("Client email is required to send by email")).toBeInTheDocument();
+    expect(publishAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("with no address and no client email, sending by email flags both fields", async () => {
     const user = userEvent.setup();
     render(<InvoiceForm />);
     await user.click(screen.getByRole("button", { name: /^send/i }));
-    const item = await screen.findByRole("menuitem", { name: /send now via email/i });
-    expect(item).toHaveAttribute("data-disabled");
+    await user.click(await screen.findByRole("menuitem", { name: /send now via email/i }));
+    expect(await screen.findByText(/btc address.*required/i)).toBeInTheDocument();
+    expect(screen.getByText("Client email is required to send by email")).toBeInTheDocument();
   });
 });
 
