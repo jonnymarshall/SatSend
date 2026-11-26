@@ -26,6 +26,16 @@ import { invoiceSchema } from "@/lib/invoices/schema";
 import { ADDRESS_KEYS, emptyAddressValues, type AddressKey } from "@/lib/invoices/address";
 import { AddressFields, addressInputId } from "@/components/address-fields";
 import { NO_AUTOFILL } from "@/lib/no-autofill";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
   DndContext,
@@ -357,18 +367,46 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   const taxPct = parseFloat(form.tax_percent) || 0;
   const { subtotal, taxFiat, total } = computeInvoiceTotals(toLineItems(items), taxPct);
 
+  // v1.5.41: unsaved changes are confirmed in SatSend's own dialog (was the
+  // browser's window.confirm). Cancel only leaves once the user picks.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
   function handleCancel() {
     const isDirty =
       JSON.stringify(form) !== initialFormRef.current ||
       JSON.stringify(items) !== initialItemsRef.current;
     if (isDirty) {
-      if (!window.confirm("You have unsaved changes. Discard and go back?")) return;
+      setConfirmDiscard(true);
+      return;
     }
     router.back();
   }
 
   return (
     <div id="form-invoice" className="space-y-8">
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent id="discard-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle id="discard-dialog--title">Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription id="discard-dialog--description">
+              Your changes to this invoice haven&apos;t been saved and will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel id="discard-dialog--keep-editing">Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              id="discard-dialog--discard"
+              variant="danger"
+              onClick={() => {
+                setConfirmDiscard(false);
+                router.back();
+              }}
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {errors._form && (
         <div id="form-error" role="alert" className="rounded-(--radius-md) border border-(--color-danger)/30 bg-(--color-danger-soft) px-4 py-3 text-sm text-(--color-danger-text)">
           {errors._form}

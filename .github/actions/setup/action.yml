@@ -1,7 +1,7 @@
 name: Set up Node and packages
 description: >
-  Node 22, then node_modules from the cache when package-lock.json is unchanged
-  (a fresh `npm ci` only when it isn't).
+  Node 22, then node_modules from the cache when the packages are unchanged
+  (a fresh `npm ci` only when they aren't).
 
 runs:
   using: composite
@@ -9,12 +9,26 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: "22"
+    # The cache key is the package list, not the whole package-lock.json: every
+    # branch bumps the app's own version, which is written into the lock file,
+    # so keying on the file missed the cache on every PR (v1.5.41).
+    - name: Work out the package-list key
+      id: lock
+      shell: bash
+      run: |
+        node -e '
+          const lock = require("./package-lock.json");
+          delete lock.version;
+          if (lock.packages && lock.packages[""]) delete lock.packages[""].version;
+          const hash = require("crypto").createHash("sha256").update(JSON.stringify(lock)).digest("hex");
+          require("fs").appendFileSync(process.env.GITHUB_OUTPUT, "hash=" + hash + "\n");
+        '
     - name: Restore node_modules
       id: modules
       uses: actions/cache@v4
       with:
         path: node_modules
-        key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+        key: modules-${{ runner.os }}-node22-${{ steps.lock.outputs.hash }}
     - name: Install packages
       if: steps.modules.outputs.cache-hit != 'true'
       shell: bash
