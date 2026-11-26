@@ -567,3 +567,42 @@ describe("InvoiceForm Cancel with unsaved changes (v1.5.41)", () => {
     expect(back).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("InvoiceForm currency (R-44)", () => {
+  it("starts in the currency it's given (your last invoice's), else USD", () => {
+    const { unmount } = render(<InvoiceForm />);
+    expect(document.getElementById("input-currency")).toHaveValue("USD — US Dollar");
+    unmount();
+    render(<InvoiceForm defaultCurrency="GBP" />);
+    expect(document.getElementById("input-currency")).toHaveValue("GBP — British Pound");
+  });
+
+  it("an edited or duplicated invoice keeps its own currency", () => {
+    render(<InvoiceForm defaultCurrency="GBP" initialValues={{ currency: "CAD" }} />);
+    expect(document.getElementById("input-currency")).toHaveValue("CAD — Canadian Dollar");
+  });
+
+  it("finds a currency by code or name, saves it, and shows totals in it", async () => {
+    vi.mocked(saveDraft).mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    const input = document.getElementById("input-currency")!;
+    await user.clear(input);
+    await user.type(input, "euro");
+    await user.click(await screen.findByRole("option", { name: "EUR — Euro" }));
+    await user.type(document.getElementById("input-line-item-0-unit-price")!, "100");
+    expect(document.getElementById("value-total")).toHaveTextContent("€100.00");
+    expect(document.getElementById("value-total")).not.toHaveTextContent("$");
+    await user.click(screen.getByRole("button", { name: /save (draft|as draft)/i }));
+    expect(vi.mocked(saveDraft).mock.calls[0][0].currency).toBe("EUR");
+  });
+
+  it("finds a currency by its code", async () => {
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    const input = document.getElementById("input-currency")!;
+    await user.clear(input);
+    await user.type(input, "chf");
+    expect(await screen.findByRole("option", { name: "CHF — Swiss Franc" })).toBeInTheDocument();
+  });
+});

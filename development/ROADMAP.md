@@ -29,7 +29,7 @@ keeps its own items' order):
    sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
    R-27 close-out (✅ 2026-11-26, no code).
 2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns, R-44
-   multi-currency, R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
+   multi-currency (✅ 1.6.0), R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
 3. **Legal and trust, target 2026-12-31:** R-28, R-29,
    R-30, R-31, R-42, R-37, R-36, R-38,
    R-39.
@@ -40,7 +40,7 @@ keeps its own items' order):
 5. **Jonny's admin, in parallel from now:** R-49 (DMARC, due), R-41
    (LLC: accountant first), R-40, Terms inputs, About and Contact text.
 
-After launch: R-50, v2.7 onward, two-step sign-in (R-32 decision).
+After launch: R-50, R-62 more currencies, v2.7 onward, two-step sign-in (R-32 decision).
 
 ## Product
 
@@ -1051,7 +1051,7 @@ straight away: report-only wasn't needed after those checks.
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
       instead of sideways scrolling. A layout change, so it needs Jonny's decision.
 
-### ⏳ R-44 (was v1.5.3-H) — Multi-currency support (moved from v2.12; **pre-launch**)
+### ✅ R-44 (was v1.5.3-H) — Multi-currency support (moved from v2.12; **pre-launch**) · release 1.6.0
 
 **Branch:** `r-44/multi-currency`
 
@@ -1059,10 +1059,17 @@ straight away: report-only wasn't needed after those checks.
 > Moved before launch (Jonny, 2026-10-21): the homepage says "create your invoice
 > in your local currency", which is only true for USD until this ships.
 
-- [ ] Currency selector on invoice creation (USD, EUR, GBP, AUD, CAD, etc.)
-- [ ] BTC price fetched in the selected fiat currency
-- [ ] Dashboard shows currency alongside invoice totals
-- [ ] Widen the `currency_whitelist` constraint (Appendix A: money invariants).
+> **Shipped as release 1.6.0 (2026-11-26).** 33 currencies: those with cents
+> that both Coinbase and CoinGecko price (`src/lib/currencies.ts`). The rest are
+> R-62 (post-launch). Jonny's design for the Slippage Tolerance cap: it stays
+> $25, converted into the invoice's currency when the payment is judged (the
+> rate comes from the bitcoin price in both currencies). A new invoice starts
+> in the currency of your last one.
+
+- [x] Currency selector on invoice creation (USD, EUR, GBP, AUD, CAD, etc.)
+- [x] BTC price fetched in the selected fiat currency
+- [x] Dashboard shows currency alongside invoice totals
+- [x] Widen the `currency_whitelist` constraint (Appendix A: money invariants).
 
 ---
 
@@ -1494,6 +1501,25 @@ spam. Four weeks of passing results is the safety margin.
 - [ ] Add it to the /pricing Pro card.
 
 **Done when:** A Pro user downloads a CSV or JSON of their invoices for a chosen date range, and the numbers match the app.
+
+---
+
+### ⏳ R-62 — More currencies: no-cents and three-decimal ones (**post-launch**)
+
+**Branch:** `r-62/more-currencies`
+
+> Jonny, 2026-11-26: the currencies R-44 left out should be supported after
+> launch.
+
+- [ ] **No cents:** JPY, KRW, VND, CLP, HUF, IDR, PKR, MMK. **Three decimals:**
+      BHD, KWD. Totals, rounding (`totals_consistent` rounds to 2 places), line
+      item prices and the form's inputs need to follow each currency's own
+      number of decimals.
+- [ ] **ARS:** Coinbase has no BTC-ARS price; either accept CoinGecko alone or
+      wait for a second source.
+- [ ] Check each one is priced by both sources at the time, then widen
+      `currency_whitelist` and `src/lib/currencies.ts` together.
+- [ ] Not planned: RUB (sanctions) and VEF (retired).
 
 ---
 

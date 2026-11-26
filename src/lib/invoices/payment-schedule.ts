@@ -55,11 +55,19 @@ export const REVERT_TO_PENDING_AFTER_MS = 60 * 60_000;
 // the price when it was first seen, never at publish time: a price fixed at
 // publish would drift against the invoice's fiat total as BTC moves.
 const SLIPPAGE_TOLERANCE_RATE = 0.01;
-const SLIPPAGE_TOLERANCE_CAP = 25;
+/** The cap, always defined in US dollars (R-44, Jonny 2026-11-26). */
+const SLIPPAGE_TOLERANCE_CAP_USD = 25;
 
-/** The Slippage Tolerance for an invoice total, in the invoice's currency. */
-export function slippageToleranceFiat(totalFiat: number): number {
-  return Math.min(Math.round(totalFiat * SLIPPAGE_TOLERANCE_RATE * 100) / 100, SLIPPAGE_TOLERANCE_CAP);
+const toCents = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * The Slippage Tolerance for an invoice total, in the invoice's currency: 1% of
+ * the total, capped at $25 converted into that currency. `usdRate` is how many
+ * units of the invoice's currency one US dollar buys at the moment of judging
+ * (1 for USD), so the cap follows exchange rates without anyone updating it.
+ */
+export function slippageToleranceFiat(totalFiat: number, usdRate: number = 1): number {
+  return Math.min(toCents(totalFiat * SLIPPAGE_TOLERANCE_RATE), toCents(SLIPPAGE_TOLERANCE_CAP_USD * usdRate));
 }
 
 /**
@@ -103,6 +111,12 @@ export interface ScheduleInput {
 export interface PriceContext {
   btcPrice: number | null;
   tipHeight: number | null;
+  /**
+   * R-44: units of the invoice's currency per US dollar, for the Slippage
+   * Tolerance cap. Left out for USD (1). Null when it couldn't be fetched: like
+   * a missing price, the verdict waits for the next check.
+   */
+  usdRate?: number | null;
 }
 
 export interface ScheduleDecision {
@@ -234,10 +248,11 @@ export function decidePaymentSchedule(
       paying.status.confirmed &&
       depth !== null &&
       depth >= CONFIRMATION_DEPTH_REQUIRED &&
-      valuePrice !== null;
+      valuePrice !== null &&
+      price.usdRate !== null;
 
     if (finalized) {
-      const tolerance = slippageToleranceFiat(input.total_fiat);
+      const tolerance = slippageToleranceFiat(input.total_fiat, price.usdRate ?? 1);
       const receivedFiat = (receivedSats * valuePrice!) / 1e8;
       // Against a quote, the gap is measured in bitcoin and turned into money
       // at the quoted price; otherwise in money against the total.

@@ -471,6 +471,31 @@ describe("decidePaymentSchedule — amount verification", () => {
     expect(under.newStatus).toBe("underpaid");
   });
 
+  it("judges a non-USD invoice with the $25 cap converted into its currency (R-44)", () => {
+    // A €8,000 invoice, 1 BTC = €50,000, 1 USD = €0.80: cap €20.
+    const input = { status: "payment_detected" as const, btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: 8_000 };
+    const eur = { btcPrice: 50_000, tipHeight: 900_001, usdRate: 0.8 };
+    // €7,980 = 15,960,000 sats: €20 short, paid.
+    const paid = decidePaymentSchedule(input, [confirmedTx("tx-a", "bc1qaddr", 900_000, 15_960_000)], NOW, eur);
+    expect(paid.newStatus).toBe("paid");
+    expect(paid.slippageToleranceFiat).toBe(20);
+    // €7,979.50 = 15,959,000 sats: €20.50 short, underpaid.
+    const under = decidePaymentSchedule(input, [confirmedTx("tx-b", "bc1qaddr", 900_000, 15_959_000)], NOW, eur);
+    expect(under.newStatus).toBe("underpaid");
+  });
+
+  it("defers when the dollar rate for a non-USD invoice is unavailable (R-44)", () => {
+    const decision = decidePaymentSchedule(
+      { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
+      [confirmedTx("tx-confirmed", "bc1qaddr")],
+      NOW,
+      { btcPrice: 50_000, tipHeight: 900_001, usdRate: null }
+    );
+    expect(decision.newStatus).toBe("payment_detected");
+    expect(decision.detectedTxid).toBeNull();
+    expect(decision.newNextCheckAt).not.toBeNull();
+  });
+
   it("defers (no status flip) when the BTC price oracle is unavailable, even at sufficient confirmation depth", () => {
     const decision = decidePaymentSchedule(
       { status: "payment_detected", btc_address: "bc1qaddr", mempool_seen_at: SEEN, published_at: SEEN, stage_attempt: 3, total_fiat: TOTAL_FIAT },
@@ -654,6 +679,17 @@ describe("Slippage Tolerance (v1.5.29)", () => {
     expect(slippageToleranceFiat(10)).toBe(0.1);
     expect(slippageToleranceFiat(2_500)).toBe(25);
     expect(slippageToleranceFiat(8_000)).toBe(25);
+  });
+
+  // R-44 (Jonny, 2026-11-26): the cap is $25 converted into the invoice's
+  // currency at the moment the payment is judged, so it never needs updating.
+  it("for other currencies, the cap is $25 converted at the rate given", () => {
+    // 1 USD = 0.9116 EUR: the cap is €22.79; 1% of €1,500 is €15, so €15 applies.
+    expect(slippageToleranceFiat(1_500, 0.9116)).toBe(15);
+    expect(slippageToleranceFiat(5_000, 0.9116)).toBe(22.79);
+    // 1 USD = 83.2 INR: the cap is ₹2,080.
+    expect(slippageToleranceFiat(500_000, 83.2)).toBe(2_080);
+    expect(slippageToleranceFiat(8_000, 1)).toBe(25);
   });
 
   it("a payment within it either way counts as paid in full", () => {

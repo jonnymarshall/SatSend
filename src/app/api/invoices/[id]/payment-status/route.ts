@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTx, fetchTipHeight, txPaysToAddress } from "@/lib/mempool";
-import { fetchBtcPrice } from "@/lib/btc-price";
+import { fetchJudgingPrices } from "@/lib/btc-price";
 import { hasAccess, accessCookieName } from "@/lib/access-code";
 import { decidePaymentSchedule } from "@/lib/invoices/payment-schedule";
 import { decisionColumns, loadQuotes, paymentAfterDecision } from "@/lib/invoices/check-invoice-payment";
@@ -76,12 +76,9 @@ export async function POST(
     return NextResponse.json({ error: "Transaction does not pay to invoice address" }, { status: 400 });
   }
 
-  let btcPrice: number | null = null;
-  try {
-    btcPrice = (await fetchBtcPrice(invoice.currency)).price;
-  } catch {
-    // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
-  }
+  // R-44: the price in the invoice's currency and the dollar rate for the
+  // Slippage Tolerance cap. Either missing, decidePaymentSchedule defers.
+  const { btcPrice, usdRate } = await fetchJudgingPrices(invoice.currency);
   const tipHeight = await fetchTipHeight();
   // The quotes the client was shown (v1.5.29). Without them the payment could
   // be judged against the wrong price, so don't judge it now.
@@ -103,7 +100,7 @@ export async function POST(
     },
     [tx],
     new Date(),
-    { btcPrice, tipHeight }
+    { btcPrice, tipHeight, usdRate }
   );
 
   const { data: updated, error: updateError } = await supabase

@@ -161,7 +161,8 @@ export default function PaymentSettlementPage() {
             A payment doesn&apos;t always arrive to the exact amount. Some wallets and exchanges take their fee out of what
             they send, and some round the amount. So a payment within a small margin of the invoice still counts as paid
             in full. That margin is the <strong className="text-(--color-ink)">Slippage Tolerance</strong>: 1% of the
-            invoice total, up to $25, either way.
+            invoice total, up to $25, either way. For an invoice in another currency, the $25 is converted into that
+            currency when the payment is checked, so it&apos;s always worth the same.
           </p>
           <table id="settlement--slippage-tolerance--examples" className="w-full max-w-sm text-left text-[15px]">
             <thead>

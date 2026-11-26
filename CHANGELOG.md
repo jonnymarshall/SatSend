@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **1.6.0 — Multi-currency (roadmap R-44).** Invoices can be in any of 33
+  currencies with cents that both price sources (Coinbase, CoinGecko) support:
+  USD, EUR, GBP, CAD, AUD, NZD, CHF and 26 more (`src/lib/currencies.ts`). A
+  searchable picker on the form (code or name); a new invoice starts in the
+  currency of your last one; Edit and Duplicate keep it. Your invoice page and
+  the form's totals print in the invoice's currency (the list, client page,
+  payment breakdown, emails and PDF already did). The Slippage Tolerance cap
+  stays $25, converted into the invoice's currency when a payment is judged,
+  using the bitcoin price in both (`fetchJudgingPrices`); a missing rate defers
+  the verdict like a missing price. Migration `0042_multi_currency.sql` widens
+  `currency_whitelist`. First release numbered by semantic versioning (a
+  feature bumps the minor number); roadmap items are now R-1 … R-62.
+
 ### Changed
 
 - **v1.5.41 — Invoice page polish (ad hoc).**

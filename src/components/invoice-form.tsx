@@ -26,6 +26,8 @@ import { invoiceSchema } from "@/lib/invoices/schema";
 import { ADDRESS_KEYS, emptyAddressValues, type AddressKey } from "@/lib/invoices/address";
 import { AddressFields, addressInputId } from "@/components/address-fields";
 import { NO_AUTOFILL } from "@/lib/no-autofill";
+import { CurrencyPicker } from "@/components/currency-picker";
+import { DEFAULT_CURRENCY, formatMoney, isCurrencyCode } from "@/lib/currencies";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,11 +65,14 @@ interface InvoiceFormProps {
   // When provided, locks your_email to the session user's email. A future branch
   // can re-introduce per-invoice override behind a toggle — explicit non-goal here.
   sessionEmail?: string;
+  /** R-44: a new invoice starts in this currency (your last invoice's). */
+  defaultCurrency?: string;
 }
 
 // v1.7: the twelve address parts are flat fields named like their columns.
 interface FormState extends Record<AddressKey, string> {
   invoice_number: string;
+  currency: string;
   your_name: string;
   your_email: string;
   your_company: string;
@@ -104,6 +109,7 @@ function toLineItems(items: LineItemState[]): LineItem[] {
 
 const DEFAULT_STATE: FormState = {
   invoice_number: "",
+  currency: DEFAULT_CURRENCY,
   your_name: "",
   your_email: "",
   your_company: "",
@@ -120,10 +126,11 @@ const DEFAULT_STATE: FormState = {
   access_code: "",
 };
 
-export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceFormProps) {
+export function InvoiceForm({ invoiceId, initialValues, sessionEmail, defaultCurrency }: InvoiceFormProps) {
   const router = useRouter();
   const initialState: FormState = {
     ...DEFAULT_STATE,
+    ...(defaultCurrency && isCurrencyCode(defaultCurrency) ? { currency: defaultCurrency } : {}),
     ...initialValues,
     // v1.5.34: the server sends the due date as UTC midnight of that day; the
     // picker needs local midnight of the same day, or it shows the day before
@@ -211,6 +218,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     btc_address: "input-btc-address",
     access_code: "input-access-code",
     tax_percent: "input-tax-percent",
+    currency: "input-currency",
     ...Object.fromEntries(ADDRESS_KEYS.map((k) => [k, addressInputId(k)])),
   };
 
@@ -244,6 +252,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
   function buildPayload(): InvoicePayload {
     return {
       invoice_number: form.invoice_number || undefined,
+      currency: form.currency,
       your_name: form.your_name || undefined,
       your_email: form.your_email || undefined,
       your_company: form.your_company || undefined,
@@ -414,7 +423,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       )}
 
       {/* Invoice number */}
-      <Card id="section-invoice-number" className="space-y-0">
+      <Card id="section-invoice-number" className="grid gap-6 sm:grid-cols-2">
         <Field label="Invoice number" error={errors.invoice_number}>
           <div className="max-w-xs">
             <input
@@ -434,6 +443,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
             </p>
           </div>
         </Field>
+        <CurrencyPicker value={form.currency} onChange={(code) => set("currency", code)} error={errors.currency} />
       </Card>
 
       {/* YOU / CLIENT split */}
@@ -620,17 +630,17 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       <Card id="section-totals" className="space-y-2 text-[15px] md:ml-auto md:max-w-sm">
         <div id="row-subtotal" className="flex justify-between text-(--color-text-secondary) tabular-nums">
           <span>Subtotal</span>
-          <span id="value-subtotal">${subtotal.toFixed(2)}</span>
+          <span id="value-subtotal">{formatMoney(subtotal, form.currency)}</span>
         </div>
         {taxPct > 0 && (
           <div id="row-tax" className="flex justify-between text-(--color-text-secondary) tabular-nums">
             <span>Tax ({taxPct}%)</span>
-            <span id="value-tax">${taxFiat.toFixed(2)}</span>
+            <span id="value-tax">{formatMoney(taxFiat, form.currency)}</span>
           </div>
         )}
         <div id="row-total" className="mt-1 flex items-baseline justify-between border-t border-(--color-border) pt-3 text-lg font-semibold tabular-nums">
           <span>Total</span>
-          <span id="value-total">${total.toFixed(2)} USD</span>
+          <span id="value-total">{formatMoney(total, form.currency)}</span>
         </div>
       </Card>
 

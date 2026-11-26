@@ -47,6 +47,7 @@ interface DuplicateSource extends Partial<Record<AddressKey, string | null>> {
   tax_percent: number | null;
   due_date: string | null;
   access_code: string | null;
+  currency: string;
 }
 
 /**
@@ -73,5 +74,6 @@ export function duplicateFormValues(source: DuplicateSource, taken: Set<string>)
     due_date: source.due_date ? dateOnlyToUtc(source.due_date) : undefined,
     no_due_date: !source.due_date,
     access_code: source.access_code ?? "",
+    currency: source.currency,
   };
 }

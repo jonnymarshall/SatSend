@@ -38,9 +38,17 @@ describe("GET /api/btc-price", () => {
     expect(mockFetchBtcPrice).toHaveBeenCalledWith("USD");
   });
 
-  it("rejects a non-USD currency with 400 and never calls the price source (v1.4.25-H)", async () => {
-    const res = await get("EUR");
-    expect(res.status).toBe(400);
+  it("returns the price for any supported currency (R-44)", async () => {
+    const res = await get("eur");
+    expect(res.status).toBe(200);
+    expect(mockFetchBtcPrice).toHaveBeenCalledWith("EUR");
+  });
+
+  it("rejects an unsupported currency with 400 and never calls the price source (v1.4.25-H)", async () => {
+    for (const code of ["JPY", "RUB", "XXX", "../USD"]) {
+      const res = await get(code);
+      expect(res.status).toBe(400);
+    }
     expect(mockFetchBtcPrice).not.toHaveBeenCalled();
   });
 });

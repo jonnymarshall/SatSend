@@ -119,7 +119,8 @@ try {
   // Impossible money is refused by the CHECK constraints (0027).
   await reject("total not equal to subtotal + tax is rejected", { total_fiat: 999 });
   await reject("negative money is rejected", { subtotal_fiat: -5, tax_fiat: 0, total_fiat: -5 });
-  await reject("non-USD currency is rejected", { currency: "EUR" });
+  // R-44 (0042): the 33 supported currencies only.
+  await reject("an unsupported currency is rejected", { currency: "JPY" });
   await reject("tax percent over 100 is rejected", { tax_percent: 150 });
   await reject("malformed line_items are rejected", { line_items: "not-an-array" });
   await reject("line_items element missing unit_price is rejected", {
@@ -131,6 +132,10 @@ try {
   check("a valid invoice inserts", good.ok && !!good.json?.[0]?.id, `status ${good.status}`);
   const goodId = good.json?.[0]?.id;
   if (goodId) created.push(goodId);
+
+  const euro = await insert(user.jwt, { ...validInvoice(user.id), currency: "EUR" });
+  check("a supported non-USD currency (EUR) inserts (R-44)", euro.ok && !!euro.json?.[0]?.id, `status ${euro.status}`);
+  if (euro.json?.[0]?.id) created.push(euro.json[0].id);
 
   // Non-draft invoices may not be deleted (financial audit trail).
   const delNonDraft = await rest(`invoices?id=eq.${goodId}`, { method: "DELETE", prefer: "return=minimal" });

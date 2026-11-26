@@ -31,6 +31,7 @@ export default async function EditInvoicePage({
         sessionEmail={user!.email}
         initialValues={{
           invoice_number: invoice.invoice_number ?? "",
+          currency: invoice.currency,
           your_name: invoice.your_name ?? "",
           your_email: invoice.your_email ?? "",
           your_company: invoice.your_company ?? "",

@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { fetchBtcPrice } from "@/lib/btc-price";
+import { isCurrencyCode } from "@/lib/currencies";
 
-// v1.4.25-H: only USD is supported (matches the DB currency whitelist). The
-// value flows into external API URLs, so reject anything else explicitly rather
-// than silently pricing in the wrong currency.
-const ALLOWED_CURRENCIES = new Set(["USD"]);
+// v1.4.25-H: only supported currencies (R-44: the same list as the database's
+// currency whitelist). The value flows into external API URLs, so reject
+// anything else explicitly rather than silently pricing in the wrong currency.
 
 export async function GET(request: NextRequest) {
   const currency = (request.nextUrl.searchParams.get("currency") ?? "USD").toUpperCase();
 
-  if (!ALLOWED_CURRENCIES.has(currency)) {
+  if (!isCurrencyCode(currency)) {
     return NextResponse.json(
       { error: `Unsupported currency: ${currency}` },
       { status: 400 }

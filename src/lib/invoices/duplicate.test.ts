@@ -52,6 +52,7 @@ describe("duplicateFormValues", () => {
     btc_address: "bc1qshouldnotcopy",
     due_date: "2026-06-01",
     access_code: "LETMEIN1",
+    currency: "GBP",
   };
 
   it("copies the sender, client, line items, tax, due date and access code", () => {
@@ -73,6 +74,7 @@ describe("duplicateFormValues", () => {
       line_items: [{ description: "Work", quantity: 2, unit_price: 500 }],
       tax_percent: "10",
       access_code: "LETMEIN1",
+      currency: "GBP",
       no_due_date: false,
     });
     expect(v.due_date?.toISOString().slice(0, 10)).toBe("2026-06-01");
