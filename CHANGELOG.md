@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.39 — Faster CI.** The PR check took about 2.5 minutes (1 minute of it
+  installing packages). Packages are now cached by `package-lock.json`, and
+  typecheck + lint and the unit tests (in two halves) run at the same time on
+  separate machines. A final `verify` job, the check branch protection
+  requires, passes only when all of them do. Shared set-up:
+  `.github/actions/setup`.
+
 - **v1.5.38 — Your own invoice pages use the SatSend reference.** The sender's
   page was `/invoices/<long id>` while the client's link was
   `/invoice/ss-7k3qx9ab`. Now the sender's pages are `/invoices/ss-7k3qx9ab`

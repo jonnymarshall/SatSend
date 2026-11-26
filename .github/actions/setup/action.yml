@@ -1,0 +1,21 @@
+name: Set up Node and packages
+description: >
+  Node 22, then node_modules from the cache when package-lock.json is unchanged
+  (a fresh `npm ci` only when it isn't).
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+    - name: Install packages
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci

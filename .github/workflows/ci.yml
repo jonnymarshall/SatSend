@@ -7,24 +7,52 @@ name: CI
 # (npm run test:rls, npm run test:db) are LOCAL-ONLY by decision — they need the
 # test Supabase project and real sessions — so they are not covered here; run
 # them locally when a PR touches migrations, RLS, or grants.
+#
+# Speed (2026-11-25): the single job took about 2.5 minutes (1 min installing,
+# 70 s of unit tests). Now:
+#   - node_modules is cached by package-lock.json, so a PR that doesn't change
+#     packages skips the install;
+#   - typecheck + lint run in one job and the unit tests in two halves, all at
+#     the same time.
+# Branch protection requires a check named "verify", so `verify` is the last
+# job and passes only when all the others did.
 
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  verify:
+  checks:
+    name: typecheck + lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
-        run: npm run test:run
       - name: Lint
         run: npm run lint
+
+  tests:
+    name: unit tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Unit tests
+        run: npm run test:run -- --shard=${{ matrix.shard }}/2
+
+  verify:
+    needs: [checks, tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: |
+          echo "checks: ${{ needs.checks.result }}, tests: ${{ needs.tests.result }}"
+          test "${{ needs.checks.result }}" = success
+          test "${{ needs.tests.result }}" = success

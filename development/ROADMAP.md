@@ -26,7 +26,7 @@ keeps its own items' order):
 
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
    v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24 (✅ v1.5.37),
-   sender links by reference (✅ v1.5.38, ad hoc), CI speed-up (ad hoc),
+   sender links by reference (✅ v1.5.38, ad hoc), CI speed-up (✅ v1.5.39, ad hoc),
    v1.4.34 close-out.
 2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
    multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
