@@ -502,3 +502,31 @@ describe("InvoiceForm structured addresses (v1.7)", () => {
     expect(document.getElementById("input-client-address-country")).toHaveValue("United States");
   });
 });
+
+describe("InvoiceForm password-manager autofill (v1.7)", () => {
+  const ignored = (id: string) => {
+    const el = document.getElementById(id)!;
+    return el.getAttribute("data-lpignore") === "true" && el.getAttribute("data-1p-ignore") === "true" && el.getAttribute("autocomplete") === "off";
+  };
+
+  it("tells password managers to leave the bitcoin address and access code alone", () => {
+    render(<InvoiceForm />);
+    expect(ignored("input-btc-address")).toBe(true);
+    expect(ignored("input-access-code")).toBe(true);
+  });
+
+  it("never autofills the client's address, but allows your own", () => {
+    render(<InvoiceForm />);
+    for (const part of ["line1", "line2", "city", "region", "postcode", "country"]) {
+      expect(ignored(`input-client-address-${part}`)).toBe(true);
+    }
+    expect(document.getElementById("input-your-address-line1")).toHaveAttribute("autocomplete", "address-line1");
+    expect(document.getElementById("input-your-address-line1")).not.toHaveAttribute("data-lpignore");
+  });
+
+  it("wraps each address input so injected autofill icons can't add a layout gap", () => {
+    render(<InvoiceForm />);
+    const input = document.getElementById("input-your-address-postcode")!;
+    expect(input.parentElement!.id).toBe("input-your-address-postcode--wrap");
+  });
+});

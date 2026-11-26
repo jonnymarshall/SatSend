@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   your client's) is now six optional fields instead of one box: line 1, line 2,
   city, state / province / region, post code, and a searchable country list
   (stored as the ISO code, shown as the name; typing matches the start of any
-  word). Nothing is country-specific, so any address fits. Your invoice page,
+  word). Nothing is country-specific, so any address fits. Password managers
+  are told to leave the bitcoin address, the access code and the client's
+  address alone (LastPass was filling the BTC address with the user's street
+  address). Your invoice page,
   the client's page and the PDF print one part per line and skip empty ones.
   Migration `0041_structured_addresses.sql` adds twelve nullable columns and
   copies each old address into line 1; the old columns are dropped in a

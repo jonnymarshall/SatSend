@@ -25,6 +25,7 @@ import { addressNetworkError } from "@/lib/btc-network";
 import { invoiceSchema } from "@/lib/invoices/schema";
 import { ADDRESS_KEYS, emptyAddressValues, type AddressKey } from "@/lib/invoices/address";
 import { AddressFields, addressInputId } from "@/components/address-fields";
+import { NO_AUTOFILL } from "@/lib/no-autofill";
 import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
   DndContext,
@@ -547,6 +548,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           <input
             id="input-btc-address"
             type="text"
+            {...NO_AUTOFILL}
             value={form.btc_address}
             onChange={(e) => set("btc_address", e.target.value)}
             className={inputCls}
@@ -564,6 +566,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           <input
             id="input-access-code"
             type="text"
+            {...NO_AUTOFILL}
             value={form.access_code}
             onChange={(e) => set("access_code", e.target.value.toLowerCase().slice(0, 16))}
             className={`${inputCls} max-w-[220px] font-mono tracking-widest`}

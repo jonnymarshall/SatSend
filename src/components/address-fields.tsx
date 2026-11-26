@@ -6,6 +6,7 @@ import { COUNTRIES, countryMatches, type CountryCode } from "@/lib/countries";
 import { addressKey, type AddressKey, type AddressParty, type AddressPart } from "@/lib/invoices/address";
 import { inputClassName } from "@/components/signal/input";
 import { cn } from "@/lib/utils";
+import { NO_AUTOFILL } from "@/lib/no-autofill";
 
 /**
  * One party's address in the invoice form (v1.7): line 1, line 2, city,
@@ -46,9 +47,9 @@ export function AddressFields({
   errors: Record<string, string>;
   onChange: (key: AddressKey, value: string) => void;
 }) {
-  // Autofill hints only for the user's own address: a browser filling the
-  // client's address with the user's would be wrong.
-  const autoFill = party === "your";
+  // Autofill only for the user's own address. The client's fields opt out of
+  // password managers too: filling them with the user's address is always wrong.
+  const fillProps = (autoComplete: string) => (party === "your" ? { autoComplete } : NO_AUTOFILL);
   const countryKey = addressKey(party, "country");
   const countryId = addressInputId(countryKey);
   const selected = COUNTRY_ITEMS.find((c) => c.value === values[countryKey]) ?? null;
@@ -64,15 +65,20 @@ export function AddressFields({
             <label htmlFor={id} className="block text-sm font-medium text-(--color-ink)">
               {label}
             </label>
-            <input
-              id={id}
-              type="text"
-              value={values[key]}
-              onChange={(e) => onChange(key, e.target.value)}
-              autoComplete={autoFill ? autoComplete : "off"}
-              aria-invalid={errors[key] ? true : undefined}
-              className={inputClassName}
-            />
+            {/* The wrapper keeps anything a password manager injects next to
+                the input (LastPass's icon) out of the column's gap, which
+                otherwise pushed the fields below out of line. */}
+            <div id={`${id}--wrap`} className="relative">
+              <input
+                id={id}
+                type="text"
+                value={values[key]}
+                onChange={(e) => onChange(key, e.target.value)}
+                {...fillProps(autoComplete)}
+                aria-invalid={errors[key] ? true : undefined}
+                className={inputClassName}
+              />
+            </div>
             {errors[key] && <p className="text-sm text-(--color-danger-text)">{errors[key]}</p>}
           </div>
         );
@@ -90,10 +96,10 @@ export function AddressFields({
           filter={(item: CountryItem, query: string) => countryMatches(item.label, query)}
           isItemEqualToValue={(a: CountryItem, b: CountryItem) => a.value === b.value}
         >
-          <div className="relative">
+          <div id={`${countryId}--wrap`} className="relative">
             <Combobox.Input
               id={countryId}
-              autoComplete="off"
+              {...fillProps("off")}
               aria-invalid={errors[countryKey] ? true : undefined}
               className={cn(inputClassName, "pr-10")}
             />
