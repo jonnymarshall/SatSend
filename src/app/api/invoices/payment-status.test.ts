@@ -49,6 +49,15 @@ vi.mock("@/lib/mempool", async () => {
 const mockFetchBtcPrice = vi.fn();
 vi.mock("@/lib/btc-price", () => ({
   fetchBtcPrice: (...args: unknown[]) => mockFetchBtcPrice(...args),
+  // R-44: judging uses the price plus a dollar rate; these tests price in USD.
+  fetchJudgingPrices: async (...args: unknown[]) => {
+    try {
+      const { price } = await mockFetchBtcPrice(...args);
+      return { btcPrice: price, usdRate: 1 };
+    } catch {
+      return { btcPrice: null, usdRate: null };
+    }
+  },
 }));
 
 const mockCookieGet = vi.fn();

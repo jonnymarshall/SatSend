@@ -46,8 +46,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
   hours because the MCP was signed out. Check the MCP is connected first. A
   destructive or non-additive migration needs an agreed order instead. Never
   defer (see the environment rules above).
-- **Versions** come from `development/ROADMAP.md`. Never re-implement an item
-  marked SUPERSEDED.
+- **Roadmap items and release numbers are separate (2026-11-26).** Items in
+  `development/ROADMAP.md` are `R-1`, `R-2`, … (old label kept as "(was
+  v1.5.3-H)"); branches are `r-N/<slug>`. Release numbers (`package.json`, git
+  tags) follow semantic versioning from 1.6.0: a new feature bumps the minor
+  number (1.6.0 → 1.7.0), a fix the patch (1.7.0 → 1.7.1). Say both in PR titles
+  and updates: "Release 1.6.0 (R-44, multi-currency)". Never re-implement an
+  item marked SUPERSEDED.
 - **Skills:** `next-feature` (plan the next item, then stop for approval),
   `git-workflow` (branching/SemVer), `migration-safety`, `deploy-checklist`,
   `pre-merge-verification`, `ui-element-ids` (give UI elements hierarchical ids

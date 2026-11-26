@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
 import { isCountryCode } from "@/lib/countries";
+import { isCurrencyCode } from "@/lib/currencies";
 import { ADDRESS_KEYS, ADDRESS_PART_MAX, type AddressKey } from "./address";
 
 // One definition of a valid invoice, shared by the form and the server actions
@@ -60,6 +61,11 @@ export const invoiceSchema = z.object({
     z.string().min(MIN_ACCESS_CODE_LENGTH, `At least ${MIN_ACCESS_CODE_LENGTH} characters`).optional()
   ),
   ...addressShape,
+  // R-44: one of src/lib/currencies.ts (the database checks the same list).
+  currency: z.preprocess(
+    blankToUndefined,
+    z.string().refine(isCurrencyCode, "Pick a currency from the list").optional()
+  ),
 });
 
 export type InvoiceInput = z.infer<typeof invoiceSchema>;

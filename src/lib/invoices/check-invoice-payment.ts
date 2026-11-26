@@ -1,7 +1,7 @@
 import { fetchAddressTxs } from "@/lib/mempool";
 import { addressNetworkError } from "@/lib/btc-network";
 import { isValidBtcAddress } from "@/lib/invoices";
-import { fetchBtcPrice } from "@/lib/btc-price";
+import { fetchJudgingPrices } from "@/lib/btc-price";
 import { decidePaymentSchedule, type ScheduleDecision } from "@/lib/invoices/payment-schedule";
 import type { PaymentSummaryInvoice } from "@/lib/invoices/payment-summary";
 import type { PaymentQuote } from "@/lib/invoices/quotes";
@@ -166,12 +166,9 @@ export async function checkInvoicePayment(
       return "mempool_unreachable";
     }
 
-    let btcPrice: number | null = null;
-    try {
-      btcPrice = (await fetchBtcPrice(inv.currency)).price;
-    } catch {
-      // Oracle unavailable — decidePaymentSchedule defers rather than guessing.
-    }
+    // R-44: the price in the invoice's currency and the dollar rate for the
+    // Slippage Tolerance cap. Either missing, decidePaymentSchedule defers.
+    const { btcPrice, usdRate } = await fetchJudgingPrices(inv.currency);
 
     // Quotes only matter for a verdict, so only once a payment has confirmed.
     const quotes = txs.some((tx) => tx.status.confirmed) ? await loadQuotes(supabase, inv.id) : [];
@@ -190,7 +187,7 @@ export async function checkInvoicePayment(
       },
       txs,
       now,
-      { btcPrice, tipHeight }
+      { btcPrice, tipHeight, usdRate }
     );
 
     const statusChanges = decision.newStatus !== inv.status;

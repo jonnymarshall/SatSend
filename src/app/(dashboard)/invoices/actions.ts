@@ -20,6 +20,7 @@ import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 import { addressHasHistory } from "@/lib/mempool";
 import { addressNetworkError } from "@/lib/btc-network";
 import { addressColumns, type AddressKey } from "@/lib/invoices/address";
+import { DEFAULT_CURRENCY } from "@/lib/currencies";
 import type { Database } from "@/lib/database.types";
 
 async function addressFreshnessError(address: string, contextId?: string): Promise<FieldError | null> {
@@ -110,6 +111,8 @@ export interface InvoicePayload extends Partial<Record<AddressKey, string>> {
   client_tax_id?: string;
   line_items: LineItem[];
   tax_percent: number;
+  /** R-44: defaults to USD when left out. */
+  currency?: string;
   btc_address?: string;
   due_date?: string;
   access_code?: string;
@@ -151,7 +154,7 @@ export async function saveDraft(payload: InvoicePayload): Promise<ActionResult<I
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
       total_fiat: total,
-      currency: "USD",
+      currency: payload.currency ?? DEFAULT_CURRENCY,
       btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,
@@ -215,6 +218,8 @@ export async function updateDraft(
       tax_fiat: taxFiat,
       subtotal_fiat: subtotal,
       total_fiat: total,
+      // R-44: a draft can change currency; sent invoices can't be edited at all.
+      ...(payload.currency ? { currency: payload.currency } : {}),
       btc_address: payload.btc_address || null,
       due_date: payload.due_date || null,
       access_code: payload.access_code || null,

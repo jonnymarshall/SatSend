@@ -68,3 +68,28 @@ async function fetchFromCoinGecko(
 export function clearPriceCache(): void {
   cache.clear();
 }
+
+/**
+ * The prices a payment is judged with (R-44): the bitcoin price in the
+ * invoice's currency, and how many units of that currency one US dollar buys,
+ * worked out from the bitcoin price in both (so no separate exchange-rate
+ * service). The rate converts the $25 Slippage Tolerance cap. Either is null
+ * when it couldn't be fetched; the verdict then waits for the next check.
+ */
+export async function fetchJudgingPrices(
+  currency: string
+): Promise<{ btcPrice: number | null; usdRate: number | null }> {
+  let btcPrice: number | null = null;
+  try {
+    btcPrice = (await fetchBtcPrice(currency)).price;
+  } catch {
+    return { btcPrice: null, usdRate: null };
+  }
+  if (currency.toUpperCase() === "USD") return { btcPrice, usdRate: 1 };
+  try {
+    const usdPrice = (await fetchBtcPrice("USD")).price;
+    return { btcPrice, usdRate: btcPrice / usdPrice };
+  } catch {
+    return { btcPrice, usdRate: null };
+  }
+}

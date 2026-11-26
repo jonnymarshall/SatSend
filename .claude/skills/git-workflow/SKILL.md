@@ -17,7 +17,7 @@ Git workflow management and Semantic Versioning (SemVer 2.0.0). Your primary goa
 
 ## Phase 1: Branching & Development
 Before providing any code changes, you must output a shell block that:
-- **For roadmap features:** use the branch name defined in `development/ROADMAP.md` (e.g., `v1.0/foundation`, `v1.1/invoice-crud`). Always read the roadmap first.
+- **For roadmap features:** use the branch name defined in `development/ROADMAP.md` (e.g., `r-44/multi-currency`; items are R-1, R-2, … since 2026-11-26). Always read the roadmap first.
 - **For ad-hoc fixes/features not in the roadmap:** create a descriptive branch name (e.g., `feat/login-system` or `fix/api-header`).
 - Switches to that branch.
 *Prompting Rule: If the user asks for a change, your first response must always be: "Creating branch [name] to implement [task]..." followed by the checkout command.*
@@ -54,9 +54,10 @@ Interim feature branches should NOT be tagged as GitHub Releases. Follow this lo
 - **PATCH updates** (e.g., 1.0.1): Git Tag + CHANGELOG update only.
 - **MINOR updates** (e.g., 1.1.0): Git Tag + CHANGELOG update only.
 - **MAJOR updates** (e.g., 1.0.0, 2.0.0): Git Tag + CHANGELOG update + GitHub Release.
-- **On the branch:** bump `package.json` to the branch's version (plain SemVer —
-  no `v` inside the string, no `-H`; that suffix is roadmap naming, not SemVer).
-  The PR therefore carries the version.
+- **On the branch:** bump `package.json` to the release this branch will be
+  (plain SemVer, no `v`). Pick it by SemVer, not +1 on the last number: a
+  feature bumps MINOR (1.6.0 → 1.7.0), a fix bumps PATCH (1.7.0 → 1.7.1). The
+  roadmap's R- ID is not a version. The PR therefore carries the version.
 - **On merge to `main`:** push the matching tag
   (`git tag vX.Y.Z && git push origin vX.Y.Z`). Keep `package.json`, the tag, and
   `CHANGELOG.md` in lockstep.

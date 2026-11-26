@@ -5,7 +5,7 @@ vi.mock("@/lib/mempool", async () => {
   const actual = await vi.importActual<typeof import("@/lib/mempool")>("@/lib/mempool");
   return { ...actual, fetchAddressTxs: (...a: unknown[]) => mockFetchAddressTxs(...a) };
 });
-vi.mock("@/lib/btc-price", () => ({ fetchBtcPrice: vi.fn().mockResolvedValue({ price: 50_000 }) }));
+vi.mock("@/lib/btc-price", () => ({ fetchJudgingPrices: vi.fn().mockResolvedValue({ btcPrice: 50_000, usdRate: 1 }) }));
 const mockSendDetected = vi.fn().mockResolvedValue(undefined);
 const mockSendConfirmed = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/email/send", () => ({

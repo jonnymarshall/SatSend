@@ -16,6 +16,7 @@ import { getAppUrl } from "@/lib/app-url";
 import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
 import { publicInvoicePath, senderInvoicePath } from "@/lib/invoices/reference";
 import { findOwnInvoice } from "@/lib/invoices/own-invoice";
+import { formatMoney } from "@/lib/currencies";
 import { addressLines, addressOf } from "@/lib/invoices/address";
 import { AddressBlock } from "@/components/address-block";
 
@@ -55,7 +56,8 @@ export default async function InvoiceDetailPage({
   const sectionLabel = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";
   const yourAddress = addressLines(addressOf(invoice, "your"));
   const clientAddress = addressLines(addressOf(invoice, "client"));
-  const money = (n: number | string | null) => `$${Number(n).toFixed(2)}`;
+  // R-44: in the invoice's own currency.
+  const money = (n: number | string | null) => formatMoney(n, invoice.currency);
 
   return (
     <div id="invoice-detail" className="mx-auto max-w-3xl space-y-6">
@@ -104,7 +106,7 @@ export default async function InvoiceDetailPage({
       )}
       {invoice.overpaid && invoice.amount_received_fiat !== null && (
         <p id="invoice-detail--overpaid-indicator" className="rounded-(--radius-md) bg-(--color-warning-soft) px-4 py-3 text-sm font-medium text-(--color-warning-text)">
-          Overpaid by ${(Number(invoice.amount_received_fiat) - Number(invoice.total_fiat)).toFixed(2)}
+          Overpaid by {money(Number(invoice.amount_received_fiat) - Number(invoice.total_fiat))}
         </p>
       )}
 
@@ -165,9 +167,9 @@ export default async function InvoiceDetailPage({
             <div key={i} className="proxy-id--invoice-detail--line-items-row flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 text-[15px]">
               <span className="min-w-0 break-words">{item.description}</span>
               <span className="text-(--color-text-secondary) tabular-nums">
-                {item.quantity} × ${Number(item.unit_price).toFixed(2)} ={" "}
+                {item.quantity} × {money(item.unit_price)} ={" "}
                 <span className="font-semibold text-(--color-ink)">
-                  ${(item.quantity * item.unit_price).toFixed(2)}
+                  {money(item.quantity * item.unit_price)}
                 </span>
               </span>
             </div>

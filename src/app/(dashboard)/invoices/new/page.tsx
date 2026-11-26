@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { InvoiceForm } from "@/components/invoice-form";
 import { duplicateFormValues } from "@/lib/invoices/duplicate";
 import { findOwnInvoice } from "@/lib/invoices/own-invoice";
+import { DEFAULT_CURRENCY } from "@/lib/currencies";
 
 // v1.5.34 (roadmap v1.4.25): Duplicate opens this page with ?from=<id>, filled
 // in from the original. Nothing is saved until the sender saves, so cancelling
@@ -16,6 +17,16 @@ export default async function NewInvoicePage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
+
+  // R-44: a new invoice starts in the currency of your most recent one.
+  const { data: last } = await supabase
+    .from("invoices")
+    .select("currency")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const defaultCurrency = last?.currency ?? DEFAULT_CURRENCY;
 
   let initialValues: ReturnType<typeof duplicateFormValues> | undefined;
   let copiedFrom: string | null = null;
@@ -47,9 +58,9 @@ export default async function NewInvoicePage({
         )}
       </div>
       {initialValues ? (
-        <InvoiceForm sessionEmail={user.email} initialValues={initialValues} />
+        <InvoiceForm sessionEmail={user.email} initialValues={initialValues} defaultCurrency={defaultCurrency} />
       ) : (
-        <InvoiceForm sessionEmail={user.email} />
+        <InvoiceForm sessionEmail={user.email} defaultCurrency={defaultCurrency} />
       )}
     </div>
   );

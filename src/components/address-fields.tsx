@@ -127,7 +127,7 @@ export function AddressFields({
                     <Combobox.Item
                       key={item.value}
                       value={item}
-                      className="flex cursor-default items-center gap-2 rounded-(--radius-sm) px-3 py-2 outline-none select-none data-highlighted:bg-(--color-brand-soft)"
+                      className="flex cursor-pointer items-center gap-2 rounded-(--radius-sm) px-3 py-2 outline-none select-none data-highlighted:bg-(--color-brand-soft)"
                     >
                       <span className="flex-1">{item.label}</span>
                       <Combobox.ItemIndicator>

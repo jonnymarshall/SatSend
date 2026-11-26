@@ -22,7 +22,7 @@ This skill runs in two phases. **Phase 1 (Plan) is always required.** Do not beg
 
 4. Reply to the user with a single planning brief in this exact shape. Be concise. No filler.
 
-   **Target:** `vX.Y.Z` (one-line summary), branch name from the roadmap.
+   **Target:** `R-N` (one-line summary), the release number it will ship as (SemVer: a feature bumps MINOR, a fix PATCH), and the branch name from the roadmap.
 
    **Plan (in order):**
    1. Step one (e.g. "create branch via git-workflow skill")
@@ -39,7 +39,7 @@ This skill runs in two phases. **Phase 1 (Plan) is always required.** Do not beg
    - If it conflicts with a future ⏳ version or undoes a recent ✅ version, flag it explicitly with the version reference.
    - If none of the above apply, say "scope looks right" in one line. Do not invent concerns.
 
-   **Manual tests I'll prepare (will live in `manual-tests/vX.Y.Z-<slug>.md`):** a short bulleted list, one line per test, of the specific scenarios you will need to verify by hand once the work is done. Decide these now so the implementation is shaped to make them runnable. Each line should name what it proves (e.g. "TEST 3 - marking paid writes a `marked_as_paid` row and updates the badge"). Cover the golden path, the obvious edge cases, and any negative / RLS / failure cases that automated tests cannot reach. If a real-money or external-service step is required (real email send, real BTC payment), call that out so the user knows what they will need.
+   **Manual tests I'll prepare (will live in `manual-tests/<release>-<slug>.md`, e.g. `1.6.0-multi-currency.md`):** a short bulleted list, one line per test, of the specific scenarios you will need to verify by hand once the work is done. Decide these now so the implementation is shaped to make them runnable. Each line should name what it proves (e.g. "TEST 3 - marking paid writes a `marked_as_paid` row and updates the badge"). Cover the golden path, the obvious edge cases, and any negative / RLS / failure cases that automated tests cannot reach. If a real-money or external-service step is required (real email send, real BTC payment), call that out so the user knows what they will need.
 
    **Clarifying questions:** anything ambiguous in the roadmap section, anything I'd otherwise have to guess at, anything where there's more than one reasonable interpretation. If there are genuinely none, say "none" rather than inventing questions.
 
@@ -54,7 +54,7 @@ Once the user has agreed to the plan (and any amendments):
 1. Invoke the `git-workflow` skill to scaffold the branch using the branch name from the roadmap section.
 2. Invoke the `tdd` skill with the version name and the Scope / Tests checklist items. Work through items in order, red-green-refactor per item.
 3. Mark each checklist item with `[x]` in `development/ROADMAP.md` as it is completed.
-4. **Before opening the PR**, write the manual-tests doc agreed in Phase 1 to `manual-tests/vX.Y.Z-<slug>.md`. Use the existing files in `manual-tests/` as the template. Each test should have: a one-line "Proves" claim, Setup, Run, Expect, and (where relevant) a DB confirmation snippet. Keep it as simple as possible to follow without prior context. Include a short "Quick smoke test" section listing the 2 or 3 tests the user should run if they only have a couple of minutes. For every HTTP test, make the command print the HTTP status code as well as the response body, and state that exact status code in **Expect**.
+4. **Before opening the PR**, write the manual-tests doc agreed in Phase 1 to `manual-tests/<release>-<slug>.md`. Use the existing files in `manual-tests/` as the template. Each test should have: a one-line "Proves" claim, Setup, Run, Expect, and (where relevant) a DB confirmation snippet. Keep it as simple as possible to follow without prior context. Include a short "Quick smoke test" section listing the 2 or 3 tests the user should run if they only have a couple of minutes. For every HTTP test, make the command print the HTTP status code as well as the response body, and state that exact status code in **Expect**.
 5. When all checklist items are done, change the section header emoji from ⏳ to ✅, tell the user the version is implementation-complete, point them at the manual-tests doc, and remind them what comes next in the roadmap. Do NOT auto-merge (see `no-auto-merge`).
 
 ---

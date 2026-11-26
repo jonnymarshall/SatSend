@@ -50,6 +50,7 @@ const SOURCE = {
 };
 
 let sourceRow: object | null = SOURCE;
+let lastInvoice: { currency: string } | null = { currency: "EUR" };
 const calls: string[] = [];
 const insert = vi.fn();
 
@@ -67,8 +68,10 @@ vi.mock("@/lib/supabase/server", () => ({
             calls.push(`eq ${col}=${val}`);
             return chain;
           },
+          order: () => chain,
+          limit: () => chain,
           not: async () => ({ data: [{ invoice_number: "INV-001 (copy)" }], error: null }),
-          maybeSingle: async () => ({ data: sourceRow, error: null }),
+          maybeSingle: async () => ({ data: cols === "currency" ? lastInvoice : sourceRow, error: null }),
         };
         return chain;
       },
@@ -82,14 +85,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   calls.length = 0;
   sourceRow = SOURCE;
+  lastInvoice = { currency: "EUR" };
 });
 
 describe("New Invoice page", () => {
-  it("without ?from, shows an empty form", async () => {
+  it("without ?from, shows an empty form in your last invoice's currency (R-44)", async () => {
     render(await NewInvoicePage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByTestId("invoice-form")).toBeInTheDocument();
     expect(formProps.mock.calls[0][0]).not.toHaveProperty("initialValues");
-    expect(calls).toEqual([]);
+    expect(formProps.mock.calls[0][0]).toMatchObject({ defaultCurrency: "EUR" });
+    expect(calls).toEqual(["select currency", "eq user_id=user-1"]);
+  });
+
+  it("with no invoices yet, the form starts in USD", async () => {
+    lastInvoice = null;
+    render(await NewInvoicePage({ searchParams: Promise.resolve({}) }));
+    expect(formProps.mock.calls[0][0]).toMatchObject({ defaultCurrency: "USD" });
   });
 
   it("with ?from, fills the form from the sender's own invoice and saves nothing", async () => {

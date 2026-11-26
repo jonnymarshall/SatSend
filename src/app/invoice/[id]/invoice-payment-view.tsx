@@ -244,7 +244,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                       <CopyButton text={btcAmountDisplay!} label="Copy BTC amount" />
                     </div>
                     <p className="text-sm text-(--color-text-secondary)">
-                      at {fmtCurrency(ready.btcPrice, "USD")}/BTC
+                      at {fmtCurrency(ready.btcPrice, cur)}/BTC
                     </p>
                   </div>
                   <div className="space-y-1">
