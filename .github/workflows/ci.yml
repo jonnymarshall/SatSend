@@ -20,6 +20,11 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # v1.5.41: also on main after a merge. A PR can only restore caches saved on
+  # its own branch or on main, and CI never ran on main, so every new PR
+  # started with an empty package cache.
+  push:
+    branches: [main]
 
 jobs:
   checks:

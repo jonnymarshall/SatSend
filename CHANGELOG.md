@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     own dialog instead of the browser's.
   - Every dropdown menu item shows a hand cursor.
   - CI: the package cache is keyed on the package list without the app's
-    version, so a version bump no longer forces a full install.
+    version, so a version bump no longer forces a full install, and CI also
+    runs on `main` after each merge so new PRs can reuse its saved packages.
 
 - **v1.5.40 — Proper address forms (roadmap v1.7).** Each address (yours and
   your client's) is now six optional fields instead of one box: line 1, line 2,
