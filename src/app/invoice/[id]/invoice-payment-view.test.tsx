@@ -77,11 +77,23 @@ const BASE_INVOICE: Invoice = {
   your_email: null,
   your_company: null,
   your_address: null,
+  your_address_line1: null,
+  your_address_line2: null,
+  your_address_city: null,
+  your_address_region: null,
+  your_address_postcode: null,
+  your_address_country: null,
   your_tax_id: null,
   client_name: "",
   client_email: "",
   client_company: null,
   client_address: null,
+  client_address_line1: null,
+  client_address_line2: null,
+  client_address_city: null,
+  client_address_region: null,
+  client_address_postcode: null,
+  client_address_country: null,
   client_tax_id: null,
   line_items: [{ description: "Work", quantity: 1, unit_price: 500 }],
   subtotal_fiat: 500,
@@ -289,6 +301,26 @@ describe("InvoicePaymentView — copy buttons", () => {
     fireEvent.click(btn);
 
     expect(writeText).toHaveBeenCalledWith("0.01");
+  });
+
+  it("shows each party's address one line per part, empty parts left out", () => {
+    render(
+      <InvoicePaymentView
+        btcPrice={null}
+        invoice={{
+          ...BASE_INVOICE,
+          your_address_line1: "1 Tower Bridge",
+          your_address_city: "London",
+          your_address_country: "GB",
+          client_address_line1: "1 Queen's Road Central",
+          client_address_country: "HK",
+        }}
+      />
+    );
+    const sender = document.getElementById("invoice-view--sender-address")!;
+    expect([...sender.children].map((c) => c.textContent)).toEqual(["1 Tower Bridge", "London", "United Kingdom"]);
+    const client = document.getElementById("invoice-view--client-address")!;
+    expect([...client.children].map((c) => c.textContent)).toEqual(["1 Queen's Road Central", "Hong Kong SAR China"]);
   });
 
   it("copies the BTC address when its copy button is clicked", async () => {

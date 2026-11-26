@@ -16,6 +16,8 @@ import { getAppUrl } from "@/lib/app-url";
 import { emailOutcomeMessage, type EmailStatus } from "@/lib/invoices/send-feedback";
 import { publicInvoicePath, senderInvoicePath } from "@/lib/invoices/reference";
 import { findOwnInvoice } from "@/lib/invoices/own-invoice";
+import { addressLines, addressOf } from "@/lib/invoices/address";
+import { AddressBlock } from "@/components/address-block";
 
 const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
@@ -51,6 +53,8 @@ export default async function InvoiceDetailPage({
   const shareLink = `${appUrl}${publicInvoicePath(invoice)}`;
 
   const sectionLabel = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";
+  const yourAddress = addressLines(addressOf(invoice, "your"));
+  const clientAddress = addressLines(addressOf(invoice, "client"));
   const money = (n: number | string | null) => `$${Number(n).toFixed(2)}`;
 
   return (
@@ -105,14 +109,14 @@ export default async function InvoiceDetailPage({
       )}
 
       {/* YOU / CLIENT */}
-      {(invoice.your_name || invoice.client_company || invoice.client_address || invoice.client_tax_id) && (
+      {(invoice.your_name || invoice.client_company || clientAddress.length > 0 || invoice.client_tax_id) && (
         <Card id="invoice-detail--parties" className="grid gap-6 text-[15px] sm:grid-cols-2">
           <div id="invoice-detail--from-section" className="space-y-0.5">
             <p className={`${sectionLabel} mb-2`}>From</p>
             {invoice.your_name && <p className="font-semibold">{invoice.your_name}</p>}
             {invoice.your_company && <p className="text-(--color-text-secondary)">{invoice.your_company}</p>}
             {invoice.your_email && <p className="break-words text-(--color-text-secondary)">{invoice.your_email}</p>}
-            {invoice.your_address && <p className="text-(--color-text-secondary)">{invoice.your_address}</p>}
+            {yourAddress.length > 0 && <AddressBlock id="invoice-detail--from-address" lines={yourAddress} />}
             {invoice.your_tax_id && <p className="text-(--color-text-secondary)">Tax ID: {invoice.your_tax_id}</p>}
           </div>
           <div id="invoice-detail--bill-to-section" className="space-y-0.5">
@@ -120,7 +124,7 @@ export default async function InvoiceDetailPage({
             {invoice.client_name && <p className="font-semibold">{invoice.client_name}</p>}
             {invoice.client_company && <p className="text-(--color-text-secondary)">{invoice.client_company}</p>}
             {invoice.client_email && <p className="break-words text-(--color-text-secondary)">{invoice.client_email}</p>}
-            {invoice.client_address && <p className="text-(--color-text-secondary)">{invoice.client_address}</p>}
+            {clientAddress.length > 0 && <AddressBlock id="invoice-detail--bill-to-address" lines={clientAddress} />}
             {invoice.client_tax_id && <p className="text-(--color-text-secondary)">Tax ID: {invoice.client_tax_id}</p>}
           </div>
         </Card>

@@ -1,3 +1,4 @@
+import { addressFormValues, type AddressKey } from "./address";
 import type { LineItem } from "@/lib/invoices";
 import { dateOnlyToUtc } from "@/lib/date-only";
 
@@ -32,17 +33,15 @@ export function buildDuplicateInvoiceNumber(
   return null;
 }
 
-interface DuplicateSource {
+interface DuplicateSource extends Partial<Record<AddressKey, string | null>> {
   invoice_number: string | null;
   your_name: string | null;
   your_email: string | null;
   your_company: string | null;
-  your_address: string | null;
   your_tax_id: string | null;
   client_name: string | null;
   client_email: string | null;
   client_company: string | null;
-  client_address: string | null;
   client_tax_id: string | null;
   line_items: unknown;
   tax_percent: number | null;
@@ -62,12 +61,11 @@ export function duplicateFormValues(source: DuplicateSource, taken: Set<string>)
     your_name: source.your_name ?? "",
     your_email: source.your_email ?? "",
     your_company: source.your_company ?? "",
-    your_address: source.your_address ?? "",
     your_tax_id: source.your_tax_id ?? "",
     client_name: source.client_name ?? "",
     client_email: source.client_email ?? "",
     client_company: source.client_company ?? "",
-    client_address: source.client_address ?? "",
+    ...addressFormValues(source),
     client_tax_id: source.client_tax_id ?? "",
     line_items: (source.line_items ?? []) as LineItem[],
     tax_percent: source.tax_percent ? String(source.tax_percent) : "",
