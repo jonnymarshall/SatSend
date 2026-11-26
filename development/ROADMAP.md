@@ -27,9 +27,9 @@ keeps its own items' order):
 1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
    v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24 (✅ v1.5.37),
    sender links by reference (✅ v1.5.38, ad hoc), CI speed-up (✅ v1.5.39, ad hoc),
-   v1.4.34 close-out.
-2. **Finish the product, target 2026-12-14:** v1.7 addresses, v1.5.3-H
-   multi-currency, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
+   v1.4.34 close-out (✅ 2026-11-26, no code).
+2. **Finish the product, target 2026-12-14:** v1.7 addresses (✅ v1.5.40), v1.7.1 drop old address columns, v1.5.3-H
+   multi-currency, v1.5.3.1-H rate in the breakdown, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
 3. **Legal and trust, target 2026-12-31:** v1.5.2.8-H, v1.5.2.7-H,
    v1.5.2.15-H, v1.5.2.16-H, v1.5.7-H, v1.5.2.20-H, v1.5.2.19-H, v1.5.2.5-H,
    v1.5.2.6-H.
@@ -609,7 +609,7 @@ Sample sender: `npx tsx scripts/email/send-invoice-sample.tsx --to <address>`.
 
 ---
 
-### ⏳ v1.4.34 — Legal & Compliance Bundle (pre-launch, non-urgent)
+### ✅ v1.4.34 — Legal & Compliance Bundle (pre-launch, non-urgent)
 
 **Branch:** `v1.4.34/legal-compliance-bundle`
 
@@ -661,6 +661,21 @@ are all compliance-shaped and each is individually too small for its own PR.
 - Item 4: also needs **opt-in consent** for marketing emails (UK/EU rules),
   recorded with a date, not just an unsubscribe link.
 - Item 5 is covered by v1.5.4-H (card payments).
+
+**Closed (2026-11-26, recorded on the v1.7 branch; no code):**
+- Item 1: moved to v1.5.2.15-H (above).
+- Item 2: **done.** Network check on satsend.me (home and `/login`): the three
+  font files load from `satsend.me/_next/static/media/`; no request to any
+  other host.
+- Item 3: **not applicable.** Same check: no request leaves satsend.me, so no
+  analytics or session-replay tool is loaded.
+- Item 4: **not applicable yet.** SatSend sends no marketing email (only sign-in
+  and invoice emails). The rule moved to the Notes section ("Marketing email"),
+  so it applies whenever marketing email is built.
+- Item 5: in v1.5.4-H.
+- Item 6: **moved to v1.5.2.15-H** (Jonny, 2026-11-26: not needed yet). Agent
+  name: SATSEND LLC. Needs a working inbox first: satsend.me has no MX records,
+  so no @satsend.me address receives mail (Resend only sends).
 
 **Notes**
 - Items 4 and 5 depend on surfaces that do not exist yet (marketing email, the
@@ -806,7 +821,7 @@ payments; that is safe.
 ### ⏳ v1.5.2.15-H — Legal page (`/legal`), agreeing at sign-up, and notices for payers (**pre-launch**)
 
 - [ ] **`/legal`**: one page linking Terms, Privacy, Acceptable use (a section
-      of the Terms), Cookies (a section of Privacy), DMCA (v1.4.34), Licence
+      of the Terms), Cookies (a section of Privacy), DMCA (below), Licence
       (FSL), Security, Accessibility statement (v1.5.2.19-H), and the company's
       details (legal name, registered address, contact). Footer: the "Legal"
       heading links to it.
@@ -820,8 +835,15 @@ payments; that is safe.
       address matches what [sender] gave you." Plus links to Terms, Privacy and
       "Report this invoice" (v1.5.2.16-H). Near the amount: "Worked out at
       today's rate when you opened this invoice."
+- [ ] **`/dmca`** (moved from v1.4.34 item 6, 2026-11-26): how to send a
+      takedown notice and what it must include, how to send a counter-notice,
+      repeat-infringer policy, and the designated agent's details (SATSEND
+      LLC; one constant in the code). Jonny registers the agent with the US
+      Copyright Office ($6; I'll write the steps), and the contact address must
+      be a working inbox. Linked from `/legal` and the footer's Legal column.
 - [ ] Tests: sign-up can't complete without the box; the acceptance record is
-      written; every public invoice view and email carries the footer.
+      written; every public invoice view and email carries the footer; `/dmca`
+      shows the agent's details.
 
 ### ⏳ v1.5.2.16-H — Abuse and fraud handling (**pre-launch**)
 
@@ -1035,6 +1057,29 @@ straight away: report-only wasn't needed after those checks.
 
 ---
 
+### ⏳ v1.5.3.1-H — Exchange rate in the payment breakdown (**pre-launch**)
+
+**Branch:** `v1.5.3.1/rate-in-breakdown`
+
+> Jonny, 2026-11-26: show the FX rate in the Paid breakdown, on the website, in
+> the emails and in the PDFs. After multi-currency, so the rate is shown in the
+> invoice's own currency.
+
+- [ ] Add a row to the payment breakdown: the bitcoin price used to value the
+      payment, e.g. "Rate: 1 BTC = $97,250.00", in the invoice's currency.
+      The rate is already stored (`invoices.btc_price_at_seen`, from
+      v1.5.29), so no migration is expected; check older invoices without it
+      and leave the row out for them.
+- [ ] One source for all three surfaces: `payment-summary.ts` (read by the
+      client's invoice page, the payment emails and the PDF) gains the rate,
+      so they can't disagree.
+- [ ] Shows for every state with sums (paid, underpaid, overpaid); decide
+      whether "Payment detected" shows it too.
+- [ ] Tests: the summary's rate formatting (and its absence for old
+      invoices); page, email and PDF each render the row.
+
+---
+
 ### ⏳ v1.5.4-H — Card payments for Pro (**pre-launch**)
 
 > **Decided by Jonny, 2026-10-21:** "accepting fiat payments is going to be
@@ -1136,7 +1181,7 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v1.7 — Address Format Standardisation (**pre-launch**)
+### ✅ v1.7 — Address Format Standardisation (**pre-launch**) · v1.5.40
 
 **Branch:** `v1.7/address-fields`
 
@@ -1145,15 +1190,36 @@ spam. Four weeks of passing results is the safety margin.
 > one text box), and before v2.2 (saved clients) since those features depend on the
 > address structure.
 
-- [ ] Replace the single freeform `your_address` / `client_address` text fields with structured fields: Line 1, Line 2, City, State/Province/Region, Post Code, Country, following the UN/OASIS xNAL address standard ordering
-- [ ] **Maximally compatible with any address globally:** Line 1 and Country are the only required fields; Line 2, City, State/Province, and Post Code are all optional (many countries have no postcode or region concept); no country-specific format validation (no US-style ZIP/state rules); generous length limits
-- [ ] Country picked from the ISO 3166-1 country list (searchable dropdown), stored as the ISO code and rendered as the country name
-- [ ] Schema migration: add individual address sub-columns (nullable); keep old `*_address` column for migration only, then drop after backfill
-- [ ] Update invoice form with the new multi-field address layout
-- [ ] Update every surface that renders an address: invoice detail page (user view), client payment view, and the PDF (`invoice-pdf.tsx` prints both addresses today). Skip empty optional lines so no blank gaps appear
-- [ ] No auto-fill or address lookup required
+> **Shipped as v1.5.40 (2026-11-26).** Jonny, 2026-11-26: **every part is
+> optional**, including line 1 and country (overrides the line below). Old
+> addresses were copied into line 1 as they were; no parsing.
+
+- [x] Replace the single freeform `your_address` / `client_address` text fields with structured fields: Line 1, Line 2, City, State/Province/Region, Post Code, Country, following the UN/OASIS xNAL address standard ordering
+- [x] **Maximally compatible with any address globally:** Line 1 and Country are the only required fields; Line 2, City, State/Province, and Post Code are all optional (many countries have no postcode or region concept); no country-specific format validation (no US-style ZIP/state rules); generous length limits
+- [x] Country picked from the ISO 3166-1 country list (searchable dropdown), stored as the ISO code and rendered as the country name
+- [x] Schema migration: add individual address sub-columns (nullable); keep old `*_address` column for migration only (0041), then drop after backfill (v1.7.1)
+- [x] Update invoice form with the new multi-field address layout
+- [x] Update every surface that renders an address: invoice detail page (user view), client payment view, and the PDF (`invoice-pdf.tsx` prints both addresses today). Skip empty optional lines so no blank gaps appear
+- [x] No auto-fill or address lookup required
 
 **Done when:** all address inputs are structured multi-field forms that accept any address format in the world (no forced region or postcode), the old freeform address column is removed, and the dashboard, client payment view, and PDF all render the structured address neatly with empty optional lines omitted.
+
+---
+
+### ⏳ v1.7.1 — Drop the old one-box address columns (**pre-launch**)
+
+**Branch:** `v1.7.1/drop-old-address-columns`
+
+> Step 2 of 2 after v1.7 (0041 added the structured columns). Only once
+> v1.5.40 is live in production: until then the old code still writes the old
+> columns. Not additive, so the order is: v1.5.40 deployed, then this
+> migration on production, then merge (the code no longer reads them).
+
+- [ ] Migration: copy any `your_address` / `client_address` written after 0041
+      (rows where line 1 is still null) into line 1, then recreate
+      `invoice_email_summary` without the two columns, then drop them.
+- [ ] Remove them from `database.types.ts` and the test fixtures.
+- [ ] Tests: `npm run test:rls` and `npm run test:db` pass.
 
 ---
 
@@ -1718,6 +1784,12 @@ full spec if build.
 ---
 
 ## Notes
+
+- **Marketing email (from v1.4.34 item 4, 2026-11-26).** Before SatSend sends
+  any marketing email (newsletters, product news, offers): opt-in consent
+  recorded with a date (UK/EU), a working one-click unsubscribe, and a postal
+  address in the footer (CAN-SPAM). Transactional emails (sign-in, invoice,
+  payment) stay exempt but share the same footer component.
 
 - **Preserved branches (v1.4.32-H cleanup, 2026-10-07).** Four branches are kept on
   purpose and must NOT be deleted: `master` (an unrelated history, ~383 commits, no

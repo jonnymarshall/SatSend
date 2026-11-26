@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.40 — Proper address forms (roadmap v1.7).** Each address (yours and
+  your client's) is now six optional fields instead of one box: line 1, line 2,
+  city, state / province / region, post code, and a searchable country list
+  (stored as the ISO code, shown as the name; typing matches the start of any
+  word). Nothing is country-specific, so any address fits. Your invoice page,
+  the client's page and the PDF print one part per line and skip empty ones.
+  Migration `0041_structured_addresses.sql` adds twelve nullable columns and
+  copies each old address into line 1; the old columns are dropped in a
+  follow-up (v1.7.1) once this code is live. Roadmap: v1.4.34 closed (no code),
+  DMCA page moved to v1.5.2.15-H, and v1.5.3.1-H (exchange rate in the payment
+  breakdown) added.
+
 - **v1.5.39 — Faster CI.** The PR check took about 2.5 minutes (1 minute of it
   installing packages). Packages are now cached by `package-lock.json`, and
   typecheck + lint and the unit tests (in two halves) run at the same time on
