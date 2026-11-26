@@ -24,23 +24,23 @@
 **Order of work** (this overrides the file's top-to-bottom order; each phase
 keeps its own items' order):
 
-1. **Small stuff, target 2026-11-30:** v1.5.2.17-H security checks (✅ v1.5.32),
-   v1.5.2.24-H stricter CSP (✅ v1.5.33), v1.4.25 (✅ v1.5.34), v1.4.22 and v1.4.21 (✅ v1.5.35), v1.4.26 (✅ v1.5.36), v1.4.24 (✅ v1.5.37),
-   sender links by reference (✅ v1.5.38, ad hoc), CI speed-up (✅ v1.5.39, ad hoc), invoice page polish (✅ v1.5.41, ad hoc),
-   v1.4.34 close-out (✅ 2026-11-26, no code).
-2. **Finish the product, target 2026-12-14:** v1.7 addresses (✅ v1.5.40), v1.7.1 drop old address columns, v1.5.3-H
-   multi-currency, v1.5.3.1-H rate in the breakdown, v1.4.20, v1.4.27, v1.4.37, v1.5.2.11-H.
-3. **Legal and trust, target 2026-12-31:** v1.5.2.8-H, v1.5.2.7-H,
-   v1.5.2.15-H, v1.5.2.16-H, v1.5.7-H, v1.5.2.20-H, v1.5.2.19-H, v1.5.2.5-H,
-   v1.5.2.6-H.
-4. **Pro, target end of February 2027:** v1.5.5-H and v1.5.6-H decisions,
-   v1.5.2.18-H, v2.0, v1.5.4-H, v2.1 to v2.6 (all six Pro features on the
-   pricing card ship at launch: Jonny, 2026-11-24), v2.6.1 Pro export (added
+1. **Small stuff, target 2026-11-30:** R-32 security checks (✅ 1.5.32),
+   R-34 stricter CSP (✅ 1.5.33), R-24 (✅ 1.5.34), R-22 and R-21 (✅ 1.5.35), R-25 (✅ 1.5.36), R-23 (✅ 1.5.37),
+   sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
+   R-27 close-out (✅ 2026-11-26, no code).
+2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns, R-44
+   multi-currency, R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
+3. **Legal and trust, target 2026-12-31:** R-28, R-29,
+   R-30, R-31, R-42, R-37, R-36, R-38,
+   R-39.
+4. **Pro, target end of February 2027:** R-47 and R-48 decisions,
+   R-35, R-53, R-46, R-54 to R-59 (all six Pro features on the
+   pricing card ship at launch: Jonny, 2026-11-24), R-60 Pro export (added
    2026-11-25).
-5. **Jonny's admin, in parallel from now:** v1.5.0.4-H (DMARC, due), v1.5.8-H
-   (LLC: accountant first), v1.5.2.9-H, Terms inputs, About and Contact text.
+5. **Jonny's admin, in parallel from now:** R-49 (DMARC, due), R-41
+   (LLC: accountant first), R-40, Terms inputs, About and Contact text.
 
-After launch: v1.6, v2.7 onward, two-step sign-in (v1.5.2.17-H decision).
+After launch: R-50, v2.7 onward, two-step sign-in (R-32 decision).
 
 ## Product
 
@@ -57,6 +57,15 @@ After launch: v1.6, v2.7 onward, two-step sign-in (v1.5.2.17-H decision).
   - Dark-first brand.
 
 **This roadmap is the single source of truth** for what to build and why, per feature. `README.md` documents the payment-detection architecture. The original MVP PRD is archived at `development/archive/PRD.md`.
+
+## Item IDs and release numbers (2026-11-26)
+
+Roadmap items are **R-1, R-2, …** with their old label kept as "(was v1.5.3-H)",
+so older notes, commits and PRs still lead to the right item. Items in
+`ROADMAP-ARCHIVE.md` keep their old labels. **Release numbers** (`package.json`,
+git tags) are separate and follow semantic versioning from 1.6.0: a new feature
+bumps the middle number, a fix the last one. A finished item's heading ends with
+"· release 1.6.0". Branches for new items are `r-N/<slug>`.
 
 ## Status Legend
 
@@ -103,7 +112,7 @@ shipments:
 > result) without the human doing manual testing. Dev-only tooling, never shipped
 > to production. Run it before and alongside the hardening train.
 
-### 🟡 v1.4.37 — Schema cleanups (agreed during the test-harness work)
+### 🟡 R-61 (was v1.4.37) — Schema cleanups (agreed during the test-harness work)
 
 - **`tax_fiat` → computed column.** Keep `tax_percent` as the input and make
   `tax_fiat` `GENERATED ALWAYS AS (round(subtotal_fiat * tax_percent / 100, 2))
@@ -149,7 +158,7 @@ v1.4.21-H, including the 2026-10-06 mainnet smoke test). Their sections are in
 
 Each is one branch. Detail for all of these: Appendix A → Phase 1.
 
-- ✅ **v1.4.22-H — Detection robustness (server side)** (`v1.4.22-H/detection-robustness`):
+- ✅ **R-1 (was v1.4.22-H) — Detection robustness (server side)** (`v1.4.22-H/detection-robustness`):
   shipped — cron CAS checks `.select("id")` before sending email (no duplicate
   emails); `markUnpaid`/`bulkUnarchive` reset the schedule columns + clear
   `btc_txid`; `fetchAddressTxs` returns `null` on failure (outage ≠ "no tx") with
@@ -159,7 +168,7 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   remainder). **Split out:** the `payment-watcher.tsx` mempool.space WebSocket
   reconnect (the fastest-path client socket) is now its own branch,
   `v1.4.22-H/ws-reconnect`.
-- ✅ **v1.4.23-H — RLS & indexes** (`v1.4.23-H/rls-and-indexes`): shipped —
+- ✅ **R-2 (was v1.4.23-H) — RLS & indexes** (`v1.4.23-H/rls-and-indexes`): shipped —
   `pre_archive_status` → `invoice_status` enum + CHECK (legacy values nulled);
   the summary view recreated with enumerated columns (`security_invoker` + the
   anon revoke re-asserted); `invoices (user_id, created_at desc)` index +
@@ -171,7 +180,7 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   duplicate groups (`development/invoice-number-duplicates-audit.md`), so the
   constraint would fail the migration. The generator bug that created them
   (`buildDuplicateInvoiceNumber` used a fixed suffix) **is fixed here**.
-- ✅ **v1.4.23.1-H — Invoice-number uniqueness** (`v1.4.23.1-H/invoice-number-uniqueness`):
+- ✅ **R-3 (was v1.4.23.1-H) — Invoice-number uniqueness** (`v1.4.23.1-H/invoice-number-uniqueness`):
   shipped (package `1.4.37`) — production's 8 duplicate groups (16 rows) resolved by
   renaming the later copies to `<number> (dup N)` (**not** deleting: the v1.4.21-H
   trigger blocks deleting non-draft invoices, and 6 of the 8 groups involve one),
@@ -181,11 +190,11 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   separate `check (invoice_number <> '')` — the app writes NULL (never '') for blank
   drafts, so the index already covers it and a blanket CHECK is unnecessary. Applied
   to test and production. **Split out:** the friendly `23505` message → v1.4.23.2-H.
-- ✅ **v1.4.23.2-H — Friendly duplicate-invoice-number message** (2026-10-08):
+- ✅ **R-4 (was v1.4.23.2-H) — Friendly duplicate-invoice-number message** (2026-10-08):
   **already satisfied, no work needed** — `dbErrorToFieldError` (v1.4.29-H) already
   maps a `23505` on the invoice-number index to `invoice_number` with "You already
   have an invoice with this number." My earlier split was redundant; closed.
-- ✅ **v1.4.24-H — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
+- ✅ **R-5 (was v1.4.24-H) — Proxy & boundaries** (`v1.4.24-H/proxy-and-boundaries`): shipped —
   the proxy now exports `config` (Next reads it, so the matcher finally applies and
   the proxy stops running on static assets) and validates the token with `getUser`
   instead of trusting the cookie; added root `error.tsx` + `not-found.tsx` and
@@ -194,13 +203,13 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   frame-ancestors/object-src/base-uri only). The stricter nonce-based CSP is
   deferred: it forces dynamic rendering, and a wrong `connect-src` would silently
   kill the live mempool/Supabase sockets.
-- ✅ **v1.4.25-H — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
+- ✅ **R-6 (was v1.4.25-H) — Public-endpoint hardening** (`v1.4.25-H/public-endpoint-hardening`):
   shipped — the public PDF route now enforces the access code (404 on failure);
   the access cookie's path widened to `/` (which also fixed the payer fast-path
   silently 404ing on access-protected invoices) and gained `secure` in prod;
   `btc-price` rejects non-USD with 400; the cron secret is compared in constant
   time; line items capped at 100; the public PDF is cached by version (ETag/304).
-- ✅ **v1.4.26-H — Abuse controls (code side)** (`v1.4.26-H/rate-limiting`): shipped —
+- ✅ **R-7 (was v1.4.26-H) — Abuse controls (code side)** (`v1.4.26-H/rate-limiting`): shipped —
   server-side `client_email` validation (empty OK, malformed rejected on save and
   at send, where a bad payer address skips quietly); minimum access-code length of
   6; and a per-user daily send cap of 200 enforced in the shared send helper. At
@@ -208,7 +217,7 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
   sweep/fast-path cannot crash, while owner-initiated sends surface an error.
   **Split out:** rate limiting → v1.4.26.1-H (hashed access codes were considered
   and scrapped — see below).
-- ✅ **v1.4.26.1-H — Rate limiting (done); hashed access codes scrapped** (2026-10-08):
+- ✅ **R-8 (was v1.4.26.1-H) — Rate limiting (done); hashed access codes scrapped** (2026-10-08):
   **Rate limiting: done** — a Vercel Firewall rule (Hobby, free — one rule allowed;
   30 req / 60 s per IP, 429) on `/invoice/`, `/api/invoice/`, `/api/invoices/`,
   covering the access-code verify, PDF and payment-polling surfaces. It lives in
@@ -224,47 +233,47 @@ Each is one branch. Detail for all of these: Appendix A → Phase 1.
 
 Each is one branch. Detail: Appendix A → Phase 2.
 
-- ✅ **v1.4.27-H — Generate Supabase types** (`chore/supabase-types`): shipped —
+- ✅ **R-9 (was v1.4.27-H) — Generate Supabase types** (`chore/supabase-types`): shipped —
   `src/lib/database.types.ts` generated (`npm run gen:types`) and committed;
   `Database` threaded through the three client factories; the hand-declared row
   shapes replaced by types derived from the generated ones (one `Invoice` + `Pick`
   subsets); one home for the JSONB cast. `npm run typecheck` added as the gate.
   Surfaced real drift (nullable `btc_address`, `send_method` as text, untyped
   update payloads).
-- ✅ **v1.4.29-H — Zod + typed action results** (`refactor/zod-validation`): shipped —
+- ✅ **R-10 (was v1.4.29-H) — Zod + typed action results** (`refactor/zod-validation`): shipped —
   one shared `invoiceSchema`; server actions now RETURN `{ ok, field, message }` for
   field-validation failures (thrown messages are masked in production), including
   translated DB constraint violations (the address unique index → a btc_address
   field error). Structural errors still throw; `parseServerError` deleted.
   **Split out:** the form's three parallel arrays → v1.4.29.1-H.
-- ✅ **v1.4.29.1-H — Collapse the form's parallel arrays** (`v1.4.29.1-H/form-line-item-state`):
+- ✅ **R-11 (was v1.4.29.1-H) — Collapse the form's parallel arrays** (`v1.4.29.1-H/form-line-item-state`):
   shipped (package `1.4.35`) — the form's three index-synced arrays (`line_items`,
   `rawAmounts`, `itemKeys`) are now one `LineItemState[]`; the numeric `LineItem[]`
   is derived via `toLineItems`. Behaviour-preserving (DOM ids and the existing
   validation unchanged), so the refactor is provably safe. **Split out:** the second
   clause (import the shared `invoiceSchema` client-side) → v1.4.29.2-H, since it
   changes validation semantics and messages.
-- ✅ **v1.4.29.2-H — Schema-backed client-side form validation** (`v1.4.29.2-H/form-schema-validation`):
+- ✅ **R-12 (was v1.4.29.2-H) — Schema-backed client-side form validation** (`v1.4.29.2-H/form-schema-validation`):
   shipped (package `1.4.38`) — the form's `validate()` now runs the shared
   `invoiceSchema` over the payload (one source of truth with the server actions) and
   maps Zod issues to field errors, keeping the publish-time "BTC address required"
   rule and the form-only address FORMAT check; error display added for tax percent
   and access code. Deferred from v1.4.29.1-H.
-- ✅ **v1.4.30-H — Realtime unification** (`refactor/realtime-and-styling`): shipped —
+- ✅ **R-13 (was v1.4.30-H) — Realtime unification** (`refactor/realtime-and-styling`): shipped —
   one `useInvoiceChannel` hook (auth + subscription style as explicit parameters)
   with bounded resubscribe (6 attempts, 1s→30s), replacing two near-duplicate
   hooks; the three existing exports are thin wrappers, so no call sites moved.
   `confirmationDepth` now cross-references `CONFIRMATION_DEPTH_REQUIRED` (the
   reorg rationale already existed). **Split out:** the colour source of truth →
   v1.4.30.1-H.
-- ✅ **v1.4.30.1-H — One colour source of truth** (`v1.4.30.1-H/colour-source`):
+- ✅ **R-14 (was v1.4.30.1-H) — One colour source of truth** (`v1.4.30.1-H/colour-source`):
   shipped (package `1.4.36`) — **`globals.css` is canonical** (it is what the app
   renders; no visual change before the v1.5 redesign). `brand-colors.ts` synced to
   the browser-accurate hex of the `.dark` tokens (`background #010101`,
   `surface #070707`, `primary #D02A3A`, `muted #727460`), and `brand-colors.test.ts`
   now fails if any of the four drifts (OKLCH→hex, ±2/channel). `foreground`/`paper`
   are PDF-only and unguarded. Visual restyle stays with v1.5.
-- ✅ **v1.4.31-H — Address uniqueness across tenants (H-DB-3)** (`v1.4.31-H/address-uniqueness`):
+- ✅ **R-15 (was v1.4.31-H) — Address uniqueness across tenants (H-DB-3)** (`v1.4.31-H/address-uniqueness`):
   shipped — a `security definer` RPC (`is_address_registered`, search_path pinned,
   execute limited to authenticated) lets the pre-check see across tenants, so a
   cross-tenant collision is caught at validation time instead of after a failed
@@ -273,7 +282,7 @@ Each is one branch. Detail: Appendix A → Phase 2.
   (intrinsic to global uniqueness; rate limiting is the mitigation, v1.4.26.1-H) —
   it makes the pre-check correct and the error timely. **Split out:** the
   integration test harness → v1.4.31.1-H.
-- ✅ **v1.4.31.1-H — Integration test layer (first suite)** (`v1.4.31.1-H/supabase-integration`):
+- ✅ **R-16 (was v1.4.31.1-H) — Integration test layer (first suite)** (`v1.4.31.1-H/supabase-integration`):
   shipped `test-automation/rls-integration.mjs` (`npm run test:rls`) — local-only,
   runs against the real test Supabase with real user JWTs, and is guarded (skips
   without an anon key; aborts on a production URL or `PAYMENT_SWEEP_ENABLED`).
@@ -283,7 +292,7 @@ Each is one branch. Detail: Appendix A → Phase 2.
   EXECUTE to `anon` on new functions, so 0030's `revoke … from public` had not
   taken — fixed by 0031 (test and prod). Follow-ups: CI wiring, more suites
   (status transitions), M-FE-1's shared fake.
-- ✅ **v1.4.31.2-H — Integration harness, second suite: DB invariants** (`v1.4.31.2-H/db-invariants`):
+- ✅ **R-17 (was v1.4.31.2-H) — Integration harness, second suite: DB invariants** (`v1.4.31.2-H/db-invariants`):
   `test-automation/db-invariants.mjs` (`npm run test:db`) proves migration 0027
   against real Postgres: impossible money (inconsistent totals, negative, non-USD,
   out-of-range tax, malformed line items) is rejected; non-draft invoices cannot be
@@ -292,7 +301,7 @@ Each is one branch. Detail: Appendix A → Phase 2.
 
 ### Roadmap & docs housekeeping (do alongside Phase 0)
 
-- ✅ **v1.4.32-H — Roadmap/docs restructure** (`chore/roadmap-restructure`): shipped
+- ✅ **R-18 (was v1.4.32-H) — Roadmap/docs restructure** (`chore/roadmap-restructure`): shipped
   — ✅ history (v1.0–v1.4.18) moved verbatim to `ROADMAP-ARCHIVE.md`; live file is
   ~2225 lines (the old "< 500" target predated the hardening train — restated
   honestly); `development/OUTSTANDING-VERIFICATIONS.md` + `manual-tests/README.md`
@@ -302,7 +311,7 @@ Each is one branch. Detail: Appendix A → Phase 2.
   merge `v1.4.32`, prune merged branches. **`master` is NOT deleted** — unrelated
   history (~383 commits, no merge-base with `main`); optionally renamed
   `archive/pre-restart`. Detail: Appendix A → "Roadmap & docs restructure".
-- ✅ **v1.4.33-H — Claude workflow hooks/skills** (`chore/claude-hooks`): shipped —
+- ✅ **R-19 (was v1.4.33-H) — Claude workflow hooks/skills** (`chore/claude-hooks`): shipped —
   CI workflow (`.github/workflows/ci.yml`: typecheck + unit tests + lint on PR; the
   real, tool-blind gate — unit-only, since the integration suites are local-only);
   four warn-only hook scripts in `.claude/hooks/` wired via `settings.json` (commit
@@ -324,9 +333,9 @@ not re-implement.
 
 ---
 
-### ⏳ v1.4.20 — Auto Overdue Email Notifications
+### ⏳ R-20 (was v1.4.20) — Auto Overdue Email Notifications
 
-**Branch:** `v1.4.20/overdue-email-notifications`
+**Branch:** `r-20/overdue-email-notifications`
 
 **Context:** v1.4.11 made the `pending → overdue` transition automatic (via cron + at publish time) but explicitly deferred the email side: the owner only finds out on the next dashboard load. v1.4.20 closes that loop by sending two emails on the auto-flip — one to the owner, one to the client (where a `client_email` exists).
 
@@ -354,7 +363,7 @@ not re-implement.
 
 ---
 
-### ✅ v1.4.21 — Watcher mount-time GET de-duplication (deferred from v1.4.13) · v1.5.35 (closed: dev-only)
+### ✅ R-21 (was v1.4.21) — Watcher mount-time GET de-duplication (deferred from v1.4.13) · v1.5.35 (closed: dev-only)
 
 **Branch:** `v1.4.21/watcher-mount-dedup` (or fold into another branch that touches `payment-watcher.tsx` — e.g. v1.4.19's payment-amount work, where the watcher will be modified anyway).
 
@@ -389,7 +398,7 @@ test wasn't added: there is no production bug for it to guard.
 
 ---
 
-### ✅ v1.4.22 — Activity Feed Completeness: Publish Event + Delivery-Status Deduplication · v1.5.35
+### ✅ R-22 (was v1.4.22) — Activity Feed Completeness: Publish Event + Delivery-Status Deduplication · release 1.5.35
 
 **Branch:** `v1.4.22/activity-feed-completeness`
 
@@ -450,7 +459,7 @@ still drive the Send menu.
 
 ---
 
-### ✅ v1.4.24 — `/invoices` Row Actions: Disable Unavailable Actions with Hover Explanation · v1.5.37
+### ✅ R-23 (was v1.4.24) — `/invoices` Row Actions: Disable Unavailable Actions with Hover Explanation · release 1.5.37
 
 **Branch:** `v1.4.24/row-actions-disabled-with-tooltip`
 
@@ -495,7 +504,7 @@ a wrapper around the button.
 
 ---
 
-### ✅ v1.4.25 — Duplicate Invoice: No Phantom Draft, No `NEXT_REDIRECT` Dialog · v1.5.34
+### ✅ R-24 (was v1.4.25) — Duplicate Invoice: No Phantom Draft, No `NEXT_REDIRECT` Dialog · release 1.5.34
 
 **Branch:** `v1.4.25/duplicate-invoice-cleanup`
 
@@ -532,7 +541,7 @@ before this may be a day early if they were picked in summer in the UK.
 
 ---
 
-### ✅ v1.4.26 — Client `invoice_published` Email: Subject + Body Rework · v1.5.36
+### ✅ R-25 (was v1.4.26) — Client `invoice_published` Email: Subject + Body Rework · release 1.5.36
 
 **Branch:** `v1.4.26/client-email-rework`
 
@@ -572,9 +581,9 @@ Sample sender: `npx tsx scripts/email/send-invoice-sample.tsx --to <address>`.
 
 ---
 
-### ⏳ v1.4.27 — Owner Notification: Email Sender on Publish
+### ⏳ R-26 (was v1.4.27) — Owner Notification: Email Sender on Publish
 
-**Branch:** `v1.4.27/sender-publish-notification`
+**Branch:** `r-26/sender-publish-notification`
 
 **Context:** today only the recipient gets an email when an invoice is published. The owner has no inbox confirmation, no nudge on next steps (share the link, track activity), no post-publish receipt. Adds a new email type sent to the owner whenever any of `publishInvoice`, `publishAndSendEmail`, or `publishAndMarkSent` succeeds.
 
@@ -609,7 +618,7 @@ Sample sender: `npx tsx scripts/email/send-invoice-sample.tsx --to <address>`.
 
 ---
 
-### ✅ v1.4.34 — Legal & Compliance Bundle (pre-launch, non-urgent)
+### ✅ R-27 (was v1.4.34) — Legal & Compliance Bundle (pre-launch, non-urgent)
 
 **Branch:** `v1.4.34/legal-compliance-bundle`
 
@@ -746,7 +755,7 @@ Lightning (any future Lightning support pays to the user's own node or
 provider). Pro is a flat subscription paid to SatSend, kept apart from users'
 payments; that is safe.
 
-### ⏳ v1.5.2.8-H — Terms of service (`/terms`) (**pre-launch**, moved up)
+### ⏳ R-28 (was v1.5.2.8-H) — Terms of service (`/terms`) (**pre-launch**, moved up)
 
 > Was a one-line placeholder. **Must be live before Pro**, ideally before launch.
 
@@ -792,7 +801,7 @@ payments; that is safe.
 - [ ] **Lawyer review** before Pro takes money (budget it), then publish. Keep
       a dated version history at the bottom of the page.
 
-### ⏳ v1.5.2.7-H — Privacy policy (`/privacy`) (**pre-launch**, moved up)
+### ⏳ R-29 (was v1.5.2.7-H) — Privacy policy (`/privacy`) (**pre-launch**, moved up)
 
 > Was a one-line placeholder. **Must be live before Pro.** Drafted from what the
 > code actually stores and sends; same lawyer review as v1.5.2.8-H.
@@ -818,7 +827,7 @@ payments; that is safe.
       numbers).
 - [ ] **International transfers, children (18+ only), changes, contact.**
 
-### ⏳ v1.5.2.15-H — Legal page (`/legal`), agreeing at sign-up, and notices for payers (**pre-launch**)
+### ⏳ R-30 (was v1.5.2.15-H) — Legal page (`/legal`), agreeing at sign-up, and notices for payers (**pre-launch**)
 
 - [ ] **`/legal`**: one page linking Terms, Privacy, Acceptable use (a section
       of the Terms), Cookies (a section of Privacy), DMCA (below), Licence
@@ -845,7 +854,7 @@ payments; that is safe.
       written; every public invoice view and email carries the footer; `/dmca`
       shows the agent's details.
 
-### ⏳ v1.5.2.16-H — Abuse and fraud handling (**pre-launch**)
+### ⏳ R-31 (was v1.5.2.16-H) — Abuse and fraud handling (**pre-launch**)
 
 > A scammer could use SatSend to send convincing invoices pretending to be
 > another company, or to send spam from SatSend's email domain. Both harm the
@@ -862,7 +871,7 @@ payments; that is safe.
 - [ ] Written steps for handling a report (check, switch off, reply, keep a
       record), linked from the Terms' acceptable-use section.
 
-### ✅ v1.5.2.17-H — Security launch checks (**pre-launch**) · v1.5.32
+### ✅ R-32 (was v1.5.2.17-H) — Security launch checks (**pre-launch**) · release 1.5.32
 
 > From Supabase's security advisor on production (2026-10-27) and the launch
 > security checklist. Small fixes plus settings.
@@ -904,7 +913,7 @@ passwords, which is why it has to stay available there anyway.)
 `security.txt` points at the Security page's report section until a support
 email exists (v1.5.2.6-H). Two-step sign-in: **after launch**, as its own item.
 
-### ✅ v1.5.38 — Your own invoice pages use the SatSend reference (ad hoc) · v1.5.38
+### ✅ R-33 (was v1.5.38) — Your own invoice pages use the SatSend reference (ad hoc) · release 1.5.38
 
 Jonny, 2026-11-25: the sender's link was `/invoices/<long id>` while the
 client's was `/invoice/ss-…`. Now the sender's pages are `/invoices/ss-…`
@@ -913,7 +922,7 @@ old long-id links redirect. The long id stays the database key.
 
 ---
 
-### ✅ v1.5.2.24-H — Stricter Content-Security-Policy (**pre-launch**) · v1.5.33
+### ✅ R-34 (was v1.5.2.24-H) — Stricter Content-Security-Policy (**pre-launch**) · release 1.5.33
 
 > Split out of v1.5.2.17-H. Limits which scripts a page may run, the main
 > defence against injected script stealing a signed-in session.
@@ -939,7 +948,7 @@ sockets open, and a status change on the test DB reaching the open client page
 in real time. Development mode works too (hot reload, sockets). Enforced
 straight away: report-only wasn't needed after those checks.
 
-### ⏳ v1.5.2.18-H — Commercial hosting, outside services' terms and spending caps (**pre-launch, before Pro**)
+### ⏳ R-35 (was v1.5.2.18-H) — Commercial hosting, outside services' terms and spending caps (**pre-launch, before Pro**)
 
 - [ ] **Vercel:** the Hobby plan is for personal, non-commercial use only.
       Move to Pro before charging for Pro (ideally at launch). Then turn on
@@ -956,7 +965,7 @@ straight away: report-only wasn't needed after those checks.
       webhooks, emails), every scheduled job has a time and size limit, and
       billing alerts go to Jonny's email.
 
-### ⏳ v1.5.2.19-H — Accessibility (WCAG 2.2 AA) and an accessibility statement (**pre-launch**)
+### ⏳ R-36 (was v1.5.2.19-H) — Accessibility (WCAG 2.2 AA) and an accessibility statement (**pre-launch**)
 
 > Accessibility lawsuits are common against small sites too. The design system
 > already uses focus rings and labels; this checks it properly.
@@ -970,7 +979,7 @@ straight away: report-only wasn't needed after those checks.
 - [ ] Accessibility statement on `/legal`: the standard aimed for, known gaps,
       how to report a problem.
 
-### ⏳ v1.5.2.20-H — Data protection housekeeping (**pre-launch, before Pro**)
+### ⏳ R-37 (was v1.5.2.20-H) — Data protection housekeeping (**pre-launch, before Pro**)
 
 - [ ] Accept the data processing agreements of Supabase, Vercel and Resend
       (and the card provider), and note each one's data region.
@@ -986,13 +995,13 @@ straight away: report-only wasn't needed after those checks.
 
 ---
 
-### ⏳ v1.5.2.5-H — About page (`/about`)
+### ⏳ R-38 (was v1.5.2.5-H) — About page (`/about`)
 - [ ] Who's behind SatSend and why it exists. **Needs a few lines from Jonny.**
 
-### ⏳ v1.5.2.6-H — Contact page (`/contact`)
+### ⏳ R-39 (was v1.5.2.6-H) — Contact page (`/contact`)
 - [ ] How to get in touch. **Needs the support email address from Jonny.**
 
-### ⏳ v1.5.2.9-H — SatSend accounts on X, LinkedIn and GitHub
+### ⏳ R-40 (was v1.5.2.9-H) — SatSend accounts on X, LinkedIn and GitHub
 - [ ] Jonny creates the accounts (a GitHub organisation for the repo).
 - [ ] **Move the codebase to the SatSend GitHub account** (Jonny, 2026-10-21):
       transfer `jonnymarshall/SatSend` to the organisation (GitHub keeps
@@ -1005,7 +1014,7 @@ straight away: report-only wasn't needed after those checks.
       and "open an issue on GitHub" (v1.5.25); point the issue link at the
       repo's `/issues`. Then `/coming-soon` has no users: delete it.
 
-### ⏳ v1.5.8-H — Form SATSEND LLC and give it the code (**pre-launch**)
+### ⏳ R-41 (was v1.5.8-H) — Form SATSEND LLC and give it the code (**pre-launch**)
 
 > `LICENSE.md` names **SATSEND LLC** as the copyright holder (Jonny,
 > 2026-10-21), but the company doesn't exist yet. Until it does, the code is
@@ -1023,7 +1032,7 @@ straight away: report-only wasn't needed after those checks.
       omissions) and cyber insurance; keep the LLC's money separate from
       personal money so the LLC protects you.
 
-### ⏳ v1.5.7-H — Account deletion (**pre-launch**)
+### ⏳ R-42 (was v1.5.7-H) — Account deletion (**pre-launch**)
 
 > Agreed 2026-10-21. The FAQ already says "contact support and we'll delete your
 > account and your invoices"; privacy law in many places expects this.
@@ -1038,13 +1047,13 @@ straight away: report-only wasn't needed after those checks.
       to export PDFs).
 - [ ] Mention in the privacy policy (v1.5.2.7-H).
 
-### ⏳ v1.5.2.11-H — Phones: invoice list as stacked rows
+### ⏳ R-43 (was v1.5.2.11-H) — Phones: invoice list as stacked rows
 - [ ] Moved out of v1.5.2-H. On phones, show the invoice table as stacked rows
       instead of sideways scrolling. A layout change, so it needs Jonny's decision.
 
-### ⏳ v1.5.3-H — Multi-currency support (moved from v2.12; **pre-launch**)
+### ⏳ R-44 (was v1.5.3-H) — Multi-currency support (moved from v2.12; **pre-launch**)
 
-**Branch:** `v1.5.3/multi-currency`
+**Branch:** `r-44/multi-currency`
 
 > **Confirmed for launch (Jonny, 2026-11-24): "max market opportunity".**
 > Moved before launch (Jonny, 2026-10-21): the homepage says "create your invoice
@@ -1057,9 +1066,9 @@ straight away: report-only wasn't needed after those checks.
 
 ---
 
-### ⏳ v1.5.3.1-H — Exchange rate in the payment breakdown (**pre-launch**)
+### ⏳ R-45 (was v1.5.3.1-H) — Exchange rate in the payment breakdown (**pre-launch**)
 
-**Branch:** `v1.5.3.1/rate-in-breakdown`
+**Branch:** `r-45/rate-in-breakdown`
 
 > Jonny, 2026-11-26: show the FX rate in the Paid breakdown, on the website, in
 > the emails and in the PDFs. After multi-currency, so the rate is shown in the
@@ -1080,7 +1089,7 @@ straight away: report-only wasn't needed after those checks.
 
 ---
 
-### ⏳ v1.5.4-H — Card payments for Pro (**pre-launch**)
+### ⏳ R-46 (was v1.5.4-H) — Card payments for Pro (**pre-launch**)
 
 > **Decided by Jonny, 2026-10-21:** "accepting fiat payments is going to be
 > pretty crucial from launch date." This **replaces the "Bitcoin-only at launch
@@ -1108,7 +1117,7 @@ straight away: report-only wasn't needed after those checks.
       cancelling online as easy as subscribing (auto-renewal laws, e.g.
       California).
 
-### ⏳ v1.5.5-H — Consider free trials of Pro (**decide before launch**)
+### ⏳ R-47 (was v1.5.5-H) — Consider free trials of Pro (**decide before launch**)
 
 > Jonny, 2026-10-21: "I want to at least think about this before launch."
 
@@ -1117,7 +1126,7 @@ straight away: report-only wasn't needed after those checks.
 - [ ] If yes: how it shows on /pricing and the homepage cards, and abuse limits
       (one trial per person, not per throwaway email).
 
-### ⏳ v1.5.6-H — Moving between Free and Pro (**decide before launch**)
+### ⏳ R-48 (was v1.5.6-H) — Moving between Free and Pro (**decide before launch**)
 
 > Jonny, 2026-10-21: consider how accounts move from Free to Pro and back,
 > including how invoices created **before** the change are handled after it.
@@ -1132,7 +1141,7 @@ straight away: report-only wasn't needed after those checks.
       invoices, including the ones you created on Pro"; keep that true.
 - [ ] Write the decisions into v2.0's entitlement model and the terms (v1.5.2.8-H).
 
-### ⏳ v1.5.0.4-H — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
+### ⏳ R-49 (was v1.5.0.4-H) — DMARC: tighten `p=none` → `p=quarantine` (**not before 2026-11-08**)
 
 **Branch:** none needed (a DNS change in Namecheap, done by Jonny) · **Date-gated.**
 
@@ -1168,9 +1177,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v1.6 — Bitcoin Enhancements
+### ⏳ R-50 (was v1.6) — Bitcoin Enhancements
 
-**Branch:** `v1.6/btc-enhancements`
+**Branch:** `r-50/btc-enhancements`
 
 - [ ] Optional BTC discount field on invoice creation (% value, e.g. 5%)
 - [ ] Discount only applies if the invoice is paid in Bitcoin — shown on the client payment view as a line item reducing the BTC amount
@@ -1181,7 +1190,7 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ✅ v1.7 — Address Format Standardisation (**pre-launch**) · v1.5.40
+### ✅ R-51 (was v1.7) — Address Format Standardisation (**pre-launch**) · release 1.5.40
 
 **Branch:** `v1.7/address-fields`
 
@@ -1206,9 +1215,9 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v1.7.1 — Drop the old one-box address columns (**pre-launch**)
+### ⏳ R-52 (was v1.7.1) — Drop the old one-box address columns (**pre-launch**)
 
-**Branch:** `v1.7.1/drop-old-address-columns`
+**Branch:** `r-52/drop-old-address-columns`
 
 > Step 2 of 2 after v1.7 (0041 added the structured columns). Only once
 > v1.5.40 is live in production: until then the old code still writes the old
@@ -1289,11 +1298,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.0 — Premium accounts: entitlement + Bitcoin billing (foundation)
+### ⏳ R-53 (was v2.0) — Premium accounts: entitlement + Bitcoin billing (foundation)
 
 > **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
-**Branch:** `v2.0/premium-bitcoin`
+**Branch:** `r-53/premium-bitcoin`
 
 **Context:** Everything else in v2 sits on this. Until the entitlement layer and a way to take money exist, nothing can be "Pro." Bitcoin-only, self-serve from day one.
 
@@ -1323,11 +1332,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.1 — Pretty links (owner slug)
+### ⏳ R-54 (was v2.1) — Pretty links (owner slug)
 
 > **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
-**Branch:** `v2.1/pretty-links`
+**Branch:** `r-54/pretty-links`
 
 **Context:** Give every Pro user a readable URL for their business, `satsend.me/theircompanyname`, so shared links look professional instead of exposing an opaque invoice ID.
 
@@ -1345,11 +1354,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.2 — Saved clients + reusable line items
+### ⏳ R-55 (was v2.2) — Saved clients + reusable line items
 
 > **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
-**Branch:** `v2.2/saved-clients`
+**Branch:** `r-55/saved-clients`
 
 > **Depends on:** v1.7 (structured addresses).
 
@@ -1372,11 +1381,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.3 — Client pages
+### ⏳ R-56 (was v2.3) — Client pages
 
 > **Launch work (Jonny, 2026-11-24):** Free and Pro launch together, so this is no longer deferred.
 
-**Branch:** `v2.3/client-pages`
+**Branch:** `r-56/client-pages`
 
 > **Depends on:** v2.1 (owner slug), v2.2 (client entity).
 
@@ -1397,11 +1406,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.4 — Custom branding
+### ⏳ R-57 (was v2.4) — Custom branding
 
 > **Launch work (Jonny, 2026-11-24):** the /pricing Pro card promises it, and all six Pro features ship at launch.
 
-**Branch:** `v2.4/custom-branding`
+**Branch:** `r-57/custom-branding`
 
 **Context:** The most visible "looks professional" upgrade: the owner's logo and colours on everything the client sees.
 
@@ -1419,11 +1428,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.5 — Client-facing email + display-name sender
+### ⏳ R-58 (was v2.5) — Client-facing email + display-name sender
 
 > **Launch work (Jonny, 2026-11-24):** the /pricing Pro card promises it, and all six Pro features ship at launch.
 
-**Branch:** `v2.5/client-email`
+**Branch:** `r-58/client-email`
 
 **Context:** Today email goes out from `SatSend <team@mail.satsend.me>` to both owner and payer. This entry makes a Pro user's client email look like it came from them. **Client email stays free** (corrected 2026-10-21): Free keeps sending as "SatSend".
 
@@ -1440,11 +1449,11 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.6 — Payment reminders
+### ⏳ R-59 (was v2.6) — Payment reminders
 
 > **Launch work (Jonny, 2026-11-24):** the /pricing Pro card promises it, and all six Pro features ship at launch.
 
-**Branch:** `v2.6/reminders`
+**Branch:** `r-59/reminders`
 
 > **Depends on:** v2.5 (client-facing email).
 
@@ -1464,13 +1473,13 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ v2.6.1 — Pro export: invoices in a date range, as CSV or JSON
+### ⏳ R-60 (was v2.6.1) — Pro export: invoices in a date range, as CSV or JSON
 
 > **Launch work (Jonny, 2026-11-25):** "I want Pro users to be able to download
 > CSVs or json files of all their invoices in a definable date range", built
 > before launch so it can be marketed. The seventh Pro feature on the /pricing card.
 
-**Branch:** `v2.6.1/pro-export`
+**Branch:** `r-60/pro-export`
 
 > **Depends on:** v2.0 (Pro entitlement); builds on the free "download all your
 > invoices" export in v1.5.2.20-H (privacy law: every user gets a full copy,
@@ -1493,7 +1502,7 @@ spam. Four weeks of passing results is the safety margin.
 > **2026-11-25:** the export part is now v2.6.1 (Pro, pre-launch); this item
 > is the reports page, after launch.
 
-**Branch:** `v2.7/reports`
+**Branch:** `r-60/reports`
 
 **Phase 2.**
 
@@ -1514,7 +1523,7 @@ spam. Four weeks of passing results is the safety margin.
 
 ### 🚫 v2.8: Public API + AI Agent Access (premium-gated)
 
-**Branch:** `v2.8/public-api`
+**Branch:** `r-60/public-api`
 
 **Phase 3.**
 
@@ -1574,7 +1583,7 @@ Security + observability
 
 ### 🚫 v2.9: Referral codes
 
-**Branch:** `v2.9/referral-codes`
+**Branch:** `r-60/referral-codes`
 
 **Later.**
 
@@ -1622,7 +1631,7 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ### 🚫 v2.10: OAuth
 
-**Branch:** `v2.10/oauth`
+**Branch:** `r-60/oauth`
 
 - [ ] Google OAuth
 - [ ] GitHub OAuth
@@ -1632,7 +1641,7 @@ The user has flagged this entry as needing a thorough grilling before any code i
 
 ### 🚫 v2.11: Custom subdomains
 
-**Branch:** `v2.11/custom-subdomains`
+**Branch:** `r-60/custom-subdomains`
 
 - [ ] Wildcard subdomain routing (`yourcompany.satsend.me`) as an alternative to the path-based pretty links (v2.1)
 
@@ -1646,7 +1655,7 @@ Moved before launch as **v1.5.3-H** (2026-10-21).
 
 ### 🚫 v2.13: Lightning payments (non-custodial, LNURL + LUD-21)
 
-**Branch:** `v2.13/lightning-payments`
+**Branch:** `r-60/lightning-payments`
 
 **Later (post-launch).** Free for everyone (locked by Jonny, 2026-10-21): a payment
 rail is part of the core loop, not a Pro feature.
@@ -1756,7 +1765,7 @@ silent failure.
 
 ### 🚫 v2.14: Investigate Nostr Wallet Connect (NWC) for Lightning verification
 
-**Branch:** `v2.14/nwc-lightning-verification`
+**Branch:** `r-60/nwc-lightning-verification`
 
 **Later.** Follow-up to v2.13, flagged by Jonny (2026-10-21).
 
