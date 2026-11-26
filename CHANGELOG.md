@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **v1.5.41 — Invoice page polish (ad hoc).**
+  - Your invoice page shows at most three buttons (Edit draft or View public
+    invoice and Download PDF, then Send) plus **More**, which holds Mark as …,
+    Archive / Unarchive, Duplicate and Delete (greyed out with the reason
+    when unavailable). The Mark as rules moved unchanged to
+    `src/lib/invoices/mark-as-options.ts`; the old Mark as menu is gone.
+  - Cancel on the invoice form asks "Discard unsaved changes?" in SatSend's
+    own dialog instead of the browser's.
+  - Every dropdown menu item shows a hand cursor.
+  - CI: the package cache is keyed on the package list without the app's
+    version, so a version bump no longer forces a full install.
+
 - **v1.5.40 — Proper address forms (roadmap v1.7).** Each address (yours and
   your client's) is now six optional fields instead of one box: line 1, line 2,
   city, state / province / region, post code, and a searchable country list

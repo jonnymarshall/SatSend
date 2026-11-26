@@ -9,7 +9,16 @@ import { SendMenu } from "@/components/send-menu";
 import { showNotice } from "@/components/notice";
 import { deferredCopy } from "@/lib/copy-when-ready";
 import { clientInvoiceUrl, emailOutcomeMessage } from "@/lib/invoices/send-feedback";
-import { MarkAsMenu } from "@/components/mark-as-menu";
+import { MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MenuItemLabel } from "@/components/menu-item-label";
+import { markAsOptions } from "@/lib/invoices/mark-as-options";
 import {
   deleteDraft,
   markOverdue,
@@ -47,7 +56,14 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
   const isDraft = invoice.status === "draft";
   const isArchived = invoice.status === "archived";
-  const canShowMarkAsMenu = !isDraft && !isArchived;
+  // v1.5.41: at most three buttons (Edit draft or View public invoice and
+  // Download PDF, then Send) plus More; everything else is in More.
+  const markAs = markAsOptions({
+    status: invoice.status,
+    dueDate: invoice.due_date ?? null,
+    paidOnChain: !!invoice.btc_txid,
+  });
+  const markAsAction = { paid: markPaid, unpaid: markUnpaid, overdue: markOverdue } as const;
   // Hide the Send menu only when truly nothing remains to do: the invoice has
   // been sent AND had an email attempt. Until then keep it reachable (even with
   // no client_email; the "Send now via email" item explains via tooltip).
@@ -192,70 +208,64 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
           />
         )}
 
-        {canShowMarkAsMenu && (
-          <MarkAsMenu
-            invoiceId={invoice.id}
-            status={invoice.status}
-            dueDate={invoice.due_date ?? null}
-            busy={busy}
-            onMarkPaid={(id) => run(() => markPaid(id))}
-            onMarkUnpaid={(id) => run(() => markUnpaid(id))}
-            onMarkOverdue={(id) => run(() => markOverdue(id))}
-            paidOnChain={!!invoice.btc_txid}
-          />
-        )}
-
-        {isArchived && (
-          <Button
-            id="invoice-actions--unarchive-button"
-            variant="secondary"
-            onClick={() =>
-              run(async () => {
-                const { unarchived } = await bulkUnarchive([invoice.id]);
-                if (unarchived === 0) {
-                  setError(
-                    "This invoice can't be unarchived automatically because its previous status wasn't recorded. Use the Mark as menu to set its status."
-                  );
-                }
-              })
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button id="invoice-actions--more-trigger" variant="secondary" disabled={busy}>
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
+                More
+              </Button>
             }
-            disabled={busy}
-          >
-            Unarchive
-          </Button>
-        )}
-        {!isArchived && !isDraft && (
-          <Button
-            id="invoice-actions--archive-button"
-            variant="secondary"
-            onClick={() => run(() => bulkArchive([invoice.id]))}
-            disabled={busy}
-          >
-            Archive
-          </Button>
-        )}
-
-        {/* v1.5.34: opens a pre-filled New Invoice form; nothing is saved. */}
-        <Link
-          id="invoice-actions--duplicate-button"
-          href={`/invoices/new?from=${referencePath(invoice.reference)}`}
-          className={buttonVariants({ variant: "secondary" })}
-        >
-          Duplicate
-        </Link>
-
-        {/* v1.5.37: a disabled button ignores the mouse, so the hover reason
-            sits on this wrapper. */}
-        <span id="invoice-actions--delete-wrapper" className="inline-flex" title={canDelete.ok ? undefined : canDelete.reason}>
-          <Button
-            id="invoice-actions--delete-button"
-            variant="danger"
-            onClick={handleDelete}
-            disabled={busy || !canDelete.ok}
-          >
-            Delete
-          </Button>
-        </span>
+          />
+          <DropdownMenuContent id="invoice-actions--more-menu" align="end" className="w-64">
+            {markAs.map(({ action, label }) => (
+              <DropdownMenuItem
+                key={action}
+                id={`invoice-actions--mark-${action}`}
+                onClick={() => run(() => markAsAction[action](invoice.id))}
+              >
+                Mark as {label}
+              </DropdownMenuItem>
+            ))}
+            {markAs.length > 0 && <DropdownMenuSeparator />}
+            {isArchived && (
+              <DropdownMenuItem
+                id="invoice-actions--unarchive"
+                onClick={() =>
+                  run(async () => {
+                    const { unarchived } = await bulkUnarchive([invoice.id]);
+                    if (unarchived === 0) {
+                      setError(
+                        "This invoice can't be unarchived automatically because its previous status wasn't recorded. Use Mark as in the More menu to set its status."
+                      );
+                    }
+                  })
+                }
+              >
+                Unarchive
+              </DropdownMenuItem>
+            )}
+            {!isArchived && !isDraft && (
+              <DropdownMenuItem id="invoice-actions--archive" onClick={() => run(() => bulkArchive([invoice.id]))}>
+                Archive
+              </DropdownMenuItem>
+            )}
+            {/* v1.5.34: opens a pre-filled New Invoice form; nothing is saved. */}
+            <DropdownMenuItem
+              id="invoice-actions--duplicate"
+              render={<Link href={`/invoices/new?from=${referencePath(invoice.reference)}`}>Duplicate</Link>}
+            />
+            {/* v1.5.37: only drafts can be deleted; otherwise greyed out with the reason. */}
+            <DropdownMenuItem
+              id="invoice-actions--delete"
+              variant="destructive"
+              disabled={!canDelete.ok}
+              onClick={handleDelete}
+            >
+              <MenuItemLabel label="Delete" reason={canDelete.ok ? undefined : canDelete.reason} />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

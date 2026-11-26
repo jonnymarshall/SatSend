@@ -15,9 +15,9 @@ vi.mock("@/lib/supabase/client", () => ({
   })),
 }));
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+const { push, back } = vi.hoisted(() => ({ push: vi.fn(), back: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: vi.fn(() => ({ push })),
+  useRouter: vi.fn(() => ({ push, back })),
 }));
 vi.mock("@/components/notice", () => ({ showNotice: vi.fn() }));
 
@@ -528,5 +528,42 @@ describe("InvoiceForm password-manager autofill (v1.7)", () => {
     render(<InvoiceForm />);
     const input = document.getElementById("input-your-address-postcode")!;
     expect(input.parentElement!.id).toBe("input-your-address-postcode--wrap");
+  });
+});
+
+describe("InvoiceForm Cancel with unsaved changes (v1.5.41)", () => {
+  it("leaves at once when nothing changed", async () => {
+    back.mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("asks in a SatSend dialog, not the browser's, and Keep editing stays", async () => {
+    back.mockClear();
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(document.getElementById("input-client-name")!, "Acme");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Discard unsaved changes?");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(back).not.toHaveBeenCalled();
+    expect(document.getElementById("input-client-name")).toHaveValue("Acme");
+    confirmSpy.mockRestore();
+  });
+
+  it("Discard changes goes back", async () => {
+    back.mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(document.getElementById("input-client-name")!, "Acme");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "Discard changes" }));
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });
