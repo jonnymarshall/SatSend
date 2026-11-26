@@ -29,7 +29,7 @@ keeps its own items' order):
    sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
    R-27 close-out (✅ 2026-11-26, no code).
 2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns, R-44
-   multi-currency (✅ 1.6.0), R-63 back link fix, R-64 email status wording, R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
+   multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
 3. **Legal and trust, target 2026-12-31:** R-28, R-29,
    R-30, R-31, R-42, R-37, R-36, R-38,
    R-39.
@@ -1239,7 +1239,7 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ R-63 — "← Invoices" goes back to the edit page after saving a draft (**pre-launch**, fix)
+### ✅ R-63 — "← Invoices" goes back to the edit page after saving a draft (**pre-launch**, fix) · release 1.6.1
 
 **Branch:** `r-63/back-link-after-save`
 
@@ -1251,15 +1251,17 @@ Cause: `back-to-invoices.tsx` calls `router.back()` whenever the previous page
 was on SatSend (to keep the list's `?page=N`). After a save, the previous page
 is the edit form, so "back" lands there.
 
-- [ ] **← Invoices** always lands on the invoice list. Go back only when the
-      page before was the list itself; otherwise open `/invoices` (keeping the
-      list's page and filters if they can be carried).
-- [ ] Test: edit, save, then back opens the list; list, invoice, back still
+> **Shipped as release 1.6.1.** Checking the previous page wasn't reliable
+> (`document.referrer` only changes on a full page load), so the list now
+> remembers its own address per tab and the link always opens that.
+
+- [x] **← Invoices** always lands on the invoice list, on the page you were on.
+- [x] Test: edit, save, then back opens the list; list, invoice, back still
       returns to the same list page.
 
 ---
 
-### ⏳ R-64 — Email status "awaiting delivery" reads as stuck (**pre-launch**, wording)
+### ✅ R-64 — Email status "awaiting delivery" reads as stuck (**pre-launch**, wording) · closed 2026-11-26, no code
 
 **Branch:** `r-64/email-status-wording`
 
@@ -1272,12 +1274,9 @@ until Resend reports back that it was delivered. Production gets those reports
 (70 marked delivered, the latest 2026-11-25). Resend can't reach a computer
 running the test site, so there every email stays at that first step.
 
-- [ ] Reword the first step so it doesn't suggest a problem, e.g. "sent"
-      (then "delivered" when Resend confirms). Agree the words with Jonny.
-- [ ] Decide what the test site shows, e.g. a note that delivery reports only
-      arrive on the live site.
-- [ ] Check emails sent long ago with no report (39 on production, all from
-      May 2026) don't read as still pending.
+> **Closed, no code (Jonny, 2026-11-26):** the wording stays ("awaiting
+> delivery", then "delivered"). It looked stuck only because the test site
+> never gets Resend's reports. Noted in AGENTS.md.
 
 ---
 

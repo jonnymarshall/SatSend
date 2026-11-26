@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { InvoiceDataTable } from "./data-table";
+import { invoiceListUrl } from "@/lib/invoices/list-return";
 import type { InvoiceRow } from "./columns";
 
 let mockSearchParams = new URLSearchParams();
@@ -751,5 +752,15 @@ describe("InvoiceDataTable — pagination URL state", () => {
     rerender(<InvoiceDataTable data={[...PAGINATED]} userId="u1" />);
     expect(screen.getByText("PG-11")).toBeInTheDocument();
     expect(screen.queryByText("PG-01")).not.toBeInTheDocument();
+  });
+});
+
+// R-63 (release 1.6.1): "← Invoices" on an invoice returns to this address.
+describe("InvoiceDataTable — remembers where the list was", () => {
+  it("remembers the list address, page included, for the back link", () => {
+    window.sessionStorage.clear();
+    mockSearchParams = new URLSearchParams("page=2");
+    render(<InvoiceDataTable data={PAGINATED} userId="u1" />);
+    expect(invoiceListUrl()).toBe("/invoices?page=2");
   });
 });

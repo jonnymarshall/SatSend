@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Fixed
+
+- **1.6.1 — "← Invoices" opens the invoice list (roadmap R-63).** After saving
+  a draft, the back link on an invoice reopened the edit form: it was the
+  browser's back. The list now remembers its own address (with the page you
+  were on) for the tab, and the link always opens that, or `/invoices`
+  (`src/lib/invoices/list-return.ts`).
+
 ### Added
 
 - **1.6.0 — Multi-currency (roadmap R-44).** Invoices can be in any of 33

@@ -1,34 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { invoiceListUrl } from "@/lib/invoices/list-return";
 
+// R-63 (release 1.6.1): always opens the invoice list, on the page you were on.
+// Never the browser's back: after saving a draft, that's the edit form.
 export function BackToInvoices() {
   const router = useRouter();
-  // Same-origin document.referrer means the user clicked a link from our app
-  // to get here — back() will return them to where they came from with the
-  // ?page=N state intact. window.history.length isn't reliable: Next.js
-  // prefetching and router internals can bump it without there being an
-  // actual user-visible page behind the current one, leaving back() a no-op.
-  const handleClick = () => {
-    if (typeof document !== "undefined" && document.referrer) {
-      try {
-        const ref = new URL(document.referrer);
-        if (ref.origin === window.location.origin) {
-          router.back();
-          return;
-        }
-      } catch {
-        // malformed referrer — fall through to push
-      }
-    }
-    router.push("/invoices");
-  };
 
   return (
     <button
       id="invoice-detail--back-link"
       type="button"
-      onClick={handleClick}
+      onClick={() => router.push(invoiceListUrl())}
       className="-mx-2 inline-flex min-h-11 items-center rounded-(--radius-sm) px-2 text-sm font-medium text-(--color-text-secondary) hover:bg-(--color-neutral-soft) hover:text-(--color-ink) md:min-h-9"
     >
       ← Invoices
