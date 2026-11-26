@@ -464,3 +464,41 @@ describe("InvoiceForm — due date keeps its day in every time zone (v1.5.34)", 
     expect(vi.mocked(saveDraft).mock.calls[0][0].due_date).toBe("2026-06-03");
   });
 });
+
+describe("InvoiceForm structured addresses (v1.7)", () => {
+  it("saves each typed part under its own field, all optional", async () => {
+    vi.mocked(saveDraft).mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(document.getElementById("input-your-address-line1")!, "1 Tower Bridge");
+    await user.type(document.getElementById("input-client-address-city")!, "Central");
+    await user.click(screen.getByRole("button", { name: /save (draft|as draft)/i }));
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(saveDraft).mock.calls[0][0];
+    expect(payload.your_address_line1).toBe("1 Tower Bridge");
+    expect(payload.client_address_city).toBe("Central");
+    expect(payload.your_address_country).toBeUndefined();
+  });
+
+  it("finds countries by typing part of the name, and saves the picked one's code", async () => {
+    vi.mocked(saveDraft).mockClear();
+    const user = userEvent.setup();
+    render(<InvoiceForm />);
+    await user.type(document.getElementById("input-client-address-country")!, "uni");
+    const options = await screen.findAllByRole("option");
+    const names = options.map((o) => o.textContent);
+    expect(names).toEqual(expect.arrayContaining(["United Kingdom", "United States", "United Arab Emirates"]));
+    // Matches the start of a word, so not Réunion or Tunisia.
+    expect(names).not.toContain("Tunisia");
+    expect(names).not.toContain("Réunion");
+    await user.click(screen.getByRole("option", { name: "United Kingdom" }));
+    await user.click(screen.getByRole("button", { name: /save (draft|as draft)/i }));
+    expect(vi.mocked(saveDraft).mock.calls[0][0].client_address_country).toBe("GB");
+  });
+
+  it("fills an edited invoice's address parts back into the fields", () => {
+    render(<InvoiceForm initialValues={{ client_address_line1: "2 High St", client_address_country: "US" }} />);
+    expect(document.getElementById("input-client-address-line1")).toHaveValue("2 High St");
+    expect(document.getElementById("input-client-address-country")).toHaveValue("United States");
+  });
+});

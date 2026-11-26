@@ -19,6 +19,7 @@ import { decideOverdueFlip } from "@/lib/invoices/overdue-actions";
 import { PRE_MEMPOOL_DELAYS_MS } from "@/lib/invoices/payment-schedule";
 import { addressHasHistory } from "@/lib/mempool";
 import { addressNetworkError } from "@/lib/btc-network";
+import { addressColumns, type AddressKey } from "@/lib/invoices/address";
 import type { Database } from "@/lib/database.types";
 
 async function addressFreshnessError(address: string, contextId?: string): Promise<FieldError | null> {
@@ -96,17 +97,16 @@ async function addressUniquenessError(
   return null;
 }
 
-export interface InvoicePayload {
+// v1.7: the twelve structured address parts (your_address_line1 ...).
+export interface InvoicePayload extends Partial<Record<AddressKey, string>> {
   invoice_number?: string;
   your_name?: string;
   your_email?: string;
   your_company?: string;
-  your_address?: string;
   your_tax_id?: string;
   client_name?: string;
   client_email?: string;
   client_company?: string;
-  client_address?: string;
   client_tax_id?: string;
   line_items: LineItem[];
   tax_percent: number;
@@ -140,12 +140,11 @@ export async function saveDraft(payload: InvoicePayload): Promise<ActionResult<I
       your_name: payload.your_name || null,
       your_email: payload.your_email ?? "",
       your_company: payload.your_company || null,
-      your_address: payload.your_address || null,
       your_tax_id: payload.your_tax_id || null,
       client_name: payload.client_name ?? "",
       client_email: payload.client_email ?? "",
       client_company: payload.client_company || null,
-      client_address: payload.client_address || null,
+      ...addressColumns(payload),
       client_tax_id: payload.client_tax_id || null,
       line_items: lineItemsToJson(payload.line_items),
       tax_percent: payload.tax_percent,
@@ -205,12 +204,11 @@ export async function updateDraft(
       your_name: payload.your_name || null,
       your_email: payload.your_email ?? "",
       your_company: payload.your_company || null,
-      your_address: payload.your_address || null,
       your_tax_id: payload.your_tax_id || null,
       client_name: payload.client_name ?? "",
       client_email: payload.client_email ?? "",
       client_company: payload.client_company || null,
-      client_address: payload.client_address || null,
+      ...addressColumns(payload),
       client_tax_id: payload.client_tax_id || null,
       line_items: lineItemsToJson(payload.line_items),
       tax_percent: payload.tax_percent,

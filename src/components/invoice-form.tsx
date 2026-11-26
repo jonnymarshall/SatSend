@@ -23,6 +23,8 @@ import { calendarDateToDateOnly, utcToCalendarDate } from "@/lib/date-only";
 import { computeInvoiceTotals, isValidBtcAddress, LineItem } from "@/lib/invoices";
 import { addressNetworkError } from "@/lib/btc-network";
 import { invoiceSchema } from "@/lib/invoices/schema";
+import { ADDRESS_KEYS, emptyAddressValues, type AddressKey } from "@/lib/invoices/address";
+import { AddressFields, addressInputId } from "@/components/address-fields";
 import type { ActionResult, FieldError } from "@/lib/invoices/schema";
 import {
   DndContext,
@@ -52,17 +54,16 @@ interface InvoiceFormProps {
   sessionEmail?: string;
 }
 
-interface FormState {
+// v1.7: the twelve address parts are flat fields named like their columns.
+interface FormState extends Record<AddressKey, string> {
   invoice_number: string;
   your_name: string;
   your_email: string;
   your_company: string;
-  your_address: string;
   your_tax_id: string;
   client_name: string;
   client_email: string;
   client_company: string;
-  client_address: string;
   client_tax_id: string;
   tax_percent: string;
   btc_address: string;
@@ -95,12 +96,11 @@ const DEFAULT_STATE: FormState = {
   your_name: "",
   your_email: "",
   your_company: "",
-  your_address: "",
   your_tax_id: "",
   client_name: "",
   client_email: "",
   client_company: "",
-  client_address: "",
+  ...emptyAddressValues(),
   client_tax_id: "",
   tax_percent: "",
   btc_address: "",
@@ -200,6 +200,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
     btc_address: "input-btc-address",
     access_code: "input-access-code",
     tax_percent: "input-tax-percent",
+    ...Object.fromEntries(ADDRESS_KEYS.map((k) => [k, addressInputId(k)])),
   };
 
   function validate(isPublish: boolean, { byEmail = false }: { byEmail?: boolean } = {}): boolean {
@@ -235,12 +236,10 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       your_name: form.your_name || undefined,
       your_email: form.your_email || undefined,
       your_company: form.your_company || undefined,
-      your_address: form.your_address || undefined,
       your_tax_id: form.your_tax_id || undefined,
       client_name: form.client_name || undefined,
       client_email: form.client_email || undefined,
       client_company: form.client_company || undefined,
-      client_address: form.client_address || undefined,
       client_tax_id: form.client_tax_id || undefined,
       line_items: toLineItems(items),
       tax_percent: parseFloat(form.tax_percent) || 0,
@@ -249,6 +248,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
       // UTC: the day before anywhere east of UTC).
       due_date: !form.no_due_date && form.due_date ? calendarDateToDateOnly(form.due_date) : undefined,
       access_code: form.access_code.trim() || undefined,
+      ...Object.fromEntries(ADDRESS_KEYS.map((k) => [k, form[k] || undefined])),
     };
   }
 
@@ -417,9 +417,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           <Field label="Company">
             <input id="input-your-company" type="text" value={form.your_company} onChange={(e) => set("your_company", e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Address">
-            <input id="input-your-address" type="text" value={form.your_address} onChange={(e) => set("your_address", e.target.value)} className={inputCls} />
-          </Field>
+          <AddressFields party="your" values={form} errors={errors} onChange={(key, value) => set(key, value)} />
           <Field label="Tax ID">
             <input id="input-your-tax-id" type="text" value={form.your_tax_id} onChange={(e) => set("your_tax_id", e.target.value)} className={inputCls} />
           </Field>
@@ -436,9 +434,7 @@ export function InvoiceForm({ invoiceId, initialValues, sessionEmail }: InvoiceF
           <Field label="Company">
             <input id="input-client-company" type="text" value={form.client_company} onChange={(e) => set("client_company", e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Address">
-            <input id="input-client-address" type="text" value={form.client_address} onChange={(e) => set("client_address", e.target.value)} className={inputCls} />
-          </Field>
+          <AddressFields party="client" values={form} errors={errors} onChange={(key, value) => set(key, value)} />
           <Field label="Tax ID">
             <input id="input-client-tax-id" type="text" value={form.client_tax_id} onChange={(e) => set("client_tax_id", e.target.value)} className={inputCls} />
           </Field>

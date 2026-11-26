@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { MIN_ACCESS_CODE_LENGTH } from "@/lib/invoices";
+import { isCountryCode } from "@/lib/countries";
+import { ADDRESS_KEYS, ADDRESS_PART_MAX, type AddressKey } from "./address";
 
 // One definition of a valid invoice, shared by the form and the server actions
 // (v1.4.29-H). Field-validation failures are RETURNED as a result, never thrown:
@@ -16,6 +18,20 @@ export const lineItemSchema = z.object({
   unit_price: z.number().min(0),
 });
 
+// v1.7: each address part is optional (Jonny, 2026-11-26) and nothing is
+// country-specific; only a length limit, and the country must be on the list.
+const addressPartSchema = z.preprocess(
+  blankToUndefined,
+  z.string().max(ADDRESS_PART_MAX, `Max ${ADDRESS_PART_MAX} characters`).optional()
+);
+const countrySchema = z.preprocess(
+  blankToUndefined,
+  z.string().refine(isCountryCode, "Pick a country from the list").optional()
+);
+const addressShape = Object.fromEntries(
+  ADDRESS_KEYS.map((k) => [k, k.endsWith("_country") ? countrySchema : addressPartSchema])
+) as Record<AddressKey, typeof addressPartSchema>;
+
 export const invoiceSchema = z.object({
   invoice_number: z.preprocess(
     blankToUndefined,
@@ -24,12 +40,10 @@ export const invoiceSchema = z.object({
   your_name: z.preprocess(blankToUndefined, z.string().optional()),
   your_email: z.preprocess(blankToUndefined, z.email("Must be a valid email").optional()),
   your_company: z.preprocess(blankToUndefined, z.string().optional()),
-  your_address: z.preprocess(blankToUndefined, z.string().optional()),
   your_tax_id: z.preprocess(blankToUndefined, z.string().optional()),
   client_name: z.preprocess(blankToUndefined, z.string().optional()),
   client_email: z.preprocess(blankToUndefined, z.email("Must be a valid email").optional()),
   client_company: z.preprocess(blankToUndefined, z.string().optional()),
-  client_address: z.preprocess(blankToUndefined, z.string().optional()),
   client_tax_id: z.preprocess(blankToUndefined, z.string().optional()),
   line_items: z
     .array(lineItemSchema)
@@ -45,6 +59,7 @@ export const invoiceSchema = z.object({
     blankToUndefined,
     z.string().min(MIN_ACCESS_CODE_LENGTH, `At least ${MIN_ACCESS_CODE_LENGTH} characters`).optional()
   ),
+  ...addressShape,
 });
 
 export type InvoiceInput = z.infer<typeof invoiceSchema>;

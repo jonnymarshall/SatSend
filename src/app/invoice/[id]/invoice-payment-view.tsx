@@ -21,6 +21,8 @@ import { getMempoolBaseUrl } from "@/lib/btc-network";
 import { usePublicInvoiceRealtime } from "./use-public-invoice-realtime";
 import { pdfHref, useTimeZone } from "@/lib/use-time-zone";
 import { referencePath } from "@/lib/invoices/reference";
+import { addressLines, addressOf } from "@/lib/invoices/address";
+import { AddressBlock } from "@/components/address-block";
 import {
   formatPaymentTime,
   hasPayment,
@@ -102,8 +104,10 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
     ? buildBip21Uri(invoice.btc_address!, ready.amountSats / 1e8, invoice.invoice_number ?? undefined)
     : null;
 
-  const senderHasInfo = invoice.your_name || invoice.your_company || invoice.your_address || invoice.your_email || invoice.your_tax_id;
-  const clientHasInfo = invoice.client_name || invoice.client_company || invoice.client_address || invoice.client_email || invoice.client_tax_id;
+  const senderAddress = addressLines(addressOf(invoice, "your"));
+  const clientAddress = addressLines(addressOf(invoice, "client"));
+  const senderHasInfo = invoice.your_name || invoice.your_company || senderAddress.length > 0 || invoice.your_email || invoice.your_tax_id;
+  const clientHasInfo = invoice.client_name || invoice.client_company || clientAddress.length > 0 || invoice.client_email || invoice.client_tax_id;
 
   const label = "text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)";
   const txLink = "font-mono break-all text-(--color-ink) underline decoration-(--color-brand) underline-offset-4";
@@ -155,7 +159,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                 {invoice.your_name && <p id="invoice-view--sender-name" className="font-semibold">{invoice.your_name}</p>}
                 {invoice.your_company && <p id="invoice-view--sender-company" className="text-(--color-text-secondary)">{invoice.your_company}</p>}
                 {invoice.your_email && <p id="invoice-view--sender-email" className="break-words text-(--color-text-secondary)">{invoice.your_email}</p>}
-                {invoice.your_address && <p id="invoice-view--sender-address" className="whitespace-pre-line text-(--color-text-secondary)">{invoice.your_address}</p>}
+                {senderAddress.length > 0 && <AddressBlock id="invoice-view--sender-address" lines={senderAddress} />}
                 {invoice.your_tax_id && <p id="invoice-view--sender-tax-id" className="text-(--color-text-secondary)">Tax ID: {invoice.your_tax_id}</p>}
               </div>
             )}
@@ -165,7 +169,7 @@ export function InvoicePaymentView({ invoice, btcPrice }: Props) {
                 {invoice.client_name && <p id="invoice-view--client-name" className="font-semibold">{invoice.client_name}</p>}
                 {invoice.client_company && <p id="invoice-view--client-company" className="text-(--color-text-secondary)">{invoice.client_company}</p>}
                 {invoice.client_email && <p id="invoice-view--client-email" className="break-words text-(--color-text-secondary)">{invoice.client_email}</p>}
-                {invoice.client_address && <p id="invoice-view--client-address" className="whitespace-pre-line text-(--color-text-secondary)">{invoice.client_address}</p>}
+                {clientAddress.length > 0 && <AddressBlock id="invoice-view--client-address" lines={clientAddress} />}
                 {invoice.client_tax_id && <p id="invoice-view--client-tax-id" className="text-(--color-text-secondary)">Tax ID: {invoice.client_tax_id}</p>}
               </div>
             )}

@@ -11,11 +11,23 @@ const baseInvoice: Invoice = {
   your_email: "ada@example.com",
   your_company: "Analytical Ltd",
   your_address: "1 Tower Bridge, London",
+  your_address_line1: "1 Tower Bridge",
+  your_address_line2: null,
+  your_address_city: "London",
+  your_address_region: null,
+  your_address_postcode: "SE1 2UP",
+  your_address_country: "GB",
   your_tax_id: "GB123456789",
   client_name: "Charles Babbage",
   client_email: "charles@example.com",
   client_company: "Difference Engine Co",
   client_address: "10 Bloomsbury, London",
+  client_address_line1: "1 Queen's Road Central",
+  client_address_line2: null,
+  client_address_city: "Central",
+  client_address_region: null,
+  client_address_postcode: null,
+  client_address_country: "HK",
   client_tax_id: "GB987654321",
   line_items: [
     { description: "Analytical engine design", quantity: 10, unit_price: 500 },
@@ -77,6 +89,16 @@ describe("renderInvoicePdf", () => {
     const text = await textFromPdf(baseInvoice);
     expect(text).toContain("Ada Lovelace");
     expect(text).toContain("Charles Babbage");
+  });
+
+  it("prints both structured addresses, one part per line, with country names", async () => {
+    const text = await textFromPdf(baseInvoice);
+    expect(text).toContain("1 Tower Bridge");
+    expect(text).toContain("London SE1 2UP");
+    expect(text).toContain("United Kingdom");
+    expect(text).toContain("1 Queen's Road Central");
+    expect(text).toContain("Hong Kong SAR China");
+    expect(text).not.toMatch(/^GB$/m);
   });
 
   it("includes every line item description", async () => {

@@ -226,6 +226,12 @@ export type Database = {
           btc_price_at_seen: number | null
           btc_txid: string | null
           client_address: string | null
+          client_address_line1: string | null
+          client_address_line2: string | null
+          client_address_city: string | null
+          client_address_region: string | null
+          client_address_postcode: string | null
+          client_address_country: string | null
           client_company: string | null
           client_email: string
           client_name: string
@@ -259,6 +265,12 @@ export type Database = {
           updated_at: string
           user_id: string
           your_address: string | null
+          your_address_line1: string | null
+          your_address_line2: string | null
+          your_address_city: string | null
+          your_address_region: string | null
+          your_address_postcode: string | null
+          your_address_country: string | null
           your_company: string | null
           your_email: string | null
           your_name: string | null
@@ -273,6 +285,12 @@ export type Database = {
           btc_price_at_seen?: number | null
           btc_txid?: string | null
           client_address?: string | null
+          client_address_line1?: string | null
+          client_address_line2?: string | null
+          client_address_city?: string | null
+          client_address_region?: string | null
+          client_address_postcode?: string | null
+          client_address_country?: string | null
           client_company?: string | null
           client_email: string
           client_name: string
@@ -306,6 +324,12 @@ export type Database = {
           updated_at?: string
           user_id: string
           your_address?: string | null
+          your_address_line1?: string | null
+          your_address_line2?: string | null
+          your_address_city?: string | null
+          your_address_region?: string | null
+          your_address_postcode?: string | null
+          your_address_country?: string | null
           your_company?: string | null
           your_email?: string | null
           your_name?: string | null
@@ -320,6 +344,12 @@ export type Database = {
           btc_price_at_seen?: number | null
           btc_txid?: string | null
           client_address?: string | null
+          client_address_line1?: string | null
+          client_address_line2?: string | null
+          client_address_city?: string | null
+          client_address_region?: string | null
+          client_address_postcode?: string | null
+          client_address_country?: string | null
           client_company?: string | null
           client_email?: string
           client_name?: string
@@ -353,6 +383,12 @@ export type Database = {
           updated_at?: string
           user_id?: string
           your_address?: string | null
+          your_address_line1?: string | null
+          your_address_line2?: string | null
+          your_address_city?: string | null
+          your_address_region?: string | null
+          your_address_postcode?: string | null
+          your_address_country?: string | null
           your_company?: string | null
           your_email?: string | null
           your_name?: string | null
@@ -415,6 +451,12 @@ export type Database = {
           btc_price_at_detection: number | null
           btc_txid: string | null
           client_address: string | null
+          client_address_line1: string | null
+          client_address_line2: string | null
+          client_address_city: string | null
+          client_address_region: string | null
+          client_address_postcode: string | null
+          client_address_country: string | null
           client_company: string | null
           client_email: string | null
           client_name: string | null
@@ -449,6 +491,12 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
           your_address: string | null
+          your_address_line1: string | null
+          your_address_line2: string | null
+          your_address_city: string | null
+          your_address_region: string | null
+          your_address_postcode: string | null
+          your_address_country: string | null
           your_company: string | null
           your_email: string | null
           your_name: string | null

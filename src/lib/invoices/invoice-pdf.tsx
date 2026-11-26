@@ -16,6 +16,7 @@ import {
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import type { Invoice } from "@/lib/invoice-public";
+import { addressLines, addressOf } from "./address";
 import { brandColors, statusColors } from "@/lib/brand-colors";
 import { PAYMENT_ICON_NODES } from "./payment-icons";
 import {
@@ -364,7 +365,9 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl, timeZone }: RenderProp
             {invoice.your_name ? <Text style={styles.partyName}>{invoice.your_name}</Text> : null}
             {invoice.your_company ? <Text style={styles.partyLine}>{invoice.your_company}</Text> : null}
             {invoice.your_email ? <Text style={styles.partyLine}>{invoice.your_email}</Text> : null}
-            {invoice.your_address ? <Text style={styles.partyLine}>{invoice.your_address}</Text> : null}
+            {addressLines(addressOf(invoice, "your")).map((line, i) => (
+              <Text key={`your-address-${i}`} style={styles.partyLine}>{line}</Text>
+            ))}
             {invoice.your_tax_id ? <Text style={styles.partyLine}>Tax ID: {invoice.your_tax_id}</Text> : null}
           </View>
           <View style={styles.party}>
@@ -372,7 +375,9 @@ function InvoiceDocument({ invoice, publicUrl, qrDataUrl, timeZone }: RenderProp
             <Text style={styles.partyName}>{invoice.client_name}</Text>
             {invoice.client_company ? <Text style={styles.partyLine}>{invoice.client_company}</Text> : null}
             {invoice.client_email ? <Text style={styles.partyLine}>{invoice.client_email}</Text> : null}
-            {invoice.client_address ? <Text style={styles.partyLine}>{invoice.client_address}</Text> : null}
+            {addressLines(addressOf(invoice, "client")).map((line, i) => (
+              <Text key={`client-address-${i}`} style={styles.partyLine}>{line}</Text>
+            ))}
             {invoice.client_tax_id ? <Text style={styles.partyLine}>Tax ID: {invoice.client_tax_id}</Text> : null}
           </View>
         </View>
