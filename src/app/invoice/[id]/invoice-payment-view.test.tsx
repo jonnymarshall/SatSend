@@ -208,6 +208,15 @@ describe("InvoicePaymentView — BTC reveal", () => {
     expect(screen.getByText(/\$50,050\.00\/BTC/)).toBeInTheDocument();
   });
 
+  // R-44 (release 1.6.0): the quote's price is in the invoice's currency.
+  it("shows the bitcoin price in the invoice's currency", async () => {
+    mockFetch.mockImplementation(async () => quoteResponse({ amountSats: 999_000, btcPrice: 55_368.6 }));
+    render(<InvoicePaymentView invoice={{ ...BTC_INVOICE, currency: "EUR" }} btcPrice={55_000} />);
+    fireEvent.click(screen.getByRole("button", { name: /pay now in bitcoin/i }));
+    expect(await screen.findByText(/€55,368\.60\/BTC/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$55,368\.60/)).not.toBeInTheDocument();
+  });
+
   it("shows no QR while the quote is on its way", () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<InvoicePaymentView invoice={BTC_INVOICE} btcPrice={50000} />);
