@@ -29,7 +29,7 @@ keeps its own items' order):
    sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
    R-27 close-out (✅ 2026-11-26, no code).
 2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns (✅ 1.6.2), R-44
-   multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown (✅ 1.7.0), R-20, R-26, R-61, R-43.
+   multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown (✅ 1.7.0), R-65 Pro price (✅ 1.8.0), R-20, R-26, R-61, R-43.
 3. **Legal and trust, target 2026-12-31:** R-28, R-29,
    R-30, R-31, R-42, R-37, R-36, R-38,
    R-39.
@@ -1118,7 +1118,8 @@ straight away: report-only wasn't needed after those checks.
       model as bitcoin (one source of truth: `getEntitlements`).
 - [ ] Refunds: on request within 15 days of paying (the /pricing FAQ promises
       this), for card and bitcoin. Decide how a bitcoin refund is sent.
-- [ ] Prices: $10/month or $100/year (2 months free), the same for both rails.
+- [ ] Prices: $15/month or $150/year (2 months free) by card; 10% off in
+      bitcoin ($13.50 / $135). From `src/lib/pro-price.ts` (R-65).
 - [ ] **Tax on SatSend's own sales** (legal and compliance train, 2026-10-27):
       selling subscriptions worldwide brings VAT / sales tax duties. A merchant
       of record collects and pays these for card sales; bitcoin sales of Pro
@@ -1288,6 +1289,22 @@ running the test site, so there every email stays at that first step.
 
 ---
 
+### ✅ R-65 — Pro price: $15 a month, 10% off in bitcoin (**pre-launch**) · release 1.8.0
+
+**Branch:** `r-65/pro-price`
+
+> Jonny, 2026-11-27: "I think I was going in too cheap before." Pro goes from
+> $10 / $100 to $15 a month or $150 a year (2 months free). Paying in bitcoin
+> is 10% less ($13.50 / $135), from day one.
+
+- [x] One source for the price and the discount: `src/lib/pro-price.ts`.
+- [x] Plan cards (homepage and /pricing) show the bitcoin price under the
+      card price; the note reads "Pay for Pro by card, or in bitcoin for 10% off."
+- [x] Pricing FAQ and the /pricing description updated.
+- [x] R-46 and R-53 price lines updated; R-53 sells monthly or yearly.
+
+---
+
 ## v2 — Growth (Monetisation + Ecosystem)
 
 > Goal: Launch a free tier and a paid (Pro) tier, then expand the creator experience.
@@ -1302,8 +1319,9 @@ running the test site, so there every email stays at that first step.
 - Gate on what costs real money per use (client email to arbitrary recipients, API resources) and on what a freelancer will happily pay for (looking professional, chasing late payers).
 
 > **Corrected by Jonny, 2026-10-21** (the earlier text made all client email
-> Pro-only). **Price: Pro is $10/month or $100/year (2 months free), paid in
-> bitcoin or by card** (card added 2026-10-21, v1.5.4-H). The homepage pricing
+> Pro-only). **Price (raised 2026-11-27, R-65): Pro is $15/month or $150/year
+> (2 months free) by card, and 10% off in bitcoin ($13.50 / $135), from day
+> one** (card added 2026-10-21, v1.5.4-H). The homepage pricing
 > cards (v1.5.16) show this split.
 
 **Free**
@@ -1365,7 +1383,7 @@ running the test site, so there every email stays at that first step.
 **Scope**
 - [ ] Entitlement model per the plan above: single `premium_until` column, `isPremium` computed, no downgrade cron, and one `getEntitlements(userId)` helper that every gate calls.
 - [ ] Bitcoin billing built on the existing invoice machinery (address watch + sweep + detection + dedup), not a parallel system. An "upgrade attempt" reuses the invoice shape; confirmation extends `premium_until`.
-- [ ] Tier picker: 1 month / 6 months / 12 months. Fiat price converted to BTC at attempt time, locked ~15 min.
+- [ ] Monthly or yearly, matching /pricing (Jonny, 2026-11-27; was 1 / 6 / 12 months), at the bitcoin price (10% off, `src/lib/pro-price.ts`). Fiat price converted to BTC at attempt time, locked ~15 min. Bitcoin doesn't renew by itself: email a pay link before each period ends.
 - [ ] Address derivation from a dedicated `BILLING_XPUB` (BIP84 `m/84'/0'/0'/0/n`), per-user index, never reuse an address, audit log of every derived address.
 - [ ] "Upgrade" / "Go Premium" CTA in settings + a free-tier nav banner.
 - [ ] Premium-gated surfaces show a "Pro" badge with an upgrade CTA.

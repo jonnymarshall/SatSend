@@ -5,15 +5,13 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { buttonVariants } from "@/components/signal/button";
 import { cn } from "@/lib/utils";
+import { PRO_PRICE, BITCOIN_DISCOUNT, bitcoinPrice, usd } from "@/lib/pro-price";
 
 /*
  * The Free and Pro plan cards (v1.5.16; shared and given a Monthly / Yearly
  * toggle in v1.5.21). Used by the homepage and /pricing so they can't disagree.
  * Plan content: development/ROADMAP.md, "Monetisation plan (free vs Pro)".
  */
-
-/** Pro: $10 a month, or $100 a year (2 months free). */
-export const PRO_PRICE = { monthly: 10, yearly: 100 } as const;
 
 type Period = "monthly" | "yearly";
 
@@ -36,8 +34,6 @@ export const PRO_FEATURES = [
   "Your logo and colours on invoices, PDFs and emails",
   "Automatic payment reminders",
 ];
-
-const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 function PlanCard({
   id,
@@ -150,6 +146,12 @@ function PeriodToggle({ idPrefix, period, onChange }: { idPrefix: string; period
 export function PricingPlans({ idPrefix }: { idPrefix: string }) {
   const [period, setPeriod] = useState<Period>("monthly");
   const proPerMonth = period === "monthly" ? PRO_PRICE.monthly : Math.floor((PRO_PRICE.yearly / 12) * 100) / 100;
+  const off = `${BITCOIN_DISCOUNT * 100}% off`;
+  // R-65: the bitcoin price sits under the card price.
+  const proNote =
+    period === "monthly"
+      ? `${usd(bitcoinPrice(PRO_PRICE.monthly))} a month in bitcoin (${off})`
+      : `Billed ${usd(PRO_PRICE.yearly)} yearly, or ${usd(bitcoinPrice(PRO_PRICE.yearly))} in bitcoin`;
 
   return (
     <div id={`${idPrefix}--plans`} className="flex flex-col items-center">
@@ -166,7 +168,7 @@ export function PricingPlans({ idPrefix }: { idPrefix: string }) {
           id={`${idPrefix}--pro`}
           name="Pro"
           price={usd(proPerMonth)}
-          priceNote={period === "yearly" ? `Billed ${usd(PRO_PRICE.yearly)} yearly` : undefined}
+          priceNote={proNote}
           tag="Coming soon"
           dark
           blurb="For freelancers who want to look established and get paid on time."
@@ -174,7 +176,7 @@ export function PricingPlans({ idPrefix }: { idPrefix: string }) {
         />
       </div>
       <p id={`${idPrefix}--pro-note`} className="mt-6 max-w-[60ch] text-center text-sm text-(--color-text-secondary)">
-        Pay for Pro in bitcoin or by card. Pro features are on the way: start free today and upgrade when they land.
+        Pay for Pro by card, or in bitcoin for {off}. Pro features are on the way: start free today and upgrade when they land.
       </p>
     </div>
   );

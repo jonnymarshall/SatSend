@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Changed
+
+- **1.8.0 — Pro price $15 a month, 10% off in bitcoin (roadmap R-65).** Pro is
+  now $15 a month or $150 a year (2 months free), up from $10 / $100 (Jonny,
+  2026-11-27). Paid in bitcoin it's 10% less: $13.50 a month or $135 a year,
+  shown under the price on the plan cards (homepage and /pricing) and in the
+  pricing FAQ. The price and discount live in one place, `src/lib/pro-price.ts`,
+  which billing will charge from.
+
 ### Added
 
 - **1.7.0 — Exchange rate in the payment breakdown (roadmap R-45).** Once a

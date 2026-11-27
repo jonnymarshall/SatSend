@@ -44,14 +44,14 @@ describe("homepage (v1.5.16)", () => {
     expect(screen.getByText("Non-custodial by design")).toBeInTheDocument();
   });
 
-  it("shows Free at $0 and Pro at $10, Pro marked coming soon", () => {
+  it("shows Free at $0 and Pro at $15, Pro marked coming soon", () => {
     render(<HomePage />);
     const free = screen.getByRole("article", { name: "Free" });
     const pro = screen.getByRole("article", { name: "Pro" });
     expect(free).toHaveTextContent("$0");
     expect(free).toHaveTextContent("Invoices emailed to your client");
     expect(free).toHaveTextContent("1 saved client");
-    expect(pro).toHaveTextContent("$10");
+    expect(pro).toHaveTextContent("$15");
     expect(pro).toHaveTextContent("Coming soon");
     expect(pro).toHaveTextContent("Automatic payment reminders");
   });

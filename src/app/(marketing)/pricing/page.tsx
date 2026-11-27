@@ -6,6 +6,7 @@ import { PRICING_FAQ } from "@/components/marketing/faq-content";
 import { FaqList } from "@/components/marketing/faq-list";
 import { CONTAINER, EYEBROW, H1, H2, LEAD } from "@/components/marketing/styles";
 import { cn } from "@/lib/utils";
+import { PRO_PRICE, usd } from "@/lib/pro-price";
 
 /*
  * Pricing (v1.5.21, roadmap v1.5.2.2-H). The cards are shared with the homepage
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const TITLE = "Pricing · SatSend";
 const DESCRIPTION =
-  "Free for unlimited bitcoin invoices. Pro is $10 a month, or $100 a year, for your own link, client pages, branding and reminders.";
+  `Free for unlimited bitcoin invoices. Pro is ${usd(PRO_PRICE.monthly)} a month, or ${usd(PRO_PRICE.yearly)} a year (10% off in bitcoin), for your own link, client pages, branding and reminders.`;
 
 export const metadata: Metadata = {
   title: TITLE,
