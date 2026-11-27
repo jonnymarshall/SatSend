@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { rememberInvoiceListUrl } from "@/lib/invoices/list-return";
 import {
   ColumnFiltersState,
   PaginationState,
@@ -94,6 +95,11 @@ export function InvoiceDataTable({ data, userId }: Props) {
   // re-fetching the server component, and something in that flow was resetting the
   // local useState back to the URL's previous value).
   const urlPageIndex = parsePageParam(searchParams.get("page"));
+  // R-63: "← Invoices" on an invoice returns here, on this page of the list.
+  const listQuery = searchParams.toString();
+  React.useEffect(() => {
+    rememberInvoiceListUrl(listQuery ? `${pathname}?${listQuery}` : pathname);
+  }, [pathname, listQuery]);
   const pagination: PaginationState = React.useMemo(
     () => ({ pageIndex: urlPageIndex, pageSize: DEFAULT_PAGE_SIZE }),
     [urlPageIndex]

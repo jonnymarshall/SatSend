@@ -16,6 +16,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
   database shared with production, and must remove the flag when the session ends.
 - **Local development uses its own Supabase project.** Do not point a local
   `.env.local` at the production database.
+- **Email delivery reports only reach production.** Resend's webhook points at
+  satsend.me, so on a local/test site every email stays "awaiting delivery" in
+  an invoice's Activity. That's expected, not a fault (R-64).
 - **Never deploy a preview or branch environment that shares the production
   database** — its cron could write to live data.
 - **Migrations are applied by the agent, not deferred.** Apply each migration to
