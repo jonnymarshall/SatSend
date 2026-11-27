@@ -28,7 +28,7 @@ keeps its own items' order):
    R-34 stricter CSP (✅ 1.5.33), R-24 (✅ 1.5.34), R-22 and R-21 (✅ 1.5.35), R-25 (✅ 1.5.36), R-23 (✅ 1.5.37),
    sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
    R-27 close-out (✅ 2026-11-26, no code).
-2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns, R-44
+2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns (✅ 1.6.2), R-44
    multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
 3. **Legal and trust, target 2026-12-31:** R-28, R-29,
    R-30, R-31, R-42, R-37, R-36, R-38,
@@ -1222,7 +1222,7 @@ spam. Four weeks of passing results is the safety margin.
 
 ---
 
-### ⏳ R-52 (was v1.7.1) — Drop the old one-box address columns (**pre-launch**)
+### ✅ R-52 (was v1.7.1) — Drop the old one-box address columns (**pre-launch**) · release 1.6.2
 
 **Branch:** `r-52/drop-old-address-columns`
 
@@ -1231,11 +1231,15 @@ spam. Four weeks of passing results is the safety margin.
 > columns. Not additive, so the order is: v1.5.40 deployed, then this
 > migration on production, then merge (the code no longer reads them).
 
-- [ ] Migration: copy any `your_address` / `client_address` written after 0041
+> **Shipped as release 1.6.2 (migration 0043).** Production had nothing left
+> to copy. No code read the columns since 1.5.40, so the migration went on
+> production before the merge.
+
+- [x] Migration: copy any `your_address` / `client_address` written after 0041
       (rows where line 1 is still null) into line 1, then recreate
       `invoice_email_summary` without the two columns, then drop them.
-- [ ] Remove them from `database.types.ts` and the test fixtures.
-- [ ] Tests: `npm run test:rls` and `npm run test:db` pass.
+- [x] Remove them from `database.types.ts` and the test fixtures.
+- [x] Tests: `npm run test:rls` and `npm run test:db` pass.
 
 ---
 

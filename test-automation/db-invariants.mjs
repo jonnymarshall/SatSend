@@ -164,6 +164,15 @@ try {
   check("a draft inserts", draft.ok && !!draftId, `status ${draft.status}`);
   const delDraft = await rest(`invoices?id=eq.${draftId}`, { method: "DELETE", prefer: "return=minimal" });
   check("deleting a draft is allowed", delDraft.ok, `status ${delDraft.status}`);
+
+  // R-52 (0043): the old one-box address columns are gone, and the rebuilt
+  // invoice list view is still the owner's, never a logged-out visitor's.
+  const oldCols = await rest("invoices?select=your_address&limit=1");
+  check("the old your_address column is gone (R-52)", oldCols.status === 400, `status ${oldCols.status}`);
+  const viewOwner = await rest("invoice_email_summary?select=id,your_address_line1&limit=1", { jwt: user.jwt, key: ANON });
+  check("the owner can read the invoice list view", viewOwner.ok, `status ${viewOwner.status}`);
+  const viewAnon = await rest("invoice_email_summary?select=id&limit=1", { key: ANON });
+  check("a logged-out visitor can't read the invoice list view", !viewAnon.ok, `status ${viewAnon.status}`);
 } finally {
   await cleanup();
   if (user) {

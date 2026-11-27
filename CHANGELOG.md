@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Removed
+
+- **1.6.2 — Old one-box address columns (roadmap R-52).** Migration
+  `0043_drop_old_address_columns.sql` drops `your_address` and
+  `client_address` (replaced by the structured fields in 1.5.40), after a
+  last copy of any stray text into line 1. `invoice_email_summary` is rebuilt
+  without them, with the same permissions (logged-out visitors still can't read
+  it). Types, test data and the demo script updated. Nothing visible changes.
+
 ### Fixed
 
 - **1.6.1 — "← Invoices" opens the invoice list (roadmap R-63).** After saving
