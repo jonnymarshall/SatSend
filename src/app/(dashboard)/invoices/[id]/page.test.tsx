@@ -31,6 +31,7 @@ const BASE_INVOICE = {
   updated_at: "2026-04-15T12:00:00Z",
   amount_received_sats: null as number | null,
   amount_received_fiat: null as number | null,
+  btc_price_at_detection: null as number | null,
   overpaid: false,
 };
 
@@ -251,6 +252,42 @@ describe("InvoiceDetailPage — under/overpaid amount indicator", () => {
   });
 });
 
+
+// R-45 (release 1.7.0): the sender sees the rate on their own page, not only on
+// the client's (Jonny, 2026-11-27).
+describe("InvoiceDetailPage — payment and exchange rate", () => {
+  async function renderWith(over: Partial<typeof BASE_INVOICE>) {
+    const { createClient } = await import("@/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValueOnce(
+      makeSupabaseMock({ ...BASE_INVOICE, ...over }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    render(await InvoiceDetailPage({ params: Promise.resolve({ id: "ss-7k3qx9ab" }) }));
+  }
+
+  it("a paid invoice shows what arrived and the rate it was valued at, in the invoice's currency", async () => {
+    await renderWith({
+      status: "paid",
+      currency: "EUR",
+      total_fiat: 300,
+      amount_received_sats: 541_822,
+      amount_received_fiat: 300,
+      btc_price_at_detection: 55_368.6,
+    });
+    expect(document.getElementById("invoice-detail--payment-received")!.textContent).toBe("€300.00 (0.00541822 BTC)");
+    expect(document.getElementById("invoice-detail--payment-rate")!.textContent).toBe("1 BTC = €55,368.60");
+  });
+
+  it("no payment panel before a payment is valued, or when none was recorded", async () => {
+    await renderWith({ status: "pending" });
+    expect(document.getElementById("invoice-detail--payment")).toBeNull();
+  });
+
+  it("a payment with no recorded rate shows what arrived, without a rate row", async () => {
+    await renderWith({ status: "paid", amount_received_sats: 2_000_000, amount_received_fiat: 1000, btc_price_at_detection: null });
+    expect(document.getElementById("invoice-detail--payment")).not.toBeNull();
+    expect(document.getElementById("invoice-detail--payment-rate")).toBeNull();
+  });
+});
 
 // v1.5.38: the sender's page is /invoices/ss-<reference>, like the client's
 // link. Old UUID links (and other spellings) redirect to it.

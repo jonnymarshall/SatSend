@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-07-25
 
+### Added
+
+- **1.7.0 — Exchange rate in the payment breakdown (roadmap R-45).** Once a
+  payment is judged (paid, underpaid, overpaid), the client's invoice page, the
+  payment emails and the PDF show "Exchange rate: 1 BTC = €55,368.60", in the
+  invoice's currency: the price the payment was valued at
+  (`btc_price_at_detection`, the held quote's price or the price when first
+  seen). Worked out once in `payment-summary.ts`, so all of them agree. The
+  sender's own invoice page gains a Payment panel with what arrived and the
+  rate (Jonny: the sender shouldn't need the public page for it). Not shown
+  while a payment is only detected, or where no rate was recorded.
+
 ### Removed
 
 - **1.6.2 — Old one-box address columns (roadmap R-52).** Migration

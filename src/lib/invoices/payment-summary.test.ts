@@ -23,6 +23,8 @@ const PAID: PaymentSummaryInvoice = {
   mempool_seen_at: "2026-10-27T12:18:00Z",
   // v1.5.29: judged with a Slippage Tolerance of 1% of $100.
   slippage_tolerance_fiat: 1,
+  // R-45: 200,000 sats at $50,000/BTC = $100.
+  btc_price_at_detection: 50_000,
   your_company: "Maya Design Ltd",
   your_name: "Maya",
   client_company: null,
@@ -151,6 +153,35 @@ describe("paymentSummary", () => {
         expect(JSON.stringify(paymentSummary(inv, { audience }))).not.toMatch(/\bwe\b/i);
       }
     }
+  });
+});
+
+// R-45 (release 1.7.0): the rate the payment was valued at, in the invoice's
+// currency, on the page, the emails and the PDF.
+describe("paymentSummary — exchange rate", () => {
+  it("shows the rate the payment was valued at", () => {
+    expect(paymentSummary(PAID, { audience: "client" }).exchangeRate).toBe("1 BTC = $50,000.00");
+  });
+
+  it("in the invoice's own currency", () => {
+    const eur = paymentSummary({ ...PAID, currency: "EUR", btc_price_at_detection: 55_368.6 }, { audience: "sender" });
+    expect(eur.exchangeRate).toBe("1 BTC = €55,368.60");
+  });
+
+  it("for underpaid and overpaid too", () => {
+    expect(paymentSummary({ ...PAID, status: "underpaid", amount_received_fiat: 61.5 }, { audience: "client" }).exchangeRate).toBe("1 BTC = $50,000.00");
+    expect(paymentSummary({ ...PAID, overpaid: true, amount_received_fiat: 112 }, { audience: "client" }).exchangeRate).toBe("1 BTC = $50,000.00");
+  });
+
+  it("not while the payment is only detected: it isn't valued yet", () => {
+    const s = paymentSummary({ ...PAID, status: "payment_detected", amount_received_fiat: null }, { audience: "client" });
+    expect(s.exchangeRate).toBeNull();
+  });
+
+  it("not when no rate was recorded (older or hand-marked invoices)", () => {
+    expect(paymentSummary({ ...PAID, btc_price_at_detection: null }, { audience: "client" }).exchangeRate).toBeNull();
+    const byHand = { ...PAID, amount_received_sats: null, amount_received_fiat: null, btc_price_at_detection: null };
+    expect(paymentSummary(byHand, { audience: "sender" }).exchangeRate).toBeNull();
   });
 });
 

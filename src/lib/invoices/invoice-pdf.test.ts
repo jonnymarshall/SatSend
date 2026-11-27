@@ -220,6 +220,7 @@ describe("renderInvoicePdf — the payment block (v1.5.28)", () => {
     amount_received_fiat: 7200,
     mempool_seen_at: "2026-10-27T12:18:00Z",
     payment_confirmed_at: "2026-10-27T12:32:00Z",
+    btc_price_at_detection: 100_000,
   };
   const flat = (t: string) => t.replace(/\s+/g, " ");
 
@@ -231,6 +232,12 @@ describe("renderInvoicePdf — the payment block (v1.5.28)", () => {
     expect(text).toMatch(/Outstanding \$0\.00/);
     expect(text).toMatch(/Paid on Oct 27, 2026, 12:32 PM UTC/);
     expect(text).toContain(baseInvoice.btc_address!);
+  });
+
+  // R-45 (release 1.7.0).
+  it("shows the exchange rate the payment was valued at", async () => {
+    expect(flat(await textFromPdf(PAID))).toMatch(/Exchange rate 1 BTC = \$100,000\.00/);
+    expect(flat(await textFromPdf({ ...PAID, btc_price_at_detection: null }))).not.toContain("Exchange rate");
   });
 
   it("uses the time zone it's given", async () => {

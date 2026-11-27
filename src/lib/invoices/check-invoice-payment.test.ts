@@ -145,6 +145,7 @@ describe("checkInvoicePayment", () => {
           payment_confirmed_at: new Date(1_793_100_000 * 1000).toISOString(),
           mempool_seen_at: detected.mempool_seen_at,
           slippage_tolerance_fiat: 2.5,
+          btc_price_at_detection: 50_000,
           your_company: null,
           your_name: "Charles",
           client_company: "Ada Labs",

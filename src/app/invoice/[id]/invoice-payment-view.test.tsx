@@ -513,6 +513,7 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     amount_received_fiat: 100,
     mempool_seen_at: "2026-10-27T12:18:00Z",
     payment_confirmed_at: "2026-10-27T12:32:00Z",
+    btc_price_at_detection: 50_000,
     your_company: "Maya Design Ltd",
   };
   const OVERPAID: Invoice = { ...PAID, amount_received_sats: 224_000, amount_received_fiat: 112, overpaid: true };
@@ -529,6 +530,18 @@ describe("InvoicePaymentView — payment block design (v1.5.27)", () => {
     expect(sumRow("received")).toContain("0.002 BTC");
     expect(sumRow("outstanding")).toContain("Outstanding");
     expect(sumRow("outstanding")).toContain("$0.00");
+  });
+
+  // R-45 (release 1.7.0).
+  it("shows the exchange rate the payment was valued at, in the invoice's currency", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, currency: "EUR", btc_price_at_detection: 55_368.6 }} btcPrice={50000} />);
+    expect(screen.getByText("Exchange rate")).toBeInTheDocument();
+    expect(document.getElementById("invoice-view--payment-rate")!.textContent).toBe("1 BTC = €55,368.60");
+  });
+
+  it("no exchange rate row when none was recorded", () => {
+    render(<InvoicePaymentView invoice={{ ...PAID, btc_price_at_detection: null }} btcPrice={50000} />);
+    expect(screen.queryByText("Exchange rate")).not.toBeInTheDocument();
   });
 
   it("paid within the Slippage Tolerance still shows nothing outstanding", () => {

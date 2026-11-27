@@ -19,6 +19,7 @@ import { findOwnInvoice } from "@/lib/invoices/own-invoice";
 import { formatMoney } from "@/lib/currencies";
 import { addressLines, addressOf } from "@/lib/invoices/address";
 import { AddressBlock } from "@/components/address-block";
+import { paymentSummary } from "@/lib/invoices/payment-summary";
 
 const EMAIL_STATUSES: EmailStatus[] = ["failed", "skipped_no_api_key", "skipped_daily_cap"];
 
@@ -45,6 +46,9 @@ export default async function InvoiceDetailPage({
   }
 
   const items: LineItem[] = toInvoice(invoice).line_items;
+  // R-45: what arrived and the rate it was valued at, the same figures the
+  // client's page, the emails and the PDF show.
+  const payment = paymentSummary(toInvoice(invoice), { audience: "sender" });
   const emailProblem =
     emailParam && EMAIL_STATUSES.includes(emailParam) && invoice.status === "draft"
       ? emailOutcomeMessage(emailParam, { wasDraft: true, clientEmail: invoice.client_email }).text
@@ -108,6 +112,27 @@ export default async function InvoiceDetailPage({
         <p id="invoice-detail--overpaid-indicator" className="rounded-(--radius-md) bg-(--color-warning-soft) px-4 py-3 text-sm font-medium text-(--color-warning-text)">
           Overpaid by {money(Number(invoice.amount_received_fiat) - Number(invoice.total_fiat))}
         </p>
+      )}
+
+      {payment.sums && (
+        <Card id="invoice-detail--payment" className="space-y-2 text-[15px]">
+          <p className={`${sectionLabel} mb-2`}>Payment</p>
+          <div className="flex items-start justify-between gap-4">
+            <span className="shrink-0 text-(--color-text-secondary)">Received</span>
+            <span id="invoice-detail--payment-received" className="text-right font-medium tabular-nums">
+              {payment.sums.received}
+              {payment.sums.receivedBtc && ` (${payment.sums.receivedBtc})`}
+            </span>
+          </div>
+          {payment.exchangeRate && (
+            <div className="flex items-start justify-between gap-4">
+              <span className="shrink-0 text-(--color-text-secondary)">Exchange rate</span>
+              <span id="invoice-detail--payment-rate" className="text-right font-medium tabular-nums">
+                {payment.exchangeRate}
+              </span>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* YOU / CLIENT */}

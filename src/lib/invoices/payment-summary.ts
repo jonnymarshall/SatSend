@@ -27,6 +27,7 @@ export type PaymentSummaryInvoice = Pick<
   | "payment_confirmed_at"
   | "mempool_seen_at"
   | "slippage_tolerance_fiat"
+  | "btc_price_at_detection"
   | "your_company"
   | "your_name"
   | "client_company"
@@ -51,6 +52,12 @@ export interface PaymentSummary {
   sums: PaymentSums | null;
   message: string | null;
   time: { label: "Paid on" | "Seen at"; iso: string } | null;
+  /**
+   * R-45 (release 1.7.0): the bitcoin price the payment was valued at, in the
+   * invoice's currency: "1 BTC = €55,368.60". Null until it's judged, and for
+   * invoices with no recorded rate.
+   */
+  exchangeRate: string | null;
 }
 
 const HEADINGS: Record<PaymentState, string> = {
@@ -194,5 +201,8 @@ export function paymentSummary(
       ? { label: "Seen at" as const, iso: invoice.mempool_seen_at }
       : null;
 
-  return { state, heading: HEADINGS[state], sums, message, time };
+  const rate = invoice.btc_price_at_detection;
+  const exchangeRate = sums && rate ? `1 BTC = ${fmtCurrency(Number(rate), cur)}` : null;
+
+  return { state, heading: HEADINGS[state], sums, message, time, exchangeRate };
 }

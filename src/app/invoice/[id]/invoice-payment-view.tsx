@@ -384,7 +384,7 @@ function PaymentReceived({
 }) {
   const timeZone = useTimeZone();
   const summary = paymentSummary(invoice, { audience: "client", status });
-  const { state, sums, message, time } = summary;
+  const { state, sums, message, time, exchangeRate } = summary;
   const look = STATE_LOOK[state];
 
   const row = "flex items-start justify-between gap-4";
@@ -445,6 +445,14 @@ function PaymentReceived({
             <span className={rowLabel}>{time.label}</span>
             <span id="invoice-view--payment-time" className="text-right font-medium">
               {formatPaymentTime(time.iso, timeZone)}
+            </span>
+          </div>
+        )}
+        {exchangeRate && (
+          <div className={row}>
+            <span className={rowLabel}>Exchange rate</span>
+            <span id="invoice-view--payment-rate" className="text-right font-medium tabular-nums">
+              {exchangeRate}
             </span>
           </div>
         )}
