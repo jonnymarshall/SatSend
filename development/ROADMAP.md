@@ -29,7 +29,7 @@ keeps its own items' order):
    sender links by reference (✅ 1.5.38, ad hoc), CI speed-up (✅ 1.5.39, ad hoc), invoice page polish (✅ 1.5.41, ad hoc),
    R-27 close-out (✅ 2026-11-26, no code).
 2. **Finish the product, target 2026-12-14:** R-51 addresses (✅ 1.5.40), R-52 drop old address columns (✅ 1.6.2), R-44
-   multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown, R-20, R-26, R-61, R-43.
+   multi-currency (✅ 1.6.0), R-63 back link fix (✅ 1.6.1), R-64 email status (✅ closed, no code), R-45 rate in the breakdown (✅ 1.7.0), R-20, R-26, R-61, R-43.
 3. **Legal and trust, target 2026-12-31:** R-28, R-29,
    R-30, R-31, R-42, R-37, R-36, R-38,
    R-39.
@@ -1073,7 +1073,7 @@ straight away: report-only wasn't needed after those checks.
 
 ---
 
-### ⏳ R-45 (was v1.5.3.1-H) — Exchange rate in the payment breakdown (**pre-launch**)
+### ✅ R-45 (was v1.5.3.1-H) — Exchange rate in the payment breakdown (**pre-launch**) · release 1.7.0
 
 **Branch:** `r-45/rate-in-breakdown`
 
@@ -1081,17 +1081,21 @@ straight away: report-only wasn't needed after those checks.
 > the emails and in the PDFs. After multi-currency, so the rate is shown in the
 > invoice's own currency.
 
-- [ ] Add a row to the payment breakdown: the bitcoin price used to value the
-      payment, e.g. "Rate: 1 BTC = $97,250.00", in the invoice's currency.
-      The rate is already stored (`invoices.btc_price_at_seen`, from
-      v1.5.29), so no migration is expected; check older invoices without it
-      and leave the row out for them.
-- [ ] One source for all three surfaces: `payment-summary.ts` (read by the
+> **Shipped as release 1.7.0 (2026-11-27).** The rate shown is
+> `btc_price_at_detection` (the price the payment was valued at: the held
+> quote's, or the price when first seen), not `btc_price_at_seen`. Not shown
+> for "Payment detected" (not valued yet). Jonny added: the sender's own page
+> shows it too, in a new Payment panel.
+
+- [x] Add a row to the payment breakdown: the bitcoin price used to value the
+      payment, e.g. "Exchange rate: 1 BTC = $97,250.00", in the invoice's
+      currency. No migration; older invoices without it leave the row out.
+- [x] One source for all three surfaces: `payment-summary.ts` (read by the
       client's invoice page, the payment emails and the PDF) gains the rate,
       so they can't disagree.
-- [ ] Shows for every state with sums (paid, underpaid, overpaid); decide
-      whether "Payment detected" shows it too.
-- [ ] Tests: the summary's rate formatting (and its absence for old
+- [x] Shows for every state with sums (paid, underpaid, overpaid); not for
+      "Payment detected".
+- [x] Tests: the summary's rate formatting (and its absence for old
       invoices); page, email and PDF each render the row.
 
 ---

@@ -238,7 +238,7 @@ function PaymentIcon({ state }: { state: PaymentState }) {
 }
 
 function PaymentBlock({ invoice, timeZone }: { invoice: Invoice; timeZone: string }) {
-  const { state, heading, sums, message, time } = paymentSummary(invoice, { audience: "client" });
+  const { state, heading, sums, message, time, exchangeRate } = paymentSummary(invoice, { audience: "client" });
   const c = statusColors[state];
   return (
     <View style={styles.btc} wrap={false}>
@@ -287,6 +287,12 @@ function PaymentBlock({ invoice, timeZone }: { invoice: Invoice; timeZone: strin
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{time.label}</Text>
             <Text style={[styles.detailValue, { fontWeight: 500 }]}>{formatPaymentTime(time.iso, timeZone)}</Text>
+          </View>
+        ) : null}
+        {exchangeRate ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Exchange rate</Text>
+            <Text style={[styles.detailValue, { fontWeight: 500 }]}>{exchangeRate}</Text>
           </View>
         ) : null}
         <View style={styles.detailRow}>

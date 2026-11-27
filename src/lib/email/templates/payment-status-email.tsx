@@ -68,7 +68,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 
 export function PaymentStatusEmail({ audience, payment, invoiceNumber, reference, btcAddress, txid, mempoolUrl, actionUrl }: PaymentStatusEmailProps) {
   const summary = paymentSummary(payment, { audience });
-  const { state, sums, message, time } = summary;
+  const { state, sums, message, time, exchangeRate } = summary;
   const colors = statusColors[state];
   const sender = payment.your_company || payment.your_name || "the sender";
   const client = payment.client_company || payment.client_name || "your client";
@@ -132,6 +132,11 @@ export function PaymentStatusEmail({ audience, payment, invoiceNumber, reference
         {time && (
           <DetailRow label={time.label}>
             <span style={{ fontWeight: 500 }}>{formatPaymentTime(time.iso, "UTC")}</span>
+          </DetailRow>
+        )}
+        {exchangeRate && (
+          <DetailRow label="Exchange rate">
+            <span style={{ fontWeight: 500 }}>{exchangeRate}</span>
           </DetailRow>
         )}
         <DetailRow label="Address">

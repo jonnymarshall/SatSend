@@ -66,6 +66,7 @@ export function paymentAfterDecision(
     payment_confirmed_at: decision.confirmedAt,
     mempool_seen_at: decision.newMempoolSeenAt,
     slippage_tolerance_fiat: decision.slippageToleranceFiat,
+    btc_price_at_detection: decision.btcPriceAtDetection,
     your_company: inv.your_company,
     your_name: inv.your_name,
     client_company: inv.client_company,

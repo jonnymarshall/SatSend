@@ -29,6 +29,8 @@ const PAID: PaymentSummaryInvoice = {
   payment_confirmed_at: new Date().toISOString(),
   mempool_seen_at: new Date(Date.now() - 20 * 60_000).toISOString(),
   slippage_tolerance_fiat: 1,
+  // 201,500 sats at $50,000/BTC = $100.75.
+  btc_price_at_detection: 50_000,
   your_company: "Maya Design Ltd",
   your_name: "Maya",
   client_company: null,

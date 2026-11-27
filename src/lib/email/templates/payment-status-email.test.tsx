@@ -20,6 +20,8 @@ const PAID: PaymentSummaryInvoice = {
   payment_confirmed_at: "2026-10-27T12:32:00Z",
   mempool_seen_at: "2026-10-27T12:18:00Z",
   slippage_tolerance_fiat: 1,
+  // 200,000 sats at $50,000/BTC = $100.
+  btc_price_at_detection: 50_000,
   your_company: "Maya Design Ltd",
   your_name: "Maya",
   client_company: null,
@@ -62,6 +64,17 @@ describe("PaymentStatusEmail", () => {
     expect(out).toContain(`href="https://mempool.space/testnet4/tx/${TXID}"`);
     expect(plain).toContain(TXID);
     expect(plain).toContain("View invoice");
+  });
+
+  // R-45 (release 1.7.0).
+  it("shows the exchange rate the payment was valued at, in the invoice's currency", async () => {
+    expect(await text(props())).toMatch(/Exchange rate:\s+1 BTC = \$50,000\.00/);
+    const eur = await text(props({ payment: { ...PAID, currency: "EUR", btc_price_at_detection: 55_368.6 } }));
+    expect(eur).toMatch(/Exchange rate:\s+1 BTC = €55,368\.60/);
+  });
+
+  it("no exchange rate row when none was recorded", async () => {
+    expect(await text(props({ payment: { ...PAID, btc_price_at_detection: null } }))).not.toContain("Exchange rate");
   });
 
   it("to the sender: names the client and opens SatSend", async () => {
