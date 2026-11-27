@@ -225,7 +225,6 @@ export type Database = {
           btc_price_at_detection: number | null
           btc_price_at_seen: number | null
           btc_txid: string | null
-          client_address: string | null
           client_address_line1: string | null
           client_address_line2: string | null
           client_address_city: string | null
@@ -264,7 +263,6 @@ export type Database = {
           total_fiat: number
           updated_at: string
           user_id: string
-          your_address: string | null
           your_address_line1: string | null
           your_address_line2: string | null
           your_address_city: string | null
@@ -284,7 +282,6 @@ export type Database = {
           btc_price_at_detection?: number | null
           btc_price_at_seen?: number | null
           btc_txid?: string | null
-          client_address?: string | null
           client_address_line1?: string | null
           client_address_line2?: string | null
           client_address_city?: string | null
@@ -323,7 +320,6 @@ export type Database = {
           total_fiat?: number
           updated_at?: string
           user_id: string
-          your_address?: string | null
           your_address_line1?: string | null
           your_address_line2?: string | null
           your_address_city?: string | null
@@ -343,7 +339,6 @@ export type Database = {
           btc_price_at_detection?: number | null
           btc_price_at_seen?: number | null
           btc_txid?: string | null
-          client_address?: string | null
           client_address_line1?: string | null
           client_address_line2?: string | null
           client_address_city?: string | null
@@ -382,7 +377,6 @@ export type Database = {
           total_fiat?: number
           updated_at?: string
           user_id?: string
-          your_address?: string | null
           your_address_line1?: string | null
           your_address_line2?: string | null
           your_address_city?: string | null
@@ -450,7 +444,6 @@ export type Database = {
           btc_address: string | null
           btc_price_at_detection: number | null
           btc_txid: string | null
-          client_address: string | null
           client_address_line1: string | null
           client_address_line2: string | null
           client_address_city: string | null
@@ -490,7 +483,6 @@ export type Database = {
           total_fiat: number | null
           updated_at: string | null
           user_id: string | null
-          your_address: string | null
           your_address_line1: string | null
           your_address_line2: string | null
           your_address_city: string | null

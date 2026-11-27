@@ -41,7 +41,10 @@ const ME = {
   your_name: "Maya Chen",
   your_company: "Maya Chen Design",
   your_email: DEMO_EMAIL,
-  your_address: "14 Harbour Street, Bristol BS1 4QA",
+  your_address_line1: "14 Harbour Street",
+  your_address_city: "Bristol",
+  your_address_postcode: "BS1 4QA",
+  your_address_country: "GB",
 };
 
 const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString();
