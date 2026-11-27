@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PRO_PRICE, bitcoinPrice, usd } from "@/lib/pro-price";
 
 /*
  * Every FAQ answer, once (v1.5.22). The homepage shows eight of them, /pricing
@@ -215,7 +216,8 @@ export const FAQ_GROUPS: FaqGroup[] = [
         q: "How much does Pro cost?",
         a: (
           <>
-            $10 a month, or $100 a year (2 months free). See{" "}
+            {usd(PRO_PRICE.monthly)} a month, or {usd(PRO_PRICE.yearly)} a year (2 months free). Paid in bitcoin, it&apos;s
+            10% less: {usd(bitcoinPrice(PRO_PRICE.monthly))} a month or {usd(bitcoinPrice(PRO_PRICE.yearly))} a year. See{" "}
             <Link href="/pricing" className="font-medium text-(--color-ink) underline decoration-(--color-brand) decoration-2 underline-offset-4">
               Pricing
             </Link>
@@ -226,7 +228,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: "pay-pro",
         q: "How do I pay for Pro?",
-        a: "In bitcoin, from any wallet, or by credit or debit card.",
+        a: "In bitcoin, from any wallet (10% off), or by credit or debit card.",
       },
       {
         id: "renew",

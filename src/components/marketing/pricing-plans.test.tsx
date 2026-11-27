@@ -1,26 +1,28 @@
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { PricingPlans, PRO_PRICE } from "./pricing-plans";
+import { PricingPlans } from "./pricing-plans";
 
 // v1.5.21: the Free and Pro cards, shared by the homepage and /pricing, with a
-// Monthly / Yearly (2 months free) toggle.
+// Monthly / Yearly (2 months free) toggle. R-65: $15 / $150, 10% off in bitcoin.
 describe("PricingPlans", () => {
-  it("is $10 a month for Pro by default, and $100 a year (2 months free)", () => {
-    expect(PRO_PRICE).toEqual({ monthly: 10, yearly: 100 });
-  });
-
-  it("starts on Monthly: Free $0, Pro $10 a month, marked coming soon", () => {
+  it("starts on Monthly: Free $0, Pro $15 a month, marked coming soon", () => {
     render(<PricingPlans idPrefix="t" />);
     expect(screen.getByRole("radio", { name: /monthly/i })).toHaveAttribute("aria-checked", "true");
     const free = screen.getByRole("article", { name: "Free" });
     const pro = screen.getByRole("article", { name: "Pro" });
     expect(free).toHaveTextContent("$0");
-    expect(pro).toHaveTextContent("$10");
+    expect(pro).toHaveTextContent("$15");
     expect(pro).toHaveTextContent("Coming soon");
     expect(pro).not.toHaveTextContent(/billed/i);
   });
 
-  it("Yearly flips Pro to $8.33 a month, billed $100 yearly; Free stays $0", () => {
+  it("Monthly shows the bitcoin price: $13.50 a month, 10% off", () => {
+    render(<PricingPlans idPrefix="t" />);
+    const note = document.getElementById("t--pro--price-note");
+    expect(note).toHaveTextContent("$13.50 a month in bitcoin (10% off)");
+  });
+
+  it("Yearly flips Pro to $12.50 a month, billed $150 yearly or $135 in bitcoin; Free stays $0", () => {
     render(<PricingPlans idPrefix="t" />);
     const yearly = screen.getByRole("radio", { name: /yearly/i });
     expect(yearly).toHaveTextContent(/2 months free/i);
@@ -28,8 +30,8 @@ describe("PricingPlans", () => {
     expect(yearly).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: /monthly/i })).toHaveAttribute("aria-checked", "false");
     const pro = screen.getByRole("article", { name: "Pro" });
-    expect(pro).toHaveTextContent("$8.33");
-    expect(pro).toHaveTextContent(/billed \$100 yearly/i);
+    expect(pro).toHaveTextContent("$12.50");
+    expect(document.getElementById("t--pro--price-note")).toHaveTextContent("Billed $150 yearly, or $135 in bitcoin");
     expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("$0");
   });
 
@@ -45,8 +47,8 @@ describe("PricingPlans", () => {
     expect(screen.queryByText(/you've been paid/i)).not.toBeInTheDocument();
   });
 
-  it("says Pro can be paid in bitcoin or by card", () => {
+  it("says Pro can be paid by card, or in bitcoin for 10% off", () => {
     render(<PricingPlans idPrefix="t" />);
-    expect(screen.getByText(/bitcoin or by card/i)).toBeInTheDocument();
+    expect(document.getElementById("t--pro-note")).toHaveTextContent("Pay for Pro by card, or in bitcoin for 10% off.");
   });
 });
